@@ -1,0 +1,501 @@
+{% extends 'layout.html' %}
+
+{% block title %}Incoming Documents - Document Management System{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap">
+    <h1 class="h2 mb-2 mb-md-0">Incoming Documents</h1>
+    <div class="d-flex gap-2">
+        <a href="/compose" class="btn btn-primary">
+            <i class="fas fa-plus"></i> New Document
+        </a>
+        <button type="button" class="btn btn-outline-primary" id="bulkActionsBtn" disabled data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+            <i class="fas fa-tasks"></i> Bulk Actions
+        </button>
+        <div class="dropdown-menu dropdown-menu-right" aria-labelledby="bulkActionsBtn">
+            <form id="bulkActionForm" action="{{ url_for('incoming_bulk_action') }}" method="post" aria-label="Bulk actions form">
+                <input type="hidden" name="bulk_action" id="bulkActionType" value="" title="Bulk action type">
+                <div id="selectedDocsContainer"></div>
+                <button type="button" class="dropdown-item bulk-action-btn" data-action="mark_pending">
+                    <i class="fas fa-clock text-warning"></i> Mark as Pending
+                </button>
+                <button type="button" class="dropdown-item bulk-action-btn" data-action="mark_received">
+                    <i class="fas fa-check-circle text-success"></i> Mark as Received
+                </button>
+                <div class="dropdown-divider"></div>
+                <button type="button" class="dropdown-item bulk-action-btn" data-action="print">
+                    <i class="fas fa-print text-secondary"></i> Print Selected
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    {% for category, message in messages %}
+      <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+    {% endfor %}
+  {% endif %}
+{% endwith %}
+
+<!-- Stats Cards -->
+<div class="row mb-4">
+    <div class="col-md-3 col-sm-6 mb-3 mb-md-0">
+        <div class="card border-left-primary shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">All Documents</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ priority_counts.Urgent + priority_counts.Priority + priority_counts.Normal }}</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-file-alt fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-sm-6 mb-3 mb-md-0">
+        <div class="card border-left-danger shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-danger text-uppercase mb-1">Urgent</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ priority_counts.Urgent }}</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-exclamation-circle fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-sm-6 mb-3 mb-md-0">
+        <div class="card border-left-warning shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">Priority</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ priority_counts.Priority }}</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-exclamation fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-sm-6">
+        <div class="card border-left-secondary shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-secondary text-uppercase mb-1">Normal</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ priority_counts.Normal }}</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-file fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Status Cards -->
+<div class="row mb-4">
+    <div class="col-md-4 col-sm-6 mb-3 mb-md-0">
+        <div class="card border-left-info shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-info text-uppercase mb-1">Incoming</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ status_counts.Incoming }}</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-inbox fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 col-sm-6 mb-3 mb-md-0">
+        <div class="card border-left-warning shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">Pending</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ status_counts.Pending }}</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-clock fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 col-sm-6">
+        <div class="card border-left-success shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-success text-uppercase mb-1">Received</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ status_counts.Received }}</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-check-circle fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Search and Filters -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form id="searchForm" action="{{ url_for('incoming') }}" method="GET">
+            <div class="row">
+                <div class="col-lg-8 col-md-12 mb-3 mb-lg-0">
+                    <div class="input-group">
+                        <input type="text" class="form-control" name="search" value="{{ search_query }}" placeholder="Search incoming documents...">
+                        <div class="input-group-append">
+                            <button class="btn btn-primary" type="submit" aria-label="Search">
+                                <i class="fas fa-search"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-4 col-md-12">
+                    <div class="d-flex flex-wrap">
+                        <div class="input-group input-group-sm mr-2 mb-2 mb-md-0">
+                            <div class="input-group-prepend">
+                                <label class="input-group-text" for="statusFilter">Status</label>
+                            </div>
+                            <select class="custom-select" id="statusFilter" name="status" title="Filter by status">
+                                <option value="All" {% if status_filter == 'All' %}selected{% endif %}>All Statuses</option>
+                                <option value="Incoming" {% if status_filter == 'Incoming' %}selected{% endif %}>Incoming</option>
+                                <option value="Pending" {% if status_filter == 'Pending' %}selected{% endif %}>Pending</option>
+                                <option value="Received" {% if status_filter == 'Received' %}selected{% endif %}>Received</option>
+                            </select>
+                        </div>
+                        <div class="btn-group btn-group-sm flex-fill" role="group">
+                            <button type="button" class="btn btn-outline-primary priority-filter {% if priority_filter == 'All' %}active{% endif %}" data-priority="All">All</button>
+                            <button type="button" class="btn btn-outline-warning priority-filter {% if priority_filter == 'Priority' %}active{% endif %}" data-priority="Priority">Priority</button>
+                            <button type="button" class="btn btn-outline-danger priority-filter {% if priority_filter == 'Urgent' %}active{% endif %}" data-priority="Urgent">Urgent</button>
+                            <button type="button" class="btn btn-outline-secondary priority-filter {% if priority_filter == 'Normal' %}active{% endif %}" data-priority="Normal">Normal</button>
+                        </div>
+                    </div>
+                    <input type="hidden" name="priority" id="priorityFilter" value="{{ priority_filter }}">
+                    <input type="hidden" name="sort_by" id="sortBy" value="{{ sort_by }}">
+                    <input type="hidden" name="sort_order" id="sortOrder" value="{{ sort_order }}">
+                    <input type="hidden" name="page" id="page" value="{{ pagination.page }}">
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Documents Table -->
+<div class="card">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">Incoming Documents</h5>
+        <div class="btn-group btn-group-sm">
+            <button type="button" class="btn btn-outline-secondary sort-btn {% if sort_by == 'date' %}active{% endif %}" data-sort="date" title="Sort by date">
+                Date 
+                {% if sort_by == 'date' %}
+                <i class="fas fa-sort-{% if sort_order == 'desc' %}down{% else %}up{% endif %}"></i>
+                {% endif %}
+            </button>
+            <button type="button" class="btn btn-outline-secondary sort-btn {% if sort_by == 'priority' %}active{% endif %}" data-sort="priority" title="Sort by priority">
+                Priority 
+                {% if sort_by == 'priority' %}
+                <i class="fas fa-sort-{% if sort_order == 'desc' %}down{% else %}up{% endif %}"></i>
+                {% endif %}
+            </button>
+            <button type="button" class="btn btn-outline-secondary sort-btn {% if sort_by == 'code' %}active{% endif %}" data-sort="code" title="Sort by code">
+                Code 
+                {% if sort_by == 'code' %}
+                <i class="fas fa-sort-{% if sort_order == 'desc' %}down{% else %}up{% endif %}"></i>
+                {% endif %}
+            </button>
+        </div>
+    </div>
+    <div class="card-body p-0 p-md-3">
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th style="width: 40px;">
+                            <div class="custom-control custom-checkbox">
+                                <input type="checkbox" class="custom-control-input" id="selectAll" title="Select all documents">
+                                <label class="custom-control-label" for="selectAll">Select All</label>
+                            </div>
+                        </th>
+                        <th>Doc. Code</th>
+                        <th>Sender</th>
+                        <th>Details</th>
+                        <th>Required Action</th>
+                        <th>Date Received</th>
+                        <th>Priority</th>
+                        <th>Status</th>
+                        <th>Holder</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if documents %}
+                        {% for doc in documents %}
+                        <tr>
+                            <td>
+                                <div class="custom-control custom-checkbox">
+                                    <input type="checkbox" class="custom-control-input doc-checkbox" id="doc-{{ doc.code }}" value="{{ doc.code }}" title="Select document {{ doc.code }}">
+                                    <label class="custom-control-label" for="doc-{{ doc.code }}">Select</label>
+                                </div>
+                            </td>
+                            <td><a href="/document/{{ doc.code }}" class="text-primary">{{ doc.code }}</a></td>
+                            <td>{{ doc.sender }}</td>
+                            <td>{{ doc.details }}</td>
+                            <td>{{ doc.required_action }}</td>
+                            <td>{{ doc.date_received.strftime('%d/%m/%Y') if doc.date_received else "N/A" }}</td>
+                            <td>
+                                {% if doc.priority == 'Urgent' %}
+                                    <span class="badge badge-danger">{{ doc.priority }}</span>
+                                {% elif doc.priority == 'Priority' %}
+                                    <span class="badge badge-warning">{{ doc.priority }}</span>
+                                {% else %}
+                                    <span class="badge badge-secondary">{{ doc.priority }}</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="badge {% if doc.status == 'Incoming' %}badge-info{% elif doc.status == 'Pending' %}badge-warning{% elif doc.status == 'Received' %}badge-success{% else %}badge-secondary{% endif %}">
+                                    {{ doc.status }}
+                                </span>
+                            </td>
+                            <td>{{ doc.current_holder }}</td>
+                            <td>
+                                <div class="dropdown">
+                                    <button class="btn btn-sm btn-primary dropdown-toggle" type="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false" title="Document actions">
+                                        <i class="fas fa-cog"></i> <span class="sr-only">Actions</span>
+                                    </button>
+                                    <div class="dropdown-menu dropdown-menu-right">
+                                        <a href="/document/{{ doc.code }}" class="dropdown-item">
+                                            <i class="fas fa-eye text-primary"></i> View
+                                        </a>
+                                        <div class="dropdown-divider"></div>
+                                        <h6 class="dropdown-header">Update Status</h6>
+                                        <form action="{{ url_for('update_incoming_status', doc_code=doc.code) }}" method="post" aria-label="Update document status form">
+                                            <button type="submit" name="status" value="Pending" class="dropdown-item {% if doc.status == 'Pending' %}disabled{% endif %}" title="Mark document as pending">
+                                                <i class="fas fa-clock text-warning"></i> Mark as Pending
+                                            </button>
+                                            <button type="submit" name="status" value="Received" class="dropdown-item {% if doc.status == 'Received' %}disabled{% endif %}" title="Mark document as received">
+                                                <i class="fas fa-check-circle text-success"></i> Mark as Received
+                                            </button>
+                                            <button type="submit" name="status" value="Outgoing" class="dropdown-item {% if doc.status == 'Outgoing' %}disabled{% endif %}" title="Move to outgoing">
+                                                <i class="fas fa-paper-plane text-info"></i> Move to Outgoing
+                                            </button>
+                                            <button type="submit" name="status" value="Ended" class="dropdown-item {% if doc.status == 'Ended' %}disabled{% endif %}" title="Mark document as ended">
+                                                <i class="fas fa-archive text-secondary"></i> Mark as Ended
+                                            </button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="10" class="text-center">No incoming documents found. <a href="/compose">Upload a new document</a>.</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    {% if pagination.pages > 1 %}
+    <div class="card-footer bg-white">
+        <nav aria-label="Document pagination">
+            <ul class="pagination pagination-sm justify-content-center mb-0">
+                {% if pagination.has_prev %}
+                    <li class="page-item">
+                        <a class="page-link" href="#" data-page="{{ pagination.prev_num }}" aria-label="Previous">
+                            <span aria-hidden="true">&laquo;</span>
+                        </a>
+                    </li>
+                {% else %}
+                    <li class="page-item disabled">
+                        <span class="page-link" aria-hidden="true">&laquo;</span>
+                    </li>
+                {% endif %}
+                
+                {% for page_num in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+                    {% if page_num %}
+                        {% if page_num == pagination.page %}
+                            <li class="page-item active">
+                                <span class="page-link">{{ page_num }}</span>
+                            </li>
+                        {% else %}
+                            <li class="page-item">
+                                <a class="page-link" href="#" data-page="{{ page_num }}">{{ page_num }}</a>
+                            </li>
+                        {% endif %}
+                    {% else %}
+                        <li class="page-item disabled">
+                            <span class="page-link">…</span>
+                        </li>
+                    {% endif %}
+                {% endfor %}
+                
+                {% if pagination.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="#" data-page="{{ pagination.next_num }}" aria-label="Next">
+                            <span aria-hidden="true">&raquo;</span>
+                        </a>
+                    </li>
+                {% else %}
+                    <li class="page-item disabled">
+                        <span class="page-link" aria-hidden="true">&raquo;</span>
+                    </li>
+                {% endif %}
+            </ul>
+        </nav>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Status filter change
+    const statusFilter = document.getElementById('statusFilter');
+    if (statusFilter) {
+        statusFilter.addEventListener('change', function() {
+            // Reset page to 1 when changing filters
+            document.getElementById('page').value = 1;
+            document.getElementById('searchForm').submit();
+        });
+    }
+    
+    // Priority filter buttons
+    const priorityButtons = document.querySelectorAll('.priority-filter');
+    priorityButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const priority = this.getAttribute('data-priority');
+            document.getElementById('priorityFilter').value = priority;
+            
+            // Reset page to 1 when changing filters
+            document.getElementById('page').value = 1;
+            
+            document.getElementById('searchForm').submit();
+        });
+    });
+    
+    // Sorting
+    const sortButtons = document.querySelectorAll('.sort-btn');
+    sortButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const sortBy = this.getAttribute('data-sort');
+            const currentSortBy = document.getElementById('sortBy').value;
+            let sortOrder = document.getElementById('sortOrder').value;
+            
+            if (sortBy === currentSortBy) {
+                // Toggle sort order if clicking the same column
+                sortOrder = sortOrder === 'asc' ? 'desc' : 'asc';
+            } else {
+                // Default to descending for new sort column
+                sortOrder = 'desc';
+            }
+            
+            document.getElementById('sortBy').value = sortBy;
+            document.getElementById('sortOrder').value = sortOrder;
+            document.getElementById('searchForm').submit();
+        });
+    });
+    
+    // Pagination
+    const pageLinks = document.querySelectorAll('.page-link[data-page]');
+    pageLinks.forEach(link => {
+        link.addEventListener('click', function(e) {
+            e.preventDefault();
+            const page = this.getAttribute('data-page');
+            document.getElementById('page').value = page;
+            document.getElementById('searchForm').submit();
+        });
+    });
+    
+    // Select all checkbox
+    const selectAll = document.getElementById('selectAll');
+    if (selectAll) {
+        selectAll.addEventListener('change', function() {
+            const checkboxes = document.querySelectorAll('.doc-checkbox');
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = this.checked;
+            });
+            
+            updateBulkActionButton();
+        });
+    }
+    
+    // Individual checkboxes
+    const checkboxes = document.querySelectorAll('.doc-checkbox');
+    checkboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            updateBulkActionButton();
+            
+            // Uncheck "select all" if any checkbox is unchecked
+            if (!this.checked) {
+                selectAll.checked = false;
+            }
+            
+            // Check "select all" if all checkboxes are checked
+            if (document.querySelectorAll('.doc-checkbox:checked').length === checkboxes.length) {
+                selectAll.checked = true;
+            }
+        });
+    });
+    
+    // Bulk action buttons
+    const bulkActionButtons = document.querySelectorAll('.bulk-action-btn');
+    bulkActionButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const action = this.getAttribute('data-action');
+            document.getElementById('bulkActionType').value = action;
+            
+            // Create hidden inputs for selected documents
+            const selectedDocs = document.querySelectorAll('.doc-checkbox:checked');
+            const container = document.getElementById('selectedDocsContainer');
+            container.innerHTML = '';
+            
+            selectedDocs.forEach(checkbox => {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'selected_docs';
+                input.value = checkbox.value;
+                container.appendChild(input);
+            });
+            
+            document.getElementById('bulkActionForm').submit();
+        });
+    });
+    
+    function updateBulkActionButton() {
+        const selectedCount = document.querySelectorAll('.doc-checkbox:checked').length;
+        const bulkActionsBtn = document.getElementById('bulkActionsBtn');
+        
+        if (selectedCount > 0) {
+            bulkActionsBtn.removeAttribute('disabled');
+            bulkActionsBtn.textContent = `Bulk Actions (${selectedCount})`;
+        } else {
+            bulkActionsBtn.setAttribute('disabled', 'disabled');
+            bulkActionsBtn.innerHTML = '<i class="fas fa-tasks"></i> Bulk Actions';
+        }
+    }
+});
+</script>
+{% endblock %} 

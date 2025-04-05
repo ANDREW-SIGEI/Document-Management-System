@@ -1,0 +1,573 @@
+{% extends 'layout.html' %}
+
+{% block title %}Reports - Document Management System{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>Reports</h1>
+    <div>
+        <button class="btn btn-outline-primary mr-2" id="printReport">
+            <i class="fas fa-print mr-1"></i> Print
+        </button>
+        <div class="btn-group">
+            <button class="btn btn-outline-success dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                <i class="fas fa-file-export mr-1"></i> Export
+            </button>
+            <div class="dropdown-menu dropdown-menu-right">
+                <a class="dropdown-item" href="#" id="exportPDF">
+                    <i class="fas fa-file-pdf mr-2 text-danger"></i> Export as PDF
+                </a>
+                <a class="dropdown-item" href="#" id="exportExcel">
+                    <i class="fas fa-file-excel mr-2 text-success"></i> Export as Excel
+                </a>
+                <a class="dropdown-item" href="#" id="exportCSV">
+                    <i class="fas fa-file-csv mr-2 text-primary"></i> Export as CSV
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    {% for category, message in messages %}
+      <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+    {% endfor %}
+  {% endif %}
+{% endwith %}
+
+<!-- Report Types -->
+<div class="row mb-4">
+    <div class="col-md-3 mb-3 mb-md-0">
+        <div class="card report-card" data-report="document-summary">
+            <div class="card-body text-center">
+                <i class="fas fa-file-alt fa-3x mb-3 text-primary"></i>
+                <h5>Document Summary</h5>
+                <p class="text-muted">View summary of all documents</p>
+                <button class="btn btn-sm btn-primary mt-2 generate-report" data-report="document-summary">Generate</button>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3 mb-md-0">
+        <div class="card report-card" data-report="activity-analysis">
+            <div class="card-body text-center">
+                <i class="fas fa-chart-bar fa-3x mb-3 text-success"></i>
+                <h5>Activity Analysis</h5>
+                <p class="text-muted">Track document activity over time</p>
+                <button class="btn btn-sm btn-primary mt-2 generate-report" data-report="activity-analysis">Generate</button>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3 mb-md-0">
+        <div class="card report-card" data-report="user-activity">
+            <div class="card-body text-center">
+                <i class="fas fa-user-check fa-3x mb-3 text-warning"></i>
+                <h5>User Activity</h5>
+                <p class="text-muted">Monitor user activity and actions</p>
+                <button class="btn btn-sm btn-primary mt-2 generate-report" data-report="user-activity">Generate</button>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3 mb-md-0">
+        <div class="card report-card" data-report="status-report">
+            <div class="card-body text-center">
+                <i class="fas fa-tasks fa-3x mb-3 text-danger"></i>
+                <h5>Status Report</h5>
+                <p class="text-muted">View document status breakdown</p>
+                <button class="btn btn-sm btn-primary mt-2 generate-report" data-report="status-report">Generate</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Document Summary Report -->
+<div class="card mb-4" id="report-container">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <h5 class="mb-0" id="report-title">Document Summary Report</h5>
+        <span class="badge badge-primary" id="report-date-range">Last 7 Days</span>
+    </div>
+    <div class="card-body">
+        <!-- Report Filters -->
+        <div class="row mb-4">
+            <div class="col-md-3 mb-3 mb-md-0">
+                <div class="form-group">
+                    <label for="date-range">Date Range</label>
+                    <select id="date-range" class="form-control">
+                        <option value="last-7-days" {% if filters.date_range == 'last-7-days' %}selected{% endif %}>Last 7 Days</option>
+                        <option value="last-30-days" {% if filters.date_range == 'last-30-days' %}selected{% endif %}>Last 30 Days</option>
+                        <option value="last-90-days" {% if filters.date_range == 'last-90-days' %}selected{% endif %}>Last 90 Days</option>
+                        <option value="custom-range" {% if filters.date_range == 'custom-range' %}selected{% endif %}>Custom Range</option>
+                    </select>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3 mb-md-0">
+                <div class="form-group">
+                    <label for="document-type">Document Type</label>
+                    <select id="document-type" class="form-control">
+                        <option value="all" {% if filters.type == 'all' %}selected{% endif %}>All Types</option>
+                        <option value="reports" {% if filters.type == 'reports' %}selected{% endif %}>Reports</option>
+                        <option value="letters" {% if filters.type == 'letters' %}selected{% endif %}>Letters</option>
+                        <option value="memos" {% if filters.type == 'memos' %}selected{% endif %}>Memos</option>
+                    </select>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3 mb-md-0">
+                <div class="form-group">
+                    <label for="document-status">Status</label>
+                    <select id="document-status" class="form-control">
+                        <option value="all" {% if filters.status == 'all' %}selected{% endif %}>All Statuses</option>
+                        <option value="Incoming" {% if filters.status == 'Incoming' %}selected{% endif %}>Incoming</option>
+                        <option value="Pending" {% if filters.status == 'Pending' %}selected{% endif %}>Pending</option>
+                        <option value="Received" {% if filters.status == 'Received' %}selected{% endif %}>Received</option>
+                        <option value="Outgoing" {% if filters.status == 'Outgoing' %}selected{% endif %}>Outgoing</option>
+                        <option value="Ended" {% if filters.status == 'Ended' %}selected{% endif %}>Ended</option>
+                    </select>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3 mb-md-0">
+                <div class="form-group">
+                    <label for="priority">Priority</label>
+                    <select id="priority" class="form-control">
+                        <option value="all" {% if filters.priority == 'all' %}selected{% endif %}>All Priorities</option>
+                        <option value="Normal" {% if filters.priority == 'Normal' %}selected{% endif %}>Normal</option>
+                        <option value="Priority" {% if filters.priority == 'Priority' %}selected{% endif %}>Priority</option>
+                        <option value="Urgent" {% if filters.priority == 'Urgent' %}selected{% endif %}>Urgent</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Custom Date Range (Hidden by default) -->
+        <div class="row mb-4" id="custom-date-container" style="display: none;">
+            <div class="col-md-6">
+                <div class="form-group">
+                    <label for="start-date">Start Date</label>
+                    <input type="date" id="start-date" class="form-control">
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="form-group">
+                    <label for="end-date">End Date</label>
+                    <input type="date" id="end-date" class="form-control">
+                </div>
+            </div>
+        </div>
+        
+        <div class="text-center mb-4">
+            <button class="btn btn-primary" id="apply-filters">
+                <i class="fas fa-filter mr-1"></i> Apply Filters
+            </button>
+            <button class="btn btn-outline-secondary ml-2" id="reset-filters">
+                <i class="fas fa-undo mr-1"></i> Reset
+            </button>
+        </div>
+        
+        <!-- Activity Analysis Chart (Hidden initially) -->
+        <div id="activity-analysis-container" style="display: none;" class="mb-4">
+            <div class="card">
+                <div class="card-body">
+                    <h6 class="card-title">Document Activity Over Time</h6>
+                    <canvas id="activityChart" style="height: 300px;"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <!-- User Activity Chart (Hidden initially) -->
+        <div id="user-activity-container" style="display: none;" class="mb-4">
+            <div class="card">
+                <div class="card-body">
+                    <h6 class="card-title">User Document Processing</h6>
+                    <canvas id="userActivityChart" style="height: 300px;"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Charts Row -->
+        <div class="row mb-4" id="summary-charts-container">
+            <div class="col-md-6 mb-4 mb-md-0">
+                <div class="card">
+                    <div class="card-body">
+                        <h6 class="card-title">Documents by Status</h6>
+                        <div style="height: 250px;" class="chart-container">
+                            <canvas id="statusChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <h6 class="card-title">Documents by Priority</h6>
+                        <div style="height: 250px;" class="chart-container">
+                            <canvas id="priorityChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Report Table -->
+        <div class="table-responsive">
+            <table class="table table-striped" id="report-table">
+                <thead>
+                    <tr>
+                        <th>Status</th>
+                        <th>Total Documents</th>
+                        <th>Normal Priority</th>
+                        <th>High Priority</th>
+                        <th>Urgent Priority</th>
+                        <th>Average Processing Time</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Incoming</td>
+                        <td>{{ status_data.Incoming.total }}</td>
+                        <td>{{ status_data.Incoming.normal }}</td>
+                        <td>{{ status_data.Incoming.priority }}</td>
+                        <td>{{ status_data.Incoming.urgent }}</td>
+                        <td>{{ avg_times.Incoming }}</td>
+                    </tr>
+                    <tr>
+                        <td>Pending</td>
+                        <td>{{ status_data.Pending.total }}</td>
+                        <td>{{ status_data.Pending.normal }}</td>
+                        <td>{{ status_data.Pending.priority }}</td>
+                        <td>{{ status_data.Pending.urgent }}</td>
+                        <td>{{ avg_times.Pending }}</td>
+                    </tr>
+                    <tr>
+                        <td>Received</td>
+                        <td>{{ status_data.Received.total }}</td>
+                        <td>{{ status_data.Received.normal }}</td>
+                        <td>{{ status_data.Received.priority }}</td>
+                        <td>{{ status_data.Received.urgent }}</td>
+                        <td>{{ avg_times.Received }}</td>
+                    </tr>
+                    <tr>
+                        <td>Outgoing</td>
+                        <td>{{ status_data.Outgoing.total }}</td>
+                        <td>{{ status_data.Outgoing.normal }}</td>
+                        <td>{{ status_data.Outgoing.priority }}</td>
+                        <td>{{ status_data.Outgoing.urgent }}</td>
+                        <td>{{ avg_times.Outgoing }}</td>
+                    </tr>
+                    <tr>
+                        <td>Ended</td>
+                        <td>{{ status_data.Ended.total }}</td>
+                        <td>{{ status_data.Ended.normal }}</td>
+                        <td>{{ status_data.Ended.priority }}</td>
+                        <td>{{ status_data.Ended.urgent }}</td>
+                        <td>{{ avg_times.Ended }}</td>
+                    </tr>
+                    <tr class="table-active">
+                        <td><strong>Total</strong></td>
+                        <td><strong>{{ total_documents }}</strong></td>
+                        <td><strong>{{ status_data.Incoming.normal + status_data.Pending.normal + status_data.Received.normal + status_data.Outgoing.normal + status_data.Ended.normal }}</strong></td>
+                        <td><strong>{{ status_data.Incoming.priority + status_data.Pending.priority + status_data.Received.priority + status_data.Outgoing.priority + status_data.Ended.priority }}</strong></td>
+                        <td><strong>{{ status_data.Incoming.urgent + status_data.Pending.urgent + status_data.Received.urgent + status_data.Outgoing.urgent + status_data.Ended.urgent }}</strong></td>
+                        <td><strong>3 days avg.</strong></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    $(document).ready(function() {
+        // Initialize charts
+        let statusChartInstance, priorityChartInstance, activityChartInstance, userActivityChartInstance;
+        
+        // Chart data from server
+        const statusChartData = JSON.parse('{{ status_chart_data|safe }}');
+        const priorityChartData = JSON.parse('{{ priority_chart_data|safe }}');
+        
+        function initializeCharts() {
+            // Status Chart
+            const statusCtx = document.getElementById('statusChart').getContext('2d');
+            statusChartInstance = new Chart(statusCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: statusChartData.map(item => item.name),
+                    datasets: [{
+                        data: statusChartData.map(item => item.value),
+                        backgroundColor: statusChartData.map(item => item.color),
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right'
+                        }
+                    }
+                }
+            });
+            
+            // Priority Chart
+            const priorityCtx = document.getElementById('priorityChart').getContext('2d');
+            priorityChartInstance = new Chart(priorityCtx, {
+                type: 'bar',
+                data: {
+                    labels: priorityChartData.map(item => item.name),
+                    datasets: [{
+                        label: 'Documents by Priority',
+                        data: priorityChartData.map(item => item.value),
+                        backgroundColor: priorityChartData.map(item => item.color),
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                precision: 0
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Initialize charts on page load
+        initializeCharts();
+        
+        // Date range selection logic
+        $('#date-range').change(function() {
+            const selectedRange = $(this).val();
+            if (selectedRange === 'custom-range') {
+                $('#custom-date-container').show();
+            } else {
+                $('#custom-date-container').hide();
+            }
+            
+            // Update badge
+            let rangeText = 'Last 7 Days';
+            switch(selectedRange) {
+                case 'last-30-days': rangeText = 'Last 30 Days'; break;
+                case 'last-90-days': rangeText = 'Last 90 Days'; break;
+                case 'custom-range': rangeText = 'Custom Range'; break;
+            }
+            $('#report-date-range').text(rangeText);
+        });
+        
+        // Handle filter application
+        $('#apply-filters').click(function() {
+            const dateRange = $('#date-range').val();
+            const documentType = $('#document-type').val();
+            const documentStatus = $('#document-status').val();
+            const priority = $('#priority').val();
+            
+            // Apply filters by reloading with query parameters
+            const url = `/reports?date_range=${dateRange}&type=${documentType}&status=${documentStatus}&priority=${priority}`;
+            window.location.href = url;
+        });
+        
+        // Reset filters
+        $('#reset-filters').click(function() {
+            $('#date-range').val('last-7-days');
+            $('#document-type').val('all');
+            $('#document-status').val('all');
+            $('#priority').val('all');
+            $('#custom-date-container').hide();
+            $('#report-date-range').text('Last 7 Days');
+        });
+        
+        // Generate different reports
+        $('.generate-report').click(function() {
+            const reportType = $(this).data('report');
+            
+            // Update active report card
+            $('.report-card').removeClass('border-primary');
+            $(this).closest('.report-card').addClass('border-primary');
+            
+            // Update report title
+            let reportTitle = 'Document Summary Report';
+            switch(reportType) {
+                case 'activity-analysis': reportTitle = 'Activity Analysis Report'; break;
+                case 'user-activity': reportTitle = 'User Activity Report'; break;
+                case 'status-report': reportTitle = 'Status Report'; break;
+            }
+            $('#report-title').text(reportTitle);
+            
+            // Show/hide appropriate sections
+            if (reportType === 'activity-analysis') {
+                $('#summary-charts-container').hide();
+                $('#activity-analysis-container').show();
+                $('#user-activity-container').hide();
+                
+                // Create activity chart if it doesn't exist
+                if (!activityChartInstance) {
+                    // Show loading indicator
+                    $('#activityChart').parent().html('<div class="d-flex justify-content-center py-5"><div class="spinner-border text-primary" role="status"><span class="sr-only">Loading...</span></div></div>');
+                    
+                    // Fetch data from API
+                    $.getJSON('/api/report-data?type=activity-analysis&date_range=' + $('#date-range').val())
+                        .done(function(data) {
+                            // Remove loading indicator
+                            $('#activityChart').parent().html('<canvas id="activityChart" style="height: 300px;"></canvas>');
+                            
+                            const activityCtx = document.getElementById('activityChart').getContext('2d');
+                            activityChartInstance = new Chart(activityCtx, {
+                                type: 'line',
+                                data: {
+                                    labels: data.labels || [],
+                                    datasets: [{
+                                        label: 'Documents Created',
+                                        data: data.data || [],
+                                        borderColor: '#4CAF50',
+                                        backgroundColor: 'rgba(76, 175, 80, 0.1)',
+                                        borderWidth: 2,
+                                        fill: true,
+                                        tension: 0.4
+                                    }]
+                                },
+                                options: {
+                                    responsive: true,
+                                    maintainAspectRatio: false,
+                                    scales: {
+                                        y: {
+                                            beginAtZero: true,
+                                            ticks: {
+                                                precision: 0
+                                            }
+                                        }
+                                    }
+                                }
+                            });
+                        })
+                        .fail(function(jqXHR, textStatus, errorThrown) {
+                            console.error("Error fetching activity data:", textStatus, errorThrown);
+                            $('#activityChart').parent().html('<div class="alert alert-danger">Failed to load activity data. Please try again.</div>');
+                        });
+                }
+            } else if (reportType === 'user-activity') {
+                $('#summary-charts-container').hide();
+                $('#activity-analysis-container').hide();
+                $('#user-activity-container').show();
+                
+                // Create user activity chart if it doesn't exist
+                if (!userActivityChartInstance) {
+                    const userActivityCtx = document.getElementById('userActivityChart').getContext('2d');
+                    userActivityChartInstance = new Chart(userActivityCtx, {
+                        type: 'bar',
+                        data: {
+                            labels: ['Admin', 'User 1', 'User 2', 'User 3', 'User 4'],
+                            datasets: [{
+                                label: 'Documents Processed',
+                                data: [12, 8, 5, 7, 3],
+                                backgroundColor: [
+                                    '#4CAF50',
+                                    '#2196F3',
+                                    '#FFC107',
+                                    '#9C27B0',
+                                    '#F44336'
+                                ],
+                                borderWidth: 1
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    ticks: {
+                                        precision: 0
+                                    }
+                                }
+                            }
+                        }
+                    });
+                }
+            } else {
+                // Default: document summary or status report
+                $('#summary-charts-container').show();
+                $('#activity-analysis-container').hide();
+                $('#user-activity-container').hide();
+            }
+        });
+        
+        // Print report functionality
+        $('#printReport').click(function() {
+            window.print();
+        });
+        
+        // Export functionality (just placeholders for now)
+        $('#exportPDF').click(function() {
+            alert('Exporting as PDF...');
+            // In a real implementation, this would generate a PDF
+        });
+        
+        $('#exportExcel').click(function() {
+            alert('Exporting as Excel...');
+            // In a real implementation, this would generate an Excel file
+        });
+        
+        $('#exportCSV').click(function() {
+            alert('Exporting as CSV...');
+            // In a real implementation, this would generate a CSV file
+        });
+    });
+</script>
+<style>
+    @media print {
+        .navbar, .sidebar, .header, button, select, .btn, .form-group, #custom-date-container {
+            display: none !important;
+        }
+        
+        .card {
+            border: none !important;
+            box-shadow: none !important;
+        }
+        
+        .card-header {
+            background-color: #f8f9fa !important;
+            color: #000 !important;
+        }
+        
+        body {
+            padding: 0;
+            margin: 0;
+        }
+        
+        .main-content-wrapper {
+            margin-left: 0 !important;
+            width: 100% !important;
+        }
+    }
+    
+    .report-card {
+        transition: all 0.3s ease;
+        cursor: pointer;
+    }
+    
+    .report-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+    }
+    
+    .border-primary {
+        border: 2px solid var(--kemri-primary);
+    }
+</style>
+{% endblock %} 

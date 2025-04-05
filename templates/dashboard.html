@@ -1,0 +1,143 @@
+{% extends 'layout.html' %}
+
+{% block title %}Dashboard - Document Management System{% endblock %}
+
+{% block content %}
+<h1 class="mb-4">Dashboard</h1>
+
+<!-- Search and Filters -->
+<div class="card mb-4">
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-8">
+                <div class="input-group">
+                    <input type="text" class="form-control" placeholder="Search documents...">
+                    <div class="input-group-append">
+                        <button class="btn btn-primary" type="button" aria-label="Search">
+                            <i class="fas fa-search"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="btn-group btn-group-sm w-100" role="group">
+                    <button type="button" class="btn btn-outline-primary active">All</button>
+                    <button type="button" class="btn btn-outline-warning">Priority</button>
+                    <button type="button" class="btn btn-outline-danger">Urgent</button>
+                    <button type="button" class="btn btn-outline-secondary">Usual</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Status Cards -->
+<div class="row">
+    <div class="col-md-3">
+        <div class="card status-card status-incoming">
+            <div class="card-body">
+                <h5 class="card-title">All Incoming Docs</h5>
+                <h2>{{ incoming_count }}</h2>
+                <p class="mb-0">Total incoming documents</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card status-card status-pending">
+            <div class="card-body">
+                <h5 class="card-title">Pending Docs</h5>
+                <h2>{{ pending_count }}</h2>
+                <p class="mb-0">Documents awaiting action</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card status-card status-received">
+            <div class="card-body">
+                <h5 class="card-title">Received Docs</h5>
+                <h2>{{ received_count }}</h2>
+                <p class="mb-0">Documents received</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card status-card status-ended">
+            <div class="card-body">
+                <h5 class="card-title">Ended Docs</h5>
+                <h2>{{ ended_count }}</h2>
+                <p class="mb-0">Completed documents</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Documents Table -->
+<div class="card mt-4">
+    <div class="card-header bg-white">
+        <h5 class="mb-0">Document List</h5>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Doc. Code</th>
+                        <th>Sender</th>
+                        <th>Details</th>
+                        <th>Required Action</th>
+                        <th>Date of Letter</th>
+                        <th>Status</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><a href="#" class="text-primary">DOC-001</a></td>
+                        <td>Ministry of Health</td>
+                        <td>Annual Budget Approval</td>
+                        <td>Review and Endorse</td>
+                        <td>2025-03-15</td>
+                        <td><span class="status-badge status-badge-pending">Pending</span></td>
+                        <td>
+                            <button class="btn btn-sm btn-primary">View</button>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><a href="#" class="text-primary">DOC-002</a></td>
+                        <td>Research Department</td>
+                        <td>Quarterly Report</td>
+                        <td>Review</td>
+                        <td>2025-03-20</td>
+                        <td><span class="status-badge status-badge-pending">Pending</span></td>
+                        <td>
+                            <button class="btn btn-sm btn-primary">View</button>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><a href="#" class="text-primary">DOC-003</a></td>
+                        <td>Finance Department</td>
+                        <td>Budget Allocation</td>
+                        <td>Approve</td>
+                        <td>2025-03-25</td>
+                        <td><span class="status-badge status-badge-pending">Pending</span></td>
+                        <td>
+                            <button class="btn btn-sm btn-primary">View</button>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><a href="#" class="text-primary">DOC-004</a></td>
+                        <td>HR Department</td>
+                        <td>Staff Recruitment</td>
+                        <td>Review and Comment</td>
+                        <td>2025-03-30</td>
+                        <td><span class="status-badge status-badge-received">Received</span></td>
+                        <td>
+                            <button class="btn btn-sm btn-primary">View</button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %} 

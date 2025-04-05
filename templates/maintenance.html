@@ -1,0 +1,632 @@
+{% extends 'layout.html' %}
+
+{% block title %}Maintenance - Document Management System{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap">
+    <h1>System Maintenance</h1>
+    <div class="d-flex gap-2 mt-2 mt-md-0">
+        <a href="{{ url_for('maintenance') }}" class="btn btn-outline-primary">
+            <i class="fas fa-sync-alt"></i> Refresh Data
+        </a>
+    </div>
+</div>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    {% for category, message in messages %}
+      <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+    {% endfor %}
+  {% endif %}
+{% endwith %}
+
+<div class="row">
+    <!-- System Stats -->
+    <div class="col-md-6">
+        <div class="card mb-4">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">System Statistics</h5>
+            </div>
+            <div class="card-body">
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <strong>Total Documents:</strong>
+                    </div>
+                    <div class="col-md-6">
+                        {{ total_documents }}
+                    </div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <strong>Storage Used:</strong>
+                    </div>
+                    <div class="col-md-6">
+                        {{ storage_used }}
+                    </div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <strong>Last Backup:</strong>
+                    </div>
+                    <div class="col-md-6">
+                        {{ last_backup|default('Never') }}
+                    </div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <strong>System Version:</strong>
+                    </div>
+                    <div class="col-md-6">
+                        1.0.0
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- System Health -->
+        <div class="card mb-4">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">System Health</h5>
+            </div>
+            <div class="card-body">
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <strong>Database Status:</strong>
+                    </div>
+                    <div class="col-md-6">
+                        <span class="badge badge-success">Operational</span>
+                    </div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <strong>Storage Status:</strong>
+                    </div>
+                    <div class="col-md-6">
+                        <span class="badge badge-success">85% Available</span>
+                    </div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <strong>Memory Usage:</strong>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="progress" style="height: 15px;">
+                            <div class="progress-bar bg-success" role="progressbar" style="width: 25%;" aria-valuenow="25" aria-valuemin="0" aria-valuemax="100">25%</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <strong>Last System Check:</strong>
+                    </div>
+                    <div class="col-md-6">
+                        {{ now.strftime('%Y-%m-%d %H:%M') }}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Maintenance Actions -->
+    <div class="col-md-6">
+        <div class="card mb-4">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">Maintenance Actions</h5>
+            </div>
+            <div class="card-body">
+                <div class="list-group">
+                    <div class="list-group-item">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1">Backup Database</h6>
+                            <form action="{{ url_for('maintenance_action') }}" method="post">
+                                <input type="hidden" name="action" value="backup">
+                                <button type="submit" class="btn btn-sm btn-primary" aria-label="Run backup database">Run Now</button>
+                            </form>
+                        </div>
+                        <small class="text-muted">Create a backup of the entire system database</small>
+                    </div>
+                    <div class="list-group-item">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1">Clean Temporary Files</h6>
+                            <form action="{{ url_for('maintenance_action') }}" method="post">
+                                <input type="hidden" name="action" value="clean">
+                                <button type="submit" class="btn btn-sm btn-primary" aria-label="Run clean temporary files">Run Now</button>
+                            </form>
+                        </div>
+                        <small class="text-muted">Remove temporary files to free up storage space</small>
+                    </div>
+                    <div class="list-group-item">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1">Optimize Database</h6>
+                            <form action="{{ url_for('maintenance_action') }}" method="post">
+                                <input type="hidden" name="action" value="optimize">
+                                <button type="submit" class="btn btn-sm btn-primary" aria-label="Run optimize database">Run Now</button>
+                            </form>
+                        </div>
+                        <small class="text-muted">Optimize database for improved performance</small>
+                    </div>
+                    <div class="list-group-item">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1">Check for Updates</h6>
+                            <form action="{{ url_for('maintenance_action') }}" method="post">
+                                <input type="hidden" name="action" value="update">
+                                <button type="submit" class="btn btn-sm btn-primary" aria-label="Run check for updates">Run Now</button>
+                            </form>
+                        </div>
+                        <small class="text-muted">Check for system updates and security patches</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Scheduled Tasks -->
+        <div class="card mb-4">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Scheduled Tasks</h5>
+                <button class="btn btn-sm btn-outline-primary">Add Task</button>
+            </div>
+            <div class="card-body p-0">
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="mb-1">Daily Backup</h6>
+                                <small class="text-muted">Every day at 02:00 AM</small>
+                            </div>
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="dailyBackup" checked aria-label="Toggle daily backup">
+                                <label class="form-check-label visually-hidden" for="dailyBackup">Toggle daily backup</label>
+                            </div>
+                        </div>
+                    </li>
+                    <li class="list-group-item">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="mb-1">Weekly Cleanup</h6>
+                                <small class="text-muted">Every Sunday at 03:00 AM</small>
+                            </div>
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="weeklyCleanup" checked aria-label="Toggle weekly cleanup">
+                                <label class="form-check-label visually-hidden" for="weeklyCleanup">Toggle weekly cleanup</label>
+                            </div>
+                        </div>
+                    </li>
+                    <li class="list-group-item">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="mb-1">Monthly Report</h6>
+                                <small class="text-muted">1st day of month at 06:00 AM</small>
+                            </div>
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="monthlyReport" checked aria-label="Toggle monthly report">
+                                <label class="form-check-label visually-hidden" for="monthlyReport">Toggle monthly report</label>
+                            </div>
+                        </div>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- System Logs -->
+<div class="card">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">System Logs</h5>
+        <div>
+            <button class="btn btn-sm btn-outline-info mr-2" data-toggle="modal" data-target="#adminActivityModal">
+                <i class="fas fa-user-shield mr-1"></i> Admin Activity
+            </button>
+            <select class="form-control form-control-sm d-inline-block" style="width: auto;" aria-label="Filter logs by type">
+                <option>All Types</option>
+                <option>Info</option>
+                <option>Success</option>
+                <option>Warning</option>
+                <option>Error</option>
+            </select>
+            <button class="btn btn-sm btn-outline-secondary ml-2" aria-label="Export logs">Export Logs</button>
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Timestamp</th>
+                        <th>Type</th>
+                        <th>User</th>
+                        <th>Action</th>
+                        <th>Details</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for log in logs %}
+                    <tr>
+                        <td>{{ log.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                        <td><span class="badge badge-{{ 'info' if log.log_type == 'Info' else 'success' if log.log_type == 'Success' else 'warning' if log.log_type == 'Warning' else 'danger' }}">{{ log.log_type }}</span></td>
+                        <td>{{ log.user }}</td>
+                        <td>{{ log.action }}</td>
+                        <td>{{ log.details }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <div class="card-footer bg-white">
+        <nav aria-label="System logs pagination">
+            <ul class="pagination pagination-sm justify-content-center mb-0">
+                <li class="page-item disabled">
+                    <a class="page-link" href="#" tabindex="-1">Previous</a>
+                </li>
+                <li class="page-item active"><a class="page-link" href="#">1</a></li>
+                <li class="page-item"><a class="page-link" href="#">2</a></li>
+                <li class="page-item"><a class="page-link" href="#">3</a></li>
+                <li class="page-item">
+                    <a class="page-link" href="#">Next</a>
+                </li>
+            </ul>
+        </nav>
+    </div>
+</div>
+
+<!-- Disk Space Management -->
+<div class="card mb-4">
+    <div class="card-header bg-white">
+        <h5 class="mb-0">Disk Space Management</h5>
+    </div>
+    <div class="card-body">
+        <div class="row mb-3">
+            <div class="col-md-3">
+                <strong>Main Drive:</strong>
+            </div>
+            <div class="col-md-9">
+                <div class="progress" style="height: 20px;">
+                    <div class="progress-bar bg-info" role="progressbar" style="width: 65%;" aria-valuenow="65" aria-valuemin="0" aria-valuemax="100">65% Used</div>
+                </div>
+                <small class="text-muted">18.5 GB free of 50 GB</small>
+            </div>
+        </div>
+        <div class="row mb-3">
+            <div class="col-md-3">
+                <strong>Backup Drive:</strong>
+            </div>
+            <div class="col-md-9">
+                <div class="progress" style="height: 20px;">
+                    <div class="progress-bar bg-success" role="progressbar" style="width: 40%;" aria-valuenow="40" aria-valuemin="0" aria-valuemax="100">40% Used</div>
+                </div>
+                <small class="text-muted">60 GB free of 100 GB</small>
+            </div>
+        </div>
+        <div class="row mb-3">
+            <div class="col-md-3">
+                <strong>Archive Drive:</strong>
+            </div>
+            <div class="col-md-9">
+                <div class="progress" style="height: 20px;">
+                    <div class="progress-bar bg-warning" role="progressbar" style="width: 85%;" aria-valuenow="85" aria-valuemin="0" aria-valuemax="100">85% Used</div>
+                </div>
+                <small class="text-muted">30 GB free of 200 GB</small>
+            </div>
+        </div>
+        <div class="d-flex justify-content-end mt-3">
+            <form action="{{ url_for('maintenance_action') }}" method="post">
+                <input type="hidden" name="action" value="disk_cleanup">
+                <button type="submit" class="btn btn-primary btn-sm" aria-label="Clean up disk space">
+                    <i class="fas fa-broom mr-1"></i> Clean Up Space
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Document Indexing -->
+<div class="card mb-4">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">Document Indexing</h5>
+        <span class="badge badge-success">Running</span>
+    </div>
+    <div class="card-body">
+        <p class="text-muted">Document indexing helps maintain optimal search performance.</p>
+        <div class="row mb-3">
+            <div class="col-md-4">
+                <strong>Last Indexed:</strong>
+            </div>
+            <div class="col-md-8">
+                {{ now.strftime('%Y-%m-%d %H:%M') }}
+            </div>
+        </div>
+        <div class="row mb-3">
+            <div class="col-md-4">
+                <strong>Documents Indexed:</strong>
+            </div>
+            <div class="col-md-8">
+                {{ total_documents }}
+            </div>
+        </div>
+        <div class="row mb-3">
+            <div class="col-md-4">
+                <strong>Indexing Frequency:</strong>
+            </div>
+            <div class="col-md-8">
+                Every 6 hours
+            </div>
+        </div>
+        <div class="d-flex justify-content-end">
+            <form action="{{ url_for('maintenance_action') }}" method="post" class="mr-2">
+                <input type="hidden" name="action" value="reindex">
+                <button type="submit" class="btn btn-primary btn-sm" aria-label="Reindex documents">
+                    <i class="fas fa-sync-alt mr-1"></i> Reindex Now
+                </button>
+            </form>
+            <button class="btn btn-outline-secondary btn-sm" data-toggle="modal" data-target="#indexSettingsModal" aria-label="Configure indexing settings">
+                <i class="fas fa-cog mr-1"></i> Configure
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- JavaScript for Maintenance Page -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Toggle switches for scheduled tasks
+    const switches = document.querySelectorAll('.form-check-input');
+    switches.forEach(switchEl => {
+        switchEl.addEventListener('change', function() {
+            const taskName = this.id;
+            const isEnabled = this.checked;
+            
+            // Call the API to update the task status
+            fetch('{{ url_for("toggle_scheduled_task") }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    taskId: taskName,
+                    enabled: isEnabled
+                }),
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('Success:', data);
+                showToast(`Task ${taskName.replace(/([A-Z])/g, ' $1').trim()} is now ${isEnabled ? 'enabled' : 'disabled'}.`);
+            })
+            .catch((error) => {
+                console.error('Error:', error);
+                this.checked = !isEnabled; // Revert the switch
+                showToast('An error occurred while updating the task.', 'danger');
+            });
+        });
+    });
+    
+    // Filter logs by type
+    const logFilter = document.querySelector('select');
+    logFilter.addEventListener('change', function() {
+        const type = this.value;
+        const rows = document.querySelectorAll('tbody tr');
+        
+        rows.forEach(row => {
+            const logType = row.querySelector('td:nth-child(2) span').textContent;
+            if (type === 'All Types' || logType === type) {
+                row.style.display = '';
+            } else {
+                row.style.display = 'none';
+            }
+        });
+    });
+    
+    // Save indexing settings
+    const indexSettingsSaveBtn = document.querySelector('#indexSettingsModal .btn-primary');
+    if (indexSettingsSaveBtn) {
+        indexSettingsSaveBtn.addEventListener('click', function() {
+            const frequency = document.getElementById('indexFrequency').value;
+            const indexTitle = document.getElementById('indexTitle').checked;
+            const indexContent = document.getElementById('indexContent').checked;
+            const indexMetadata = document.getElementById('indexMetadata').checked;
+            const indexAttachments = document.getElementById('indexAttachments').checked;
+            const stopWords = document.getElementById('stopWords').value;
+            
+            // Call API to save settings
+            fetch('{{ url_for("update_indexing_settings") }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    frequency: frequency,
+                    indexFields: {
+                        title: indexTitle,
+                        content: indexContent,
+                        metadata: indexMetadata,
+                        attachments: indexAttachments
+                    },
+                    stopWords: stopWords
+                }),
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('Success:', data);
+                $('#indexSettingsModal').modal('hide');
+                showToast('Indexing settings updated successfully!');
+            })
+            .catch((error) => {
+                console.error('Error:', error);
+                showToast('An error occurred while updating the settings.', 'danger');
+            });
+        });
+    }
+    
+    // Fetch disk info periodically
+    function updateDiskInfo() {
+        fetch('{{ url_for("disk_info") }}')
+            .then(response => response.json())
+            .then(data => {
+                // This would update disk space info dynamically
+                console.log('Disk info updated', data);
+            })
+            .catch(error => {
+                console.error('Error fetching disk info:', error);
+            });
+    }
+    
+    // Update disk info every 5 minutes (simulated real-time updates)
+    setInterval(updateDiskInfo, 300000);
+    
+    // Helper function to show toast notifications
+    function showToast(message, type = 'success') {
+        const toastHTML = `
+            <div class="toast ${type === 'danger' ? 'bg-danger text-white' : ''}" role="alert" aria-live="assertive" aria-atomic="true" data-delay="3000">
+                <div class="toast-header">
+                    <strong class="mr-auto">System Notification</strong>
+                    <button type="button" class="ml-2 mb-1 close" data-dismiss="toast" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="toast-body">
+                    ${message}
+                </div>
+            </div>
+        `;
+        
+        const toastContainer = document.createElement('div');
+        toastContainer.style.position = 'absolute';
+        toastContainer.style.top = '20px';
+        toastContainer.style.right = '20px';
+        toastContainer.style.zIndex = '1050';
+        toastContainer.innerHTML = toastHTML;
+        document.body.appendChild(toastContainer);
+        
+        $('.toast').toast('show');
+        
+        // Remove toast after it's hidden
+        $('.toast').on('hidden.bs.toast', function() {
+            toastContainer.remove();
+        });
+    }
+});
+</script>
+
+<!-- Modals -->
+<div class="modal fade" id="indexSettingsModal" tabindex="-1" role="dialog" aria-labelledby="indexSettingsModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="indexSettingsModalLabel">Indexing Settings</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form>
+                    <div class="form-group">
+                        <label for="indexFrequency">Indexing Frequency</label>
+                        <select class="form-control" id="indexFrequency">
+                            <option>Every hour</option>
+                            <option selected>Every 6 hours</option>
+                            <option>Every 12 hours</option>
+                            <option>Once a day</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="contentFields">Content Fields to Index</label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="indexTitle" checked>
+                            <label class="form-check-label" for="indexTitle">Document Title</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="indexContent" checked>
+                            <label class="form-check-label" for="indexContent">Document Content</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="indexMetadata" checked>
+                            <label class="form-check-label" for="indexMetadata">Document Metadata</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="indexAttachments">
+                            <label class="form-check-label" for="indexAttachments">Document Attachments</label>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="stopWords">Custom Stop Words</label>
+                        <textarea class="form-control" id="stopWords" rows="3" placeholder="Enter custom stop words separated by commas"></textarea>
+                        <small class="form-text text-muted">Words that should be ignored during indexing.</small>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary">Save Changes</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Admin Activity Modal -->
+<div class="modal fade" id="adminActivityModal" tabindex="-1" role="dialog" aria-labelledby="adminActivityModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="adminActivityModalLabel">Administrator Activity Log</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="table-responsive">
+                    <table class="table table-sm table-striped">
+                        <thead>
+                            <tr>
+                                <th>Timestamp</th>
+                                <th>Admin User</th>
+                                <th>Action</th>
+                                <th>Details</th>
+                                <th>IP Address</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>{{ now.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                                <td>admin</td>
+                                <td>System Configuration</td>
+                                <td>Changed indexing settings</td>
+                                <td>192.168.1.1</td>
+                            </tr>
+                            <tr>
+                                <td>{{ timestamp_2hr_ago }}</td>
+                                <td>admin</td>
+                                <td>User Management</td>
+                                <td>Created new user account</td>
+                                <td>192.168.1.1</td>
+                            </tr>
+                            <tr>
+                                <td>{{ timestamp_1day_ago }}</td>
+                                <td>admin</td>
+                                <td>Backup</td>
+                                <td>Initiated manual backup</td>
+                                <td>192.168.1.1</td>
+                            </tr>
+                            <tr>
+                                <td>{{ timestamp_2day_ago }}</td>
+                                <td>admin</td>
+                                <td>System Update</td>
+                                <td>Installed system update v1.0.2</td>
+                                <td>192.168.1.1</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary">Export Log</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

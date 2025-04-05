@@ -1,0 +1,472 @@
+{% extends 'layout.html' %}
+
+{% block title %}Compose - Document Management System{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="mb-0">Upload New Document</h1>
+    <div>
+        <a href="{{ url_for('incoming') }}" class="btn btn-outline-secondary mr-2">
+            <i class="fas fa-inbox"></i> Incoming Documents
+        </a>
+        <a href="{{ url_for('outgoing') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-paper-plane"></i> Outgoing Documents
+        </a>
+    </div>
+</div>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    {% for category, message in messages %}
+      <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+    {% endfor %}
+  {% endif %}
+{% endwith %}
+
+<div class="card shadow mb-4">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">Document Information</h5>
+        <span class="badge badge-primary">New Document</span>
+    </div>
+    <div class="card-body">
+        <form method="POST" enctype="multipart/form-data" id="documentForm">
+            <!-- Document Direction Selection -->
+            <div class="form-group mb-4">
+                <label>Document Direction <span class="text-danger">*</span></label>
+                <div class="btn-group btn-group-toggle w-100" data-toggle="buttons">
+                    <label class="btn btn-outline-primary active">
+                        <input type="radio" name="document_direction" id="direction_incoming" value="incoming" checked> 
+                        <i class="fas fa-inbox mr-1"></i> Incoming Document
+                    </label>
+                    <label class="btn btn-outline-primary">
+                        <input type="radio" name="document_direction" id="direction_outgoing" value="outgoing"> 
+                        <i class="fas fa-paper-plane mr-1"></i> Outgoing Document
+                    </label>
+                </div>
+                <small class="form-text text-muted">Select whether this is an incoming or outgoing document</small>
+            </div>
+            
+            <div class="row">
+                <div class="col-lg-6 col-md-12">
+                    <div class="form-group">
+                        <label for="document">Document File <span class="text-danger">*</span></label>
+                        <div class="custom-file">
+                            <input type="file" class="custom-file-input" id="document" name="document" required>
+                            <label class="custom-file-label text-truncate" for="document">Choose file</label>
+                        </div>
+                        <small class="form-text text-muted">Supported: PDF, DOC, DOCX, XLS, XLSX (Max 16MB)</small>
+                    </div>
+                    
+                    <div class="form-group mt-3">
+                        <label for="document_title">Document Title <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="document_title" name="document_title" placeholder="Enter document title" required>
+                    </div>
+                </div>
+                
+                <div class="col-lg-6 col-md-12">
+                    <div class="form-group">
+                        <label for="workflow_template">Workflow Template</label>
+                        <select class="form-control" id="workflow_template" name="workflow_template">
+                            {% for template in workflow_templates %}
+                                <option value="{{ template.name }}">{{ template.name }}</option>
+                            {% endfor %}
+                        </select>
+                        <small class="form-text text-muted">Select workflow process</small>
+                    </div>
+                    
+                    <div class="form-group mt-3">
+                        <label for="reference_number">Reference Number</label>
+                        <input type="text" class="form-control" id="reference_number" name="reference_number" placeholder="External reference number (if any)">
+                        <small class="form-text text-muted">Optional reference number from the external source</small>
+                    </div>
+                </div>
+            </div>
+            
+            <hr>
+            <h6 class="mb-3 text-primary"><i class="fas fa-user mr-1"></i> Sender Information</h6>
+            
+            <div class="row">
+                <div class="col-lg-4 col-md-6 col-sm-12">
+                    <div class="form-group">
+                        <label for="sender">Sender Name <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="sender" name="sender" value="{{ current_user.name if current_user else '' }}" placeholder="Enter sender name" required>
+                    </div>
+                </div>
+                
+                <div class="col-lg-4 col-md-6 col-sm-12">
+                    <div class="form-group">
+                        <label for="sender_email">Sender Email</label>
+                        <input type="email" class="form-control" id="sender_email" name="sender_email" value="{{ current_user.email if current_user else '' }}" placeholder="Enter sender email">
+                        <datalist id="emailList">
+                            {% for user in users %}
+                                <option value="{{ user.email }}">
+                            {% endfor %}
+                        </datalist>
+                    </div>
+                </div>
+                
+                <div class="col-lg-4 col-md-12 col-sm-12">
+                    <div class="form-group">
+                        <label for="sender_department">Sender Department</label>
+                        <input type="text" class="form-control" id="sender_department" name="sender_department" value="{{ current_user.department if current_user else '' }}" placeholder="Enter sender department">
+                    </div>
+                </div>
+            </div>
+            
+            <hr>
+            <h6 class="mb-3 text-primary"><i class="fas fa-user-check mr-1"></i> Recipient Information</h6>
+            
+            <div class="row">
+                <div class="col-lg-4 col-md-6 col-sm-12">
+                    <div class="form-group">
+                        <label for="recipient">Recipient Name <span class="text-danger recipient-required d-none">*</span></label>
+                        <input type="text" class="form-control" id="recipient" name="recipient" placeholder="Enter recipient name">
+                    </div>
+                </div>
+                
+                <div class="col-lg-4 col-md-6 col-sm-12">
+                    <div class="form-group">
+                        <label for="recipient_email">Recipient Email <span class="text-danger recipient-required d-none">*</span></label>
+                        <input type="email" class="form-control" id="recipient_email" name="recipient_email" placeholder="Enter recipient email" list="emailList">
+                        <small class="form-text text-muted">Email notifications will be sent here</small>
+                    </div>
+                </div>
+                
+                <div class="col-lg-4 col-md-12 col-sm-12">
+                    <div class="form-group">
+                        <label for="recipient_department">Recipient Department</label>
+                        <input type="text" class="form-control" id="recipient_department" name="recipient_department" placeholder="Enter recipient department">
+                    </div>
+                </div>
+            </div>
+            
+            <hr>
+            <h6 class="mb-3 text-primary"><i class="fas fa-file-alt mr-1"></i> Document Details</h6>
+            
+            <div class="row">
+                <div class="col-12">
+                    <div class="form-group">
+                        <label for="details">Document Details</label>
+                        <textarea class="form-control" id="details" name="details" rows="3" placeholder="Provide a brief description of the document"></textarea>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="row">
+                <div class="col-lg-6 col-md-12">
+                    <div class="form-group">
+                        <label for="required_action">Required Action <span class="text-danger">*</span></label>
+                        <select class="form-control" id="required_action" name="required_action" required>
+                            <option value="Review">Review</option>
+                            <option value="Approve">Approve</option>
+                            <option value="Sign">Sign</option>
+                            <option value="Forward">Forward</option>
+                            <option value="File">File</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group mt-3 other-action-container d-none">
+                        <label for="other_action">Specify Other Action <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="other_action" name="other_action" placeholder="Specify required action">
+                    </div>
+                </div>
+                
+                <div class="col-lg-6 col-md-12">
+                    <div class="form-group">
+                        <label for="tags">Tags</label>
+                        <input type="text" class="form-control" id="tags" name="tags" placeholder="Enter tags separated by commas">
+                        <small class="form-text text-muted">E.g. report, finance, meeting, review</small>
+                    </div>
+                    
+                    <div class="form-group mt-3">
+                        <label for="expected_completion">Expected Completion Date</label>
+                        <input type="date" class="form-control" id="expected_completion" name="expected_completion">
+                        <small class="form-text text-muted">Expected date for action completion</small>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="row">
+                <div class="col-lg-6 col-md-12">
+                    <div class="form-group">
+                        <label>Priority <span class="text-danger">*</span></label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="priority" id="priorityNormal" value="Normal" checked>
+                            <label class="form-check-label" for="priorityNormal">
+                                <span class="badge badge-secondary">Normal</span> (7 day deadline)
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="priority" id="priorityPriority" value="Priority">
+                            <label class="form-check-label" for="priorityPriority">
+                                <span class="badge badge-warning">Priority</span> (5 day deadline)
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="priority" id="priorityUrgent" value="Urgent">
+                            <label class="form-check-label" for="priorityUrgent">
+                                <span class="badge badge-danger">Urgent</span> (2 day deadline)
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-lg-6 col-md-12">
+                    <div class="form-group">
+                        <label>Document Settings</label>
+                        <div class="custom-control custom-switch">
+                            <input type="checkbox" class="custom-control-input" id="is_confidential" name="is_confidential">
+                            <label class="custom-control-label" for="is_confidential">Mark as Confidential</label>
+                        </div>
+                        <small class="form-text text-muted">Confidential documents have restricted access</small>
+                        
+                        <div class="custom-control custom-switch mt-2">
+                            <input type="checkbox" class="custom-control-input" id="needs_signature" name="needs_signature">
+                            <label class="custom-control-label" for="needs_signature">Requires Signature</label>
+                        </div>
+                        
+                        <div class="custom-control custom-switch mt-2">
+                            <input type="checkbox" class="custom-control-input" id="send_notification" name="send_notification" checked>
+                            <label class="custom-control-label" for="send_notification">Send Email Notification</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <hr>
+            
+            <div class="form-group text-right">
+                <button type="button" class="btn btn-outline-secondary mr-2" id="resetForm">
+                    <i class="fas fa-times"></i> Cancel
+                </button>
+                <button type="button" class="btn btn-outline-info mr-2" id="previewTrackingCode">
+                    <i class="fas fa-qrcode"></i> Preview Tracking Code
+                </button>
+                <button type="submit" class="btn btn-primary" id="submitBtn">
+                    <i class="fas fa-upload"></i> Upload Document
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Tracking Code Preview Modal -->
+<div class="modal fade" id="trackingCodeModal" tabindex="-1" role="dialog" aria-labelledby="trackingCodeModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="trackingCodeModalLabel">Document Tracking Code</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body text-center">
+                <p class="mb-3">Your document will be assigned this tracking code upon upload:</p>
+                <div class="d-flex justify-content-center mb-3">
+                    <div id="trackingCodeQR" class="border p-2"></div>
+                </div>
+                <div class="input-group mb-3 w-75 mx-auto">
+                    <input type="text" class="form-control text-center font-weight-bold" id="generatedTrackingCode" readonly>
+                    <div class="input-group-append">
+                        <button class="btn btn-outline-secondary" type="button" onclick="copyTrackingCode()">
+                            <i class="fas fa-copy"></i>
+                        </button>
+                    </div>
+                </div>
+                <p class="text-muted small">Use this code to track your document status after upload</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" onclick="submitWithCode()">
+                    <i class="fas fa-upload"></i> Upload with this Code
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Display selected filename in the file input
+    const fileInput = document.querySelector('.custom-file-input');
+    if (fileInput) {
+        fileInput.addEventListener('change', function(e) {
+            if (e.target.files.length > 0) {
+                const fileName = e.target.files[0].name;
+                const nextSibling = e.target.nextElementSibling;
+                nextSibling.innerText = fileName;
+                
+                // If document title is empty, use filename as default title
+                const titleInput = document.getElementById('document_title');
+                if (titleInput && !titleInput.value) {
+                    // Remove file extension from name
+                    titleInput.value = fileName.replace(/\.[^/.]+$/, "");
+                }
+            }
+        });
+    }
+    
+    // Auto-populate recipient fields when recipient email is selected
+    const users = JSON.parse('{{ users|tojson|safe }}');
+    const recipientEmail = document.getElementById('recipient_email');
+    
+    if (recipientEmail) {
+        recipientEmail.addEventListener('change', function(e) {
+            const email = e.target.value;
+            const user = users.find(function(u) { return u.email === email; });
+            
+            if (user) {
+                document.getElementById('recipient').value = user.name || '';
+                document.getElementById('recipient_department').value = user.department || '';
+            }
+        });
+    }
+    
+    // Handling required_action dropdown
+    const requiredAction = document.getElementById('required_action');
+    const otherActionContainer = document.querySelector('.other-action-container');
+    const otherAction = document.getElementById('other_action');
+    
+    if (requiredAction) {
+        requiredAction.addEventListener('change', function() {
+            if (this.value === 'Other') {
+                otherActionContainer.classList.remove('d-none');
+                otherAction.setAttribute('required', 'required');
+            } else {
+                otherActionContainer.classList.add('d-none');
+                otherAction.removeAttribute('required');
+            }
+        });
+    }
+    
+    // Handle document direction change
+    const directionInputs = document.querySelectorAll('input[name="document_direction"]');
+    const recipientRequiredLabels = document.querySelectorAll('.recipient-required');
+    
+    directionInputs.forEach(function(input) {
+        input.addEventListener('change', function() {
+            // If outgoing, recipient is required
+            if (this.value === 'outgoing') {
+                recipientRequiredLabels.forEach(label => label.classList.remove('d-none'));
+                document.getElementById('recipient').setAttribute('required', 'required');
+                document.getElementById('recipient_email').setAttribute('required', 'required');
+            } else {
+                recipientRequiredLabels.forEach(label => label.classList.add('d-none'));
+                document.getElementById('recipient').removeAttribute('required');
+                document.getElementById('recipient_email').removeAttribute('required');
+            }
+        });
+    });
+    
+    // Form reset button
+    const resetBtn = document.getElementById('resetForm');
+    if (resetBtn) {
+        resetBtn.addEventListener('click', function() {
+            if (confirm('Are you sure you want to reset the form? All entered data will be lost.')) {
+                document.getElementById('documentForm').reset();
+                document.querySelector('.custom-file-label').innerText = 'Choose file';
+                otherActionContainer.classList.add('d-none');
+                recipientRequiredLabels.forEach(label => label.classList.add('d-none'));
+                document.getElementById('recipient').removeAttribute('required');
+                document.getElementById('recipient_email').removeAttribute('required');
+            }
+        });
+    }
+    
+    // Form validation
+    const form = document.getElementById('documentForm');
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            const fileInput = document.getElementById('document');
+            if (fileInput.files.length === 0) {
+                e.preventDefault();
+                alert('Please select a document file to upload.');
+                return false;
+            }
+            
+            const submitBtn = document.getElementById('submitBtn');
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Uploading...';
+            submitBtn.disabled = true;
+            
+            // In a real app, you'd use proper form validation
+            // This is just a simple example
+            return true;
+        });
+    }
+    
+    // Tracking code preview functionality
+    const previewTrackingCodeBtn = document.getElementById('previewTrackingCode');
+    if (previewTrackingCodeBtn) {
+        previewTrackingCodeBtn.addEventListener('click', function() {
+            generateTrackingCode();
+            $('#trackingCodeModal').modal('show');
+        });
+    }
+});
+
+// Generate a tracking code based on document info
+function generateTrackingCode() {
+    const timestamp = new Date().toISOString().slice(0,10).replace(/-/g,"");
+    const randomHex = Array.from({length: 8}, () => 
+        Math.floor(Math.random() * 16).toString(16)).join('').toUpperCase();
+    const code = `DOC-${timestamp}-${randomHex}`;
+    
+    document.getElementById('generatedTrackingCode').value = code;
+    
+    // Generate QR code
+    if (typeof QRious !== 'undefined') {
+        const qr = new QRious({
+            element: document.createElement('canvas'),
+            size: 180,
+            value: window.location.origin + '/track_document?code=' + code,
+            backgroundAlpha: 1,
+            foreground: '#000000',
+            level: 'H'
+        });
+        
+        const qrContainer = document.getElementById('trackingCodeQR');
+        qrContainer.innerHTML = '';
+        qrContainer.appendChild(qr.element);
+    }
+    
+    return code;
+}
+
+// Copy tracking code to clipboard
+function copyTrackingCode() {
+    const codeInput = document.getElementById('generatedTrackingCode');
+    codeInput.select();
+    document.execCommand('copy');
+    
+    // Show copied notification
+    alert('Tracking code copied to clipboard: ' + codeInput.value);
+}
+
+// Submit form with generated tracking code
+function submitWithCode() {
+    const code = document.getElementById('generatedTrackingCode').value;
+    const form = document.getElementById('documentForm');
+    
+    // Add tracking code as hidden input
+    let hiddenInput = document.getElementById('presetTrackingCode');
+    if (!hiddenInput) {
+        hiddenInput = document.createElement('input');
+        hiddenInput.type = 'hidden';
+        hiddenInput.id = 'presetTrackingCode';
+        hiddenInput.name = 'preset_tracking_code';
+        form.appendChild(hiddenInput);
+    }
+    hiddenInput.value = code;
+    
+    // Submit the form
+    $('#trackingCodeModal').modal('hide');
+    form.submit();
+}
+</script>
+{% endblock %} 

@@ -1,0 +1,1160 @@
+{% extends 'layout.html' %}
+
+{% block title %}Dashboard - KEMRI Document Management System{% endblock %}
+
+{% block head %}
+{{ super() }}
+<style>
+    :root {
+        --kemri-primary: #00a0d2;     /* Bright Blue from logo */
+        --kemri-secondary: #FFD700;   /* Gold */
+        --kemri-accent: #d91e18;      /* Red from caduceus in logo */
+        --kemri-light: #e6f7ff;       /* Light Blue */
+        --kemri-dark: #0076a3;        /* Darker Blue */
+    }
+    
+    .bg-gradient-kemri {
+        background: linear-gradient(135deg, var(--kemri-primary), var(--kemri-dark));
+    }
+    
+    .bg-kemri {
+        background-color: var(--kemri-primary);
+    }
+    
+    .text-kemri {
+        color: var(--kemri-primary);
+    }
+    
+    .btn-kemri {
+        background-color: var(--kemri-primary);
+        border-color: var(--kemri-primary);
+        color: white;
+    }
+    
+    .btn-kemri:hover {
+        background-color: var(--kemri-dark);
+        border-color: var(--kemri-dark);
+        color: white;
+    }
+    
+    .btn-outline-kemri {
+        border-color: var(--kemri-primary);
+        color: var(--kemri-primary);
+    }
+    
+    .btn-outline-kemri:hover {
+        background-color: var(--kemri-primary);
+        color: white;
+    }
+    
+    .status-card {
+        transition: transform 0.3s ease;
+        border: none;
+    }
+    
+    .status-card:hover {
+        transform: translateY(-5px);
+    }
+    
+    .status-incoming {
+        background-color: var(--kemri-light);
+        border-left: 4px solid var(--kemri-primary);
+    }
+    
+    .status-pending {
+        background-color: #FFF8E1;
+        border-left: 4px solid var(--kemri-secondary);
+    }
+    
+    .status-received {
+        background-color: #E3F2FD;
+        border-left: 4px solid var(--kemri-primary);
+    }
+    
+    .status-ended {
+        background-color: #FFEBEE;
+        border-left: 4px solid var(--kemri-accent);
+    }
+    
+    .status-badge-incoming {
+        background-color: var(--kemri-primary) !important;
+    }
+    
+    .status-badge-pending {
+        background-color: var(--kemri-secondary) !important;
+        color: #333 !important;
+    }
+    
+    .status-badge-received {
+        background-color: var(--kemri-primary) !important;
+    }
+    
+    .status-badge-ended {
+        background-color: var(--kemri-accent) !important;
+    }
+    
+    .kemri-logo {
+        max-height: 140px;
+        filter: drop-shadow(0 0 8px rgba(0,0,0,0.2));
+    }
+    
+    .kemri-logo-img {
+        border-radius: 50%;
+        border: 3px solid white;
+        background-color: var(--kemri-primary);
+        max-height: 140px;
+        box-shadow: 0 0 10px rgba(0,0,0,0.2);
+    }
+    
+    .welcome-icon {
+        font-size: 8rem;
+        color: var(--kemri-primary);
+        opacity: 0.2;
+    }
+    
+    /* Enhanced cards with box shadows */
+    .card {
+        box-shadow: 0 2px 5px rgba(0,0,0,0.08);
+        border-radius: 0.5rem;
+        overflow: hidden;
+    }
+    
+    /* Custom table styling */
+    .table-kemri thead th {
+        background-color: var(--kemri-light);
+        color: var(--kemri-dark);
+        border-bottom: 2px solid var(--kemri-primary);
+    }
+    
+    .table-kemri tbody tr:hover {
+        background-color: rgba(0, 160, 210, 0.03);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- KEMRI Banner -->
+<div class="card mb-4 bg-gradient-kemri text-white">
+    <div class="card-body py-4">
+        <div class="d-flex align-items-center justify-content-between flex-wrap">
+            <div>
+                <h1 class="display-5 mb-0">KEMRI</h1>
+                <h4 class="mb-3">Document Management System</h4>
+                <p class="lead mb-0">A comprehensive system for managing document workflows, tracking, and collaboration.</p>
+            </div>
+            <div class="text-center d-none d-md-block">
+                <!-- KEMRI Logo - SVG version with fallback to image -->
+                <div class="position-relative">
+                    <!-- Fallback colored circle with KEMRI text if SVG doesn't render -->
+                    <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; z-index: 1;">
+                        <div style="width: 140px; height: 140px; background-color: #00a0d2; border-radius: 50%; border: 3px solid white; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 24px;">
+                            KEMRI
+                        </div>
+                    </div>
+                    
+                    <!-- SVG Logo (will appear on top of fallback) -->
+                    <svg width="180" height="180" viewBox="0 0 200 200" class="kemri-logo" style="position: relative; z-index: 2;">
+                        <!-- Outer circle -->
+                        <circle cx="100" cy="100" r="95" fill="#00a0d2" />
+                        <!-- Inner white ring -->
+                        <circle cx="100" cy="100" r="90" fill="#00a0d2" stroke="white" stroke-width="3" />
+                        
+                        <!-- Top text -->
+                        <path d="M 30,45 A 80,80 0 0,1 170,45" fill="none" stroke="white" id="topTextPath" />
+                        <text>
+                            <textPath href="#topTextPath" startOffset="50%" text-anchor="middle" fill="white" font-weight="bold" font-size="12">
+                                KENYA MEDICAL RESEARCH INSTITUTE
+                            </textPath>
+                        </text>
+                        
+                        <!-- Medical Symbol - Caduceus -->
+                        <g transform="translate(100, 100) scale(1.2)">
+                            <!-- Staff/Rod -->
+                            <rect x="-4" y="-30" width="8" height="60" fill="white" />
+                            
+                            <!-- Wings at top -->
+                            <path d="M 0,-30 L -20,-20 L -18,-15 L -3,-22 Z" fill="white" />
+                            <path d="M 0,-30 L 20,-20 L 18,-15 L 3,-22 Z" fill="white" />
+                            
+                            <!-- Snakes -->
+                            <path d="M -5,-15 C -15,-10 -25,-20 -15,-25 C -5,-30 -5,-15 -5,-10 
+                                   C -15,-5 -25,5 -15,10 C -5,15 -5,0 -5,5" 
+                                  fill="none" stroke="#d91e18" stroke-width="4" />
+                            
+                            <path d="M 5,-15 C 15,-10 25,-20 15,-25 C 5,-30 5,-15 5,-10 
+                                   C 15,-5 25,5 15,10 C 5,15 5,0 5,5" 
+                                  fill="none" stroke="#d91e18" stroke-width="4" />
+                        </g>
+                        
+                        <!-- Bottom text -->
+                        <path d="M 30,155 A 80,80 0 0,0 170,155" fill="none" stroke="white" id="bottomTextPath" />
+                        <text>
+                            <textPath href="#bottomTextPath" startOffset="50%" text-anchor="middle" fill="white" font-weight="bold" font-size="16">
+                                KEMRI
+                            </textPath>
+                        </text>
+                    </svg>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="card-footer bg-kemri py-2 d-flex justify-content-between">
+        <div class="small text-white-50">Welcome, <strong class="text-white">Admin User</strong></div>
+        <div class="small text-white-50">Today: {{ today|default('March 10, 2025') }}</div>
+    </div>
+</div>
+
+<div class="d-flex justify-content-between align-items-center flex-wrap mb-4">
+    <h2 class="mb-0">Dashboard</h2>
+    <div class="d-flex align-items-center">
+        <div class="dropdown mr-3 position-relative">
+            <button class="btn btn-outline-kemri position-relative" type="button" id="notificationDropdown" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false" aria-label="Notifications">
+                <i class="fas fa-bell"></i>
+                <span class="position-absolute bg-danger rounded-circle text-white notification-badge" style="top: -8px; right: -8px; font-size: 10px; padding: 3px 6px;">3</span>
+            </button>
+            <div class="dropdown-menu dropdown-menu-right notification-dropdown" aria-labelledby="notificationDropdown" style="width: 320px; max-height: 400px; overflow-y: auto;">
+                <h6 class="dropdown-header">Notifications</h6>
+                <div class="dropdown-item-text">
+                    <div class="d-flex align-items-start">
+                        <div class="text-primary mr-2 mt-1"><i class="fas fa-file-alt"></i></div>
+                        <div>
+                            <p class="mb-0 font-weight-bold">New document requires your review</p>
+                            <small class="text-muted">Document DOC-001 from Ministry of Health requires your action</small>
+                            <div class="mt-1">
+                                <a href="/document/DOC-001" class="btn btn-sm btn-primary">View</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="dropdown-divider"></div>
+                <div class="dropdown-item-text">
+                    <div class="d-flex align-items-start">
+                        <div class="text-warning mr-2 mt-1"><i class="fas fa-exclamation-circle"></i></div>
+                        <div>
+                            <p class="mb-0 font-weight-bold">Deadline approaching</p>
+                            <small class="text-muted">Document DOC-002 from Research Department is due in 2 days</small>
+                            <div class="mt-1">
+                                <a href="/document/DOC-002" class="btn btn-sm btn-primary">View</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="dropdown-divider"></div>
+                <div class="dropdown-item-text">
+                    <div class="d-flex align-items-start">
+                        <div class="text-success mr-2 mt-1"><i class="fas fa-check-circle"></i></div>
+                        <div>
+                            <p class="mb-0 font-weight-bold">Document approved</p>
+                            <small class="text-muted">Your submission DOC-003 has been approved</small>
+                            <div class="mt-1">
+                                <a href="/document/DOC-003" class="btn btn-sm btn-primary">View</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="dropdown-divider"></div>
+                <a class="dropdown-item text-center text-primary" href="/notifications">View all notifications</a>
+            </div>
+        </div>
+        <div class="user-profile d-flex align-items-center">
+            <div class="user-info mr-2 d-none d-md-block">
+                <div class="user-name">Admin User</div>
+                <div class="user-role text-muted small">System Administrator</div>
+            </div>
+            <div class="dropdown">
+                <a href="#" class="dropdown-toggle text-decoration-none" id="userDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                    <img src="https://via.placeholder.com/40" class="rounded-circle border" width="40" height="40" alt="User profile">
+                </a>
+                <div class="dropdown-menu dropdown-menu-right" aria-labelledby="userDropdown">
+                    <h6 class="dropdown-header">Admin User</h6>
+                    <a class="dropdown-item" href="/my_account">
+                        <i class="fas fa-user-circle mr-2"></i> My Profile
+                    </a>
+                    <a class="dropdown-item" href="/my_account/settings">
+                        <i class="fas fa-cog mr-2"></i> Settings
+                    </a>
+                    <div class="dropdown-divider"></div>
+                    <a class="dropdown-item" href="/logout">
+                        <i class="fas fa-sign-out-alt mr-2"></i> Logout
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Start Guide -->
+<div class="card mb-4">
+    <div class="card-body">
+        <div class="row align-items-center">
+            <div class="col-md-8">
+                <h4 class="text-kemri">Welcome to KEMRI's Document Management System</h4>
+                <p class="mb-3">A comprehensive system for managing research documents, medical workflows, tracking, and scientific collaboration.</p>
+                <div class="d-flex flex-wrap">
+                    <a href="/dashboard" class="btn btn-kemri mr-2 mb-2">
+                        <i class="fas fa-tachometer-alt mr-1"></i> Dashboard
+                    </a>
+                    <a href="/compose" class="btn btn-success mr-2 mb-2">
+                        <i class="fas fa-file-alt mr-1"></i> New Document
+                    </a>
+                    <a href="/incoming" class="btn btn-info mr-2 mb-2">
+                        <i class="fas fa-inbox mr-1"></i> Incoming Docs
+                    </a>
+                    <a href="/reports" class="btn btn-warning text-dark mr-2 mb-2">
+                        <i class="fas fa-chart-bar mr-1"></i> Reports
+                    </a>
+                </div>
+            </div>
+            <div class="col-md-4 d-none d-md-block text-center">
+                <i class="fas fa-microscope welcome-icon"></i>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- System Stats -->
+<div class="card mb-4">
+    <div class="card-header bg-kemri text-white">
+        <h5 class="mb-0">KEMRI System Overview</h5>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-3 col-sm-6 mb-3">
+                <div class="d-flex align-items-center">
+                    <div class="text-kemri mr-3">
+                        <i class="fas fa-users fa-2x"></i>
+                    </div>
+                    <div>
+                        <h6 class="mb-0">Active Users</h6>
+                        <h4 class="mb-0">{{ active_users|default('24') }}</h4>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 col-sm-6 mb-3">
+                <div class="d-flex align-items-center">
+                    <div class="text-kemri mr-3">
+                        <i class="fas fa-folder-open fa-2x"></i>
+                    </div>
+                    <div>
+                        <h6 class="mb-0">Total Documents</h6>
+                        <h4 class="mb-0">{{ total_docs|default('143') }}</h4>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 col-sm-6 mb-3">
+                <div class="d-flex align-items-center">
+                    <div class="text-kemri mr-3">
+                        <i class="fas fa-tasks fa-2x"></i>
+                    </div>
+                    <div>
+                        <h6 class="mb-0">Completed Tasks</h6>
+                        <h4 class="mb-0">{{ completed_tasks|default('86') }}</h4>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 col-sm-6 mb-3">
+                <div class="d-flex align-items-center">
+                    <div class="text-kemri mr-3">
+                        <i class="fas fa-vial fa-2x"></i>
+                    </div>
+                    <div>
+                        <h6 class="mb-0">Research Projects</h6>
+                        <h4 class="mb-0">{{ projects|default('12') }}</h4>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Search and Filters -->
+<div class="card mb-4">
+    <div class="card-body p-0 p-md-3">
+        <form action="/search" method="GET" id="searchForm">
+            <input type="hidden" name="filter" id="filterInput" value="all">
+            <div class="row">
+                <div class="col-lg-8 col-md-12 mb-3 mb-lg-0">
+                    <div class="input-group">
+                        <input type="text" class="form-control" name="query" placeholder="Search documents..." id="searchInput">
+                        <div class="input-group-append">
+                            <button class="btn btn-kemri" type="submit" aria-label="Search">
+                                <i class="fas fa-search"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-4 col-md-12">
+                    <div class="btn-group btn-group-sm w-100" role="group">
+                        <button type="button" class="btn btn-outline-kemri active filter-btn" data-filter="all" aria-label="Filter all documents">All</button>
+                        <button type="button" class="btn btn-outline-warning filter-btn" data-filter="priority" aria-label="Filter priority documents">Priority</button>
+                        <button type="button" class="btn btn-outline-danger filter-btn" data-filter="urgent" aria-label="Filter urgent documents">Urgent</button>
+                        <button type="button" class="btn btn-outline-secondary filter-btn" data-filter="usual" aria-label="Filter usual documents">Usual</button>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Status Cards -->
+<div class="row">
+    <div class="col-md-6 col-lg-3 mb-3">
+        <a href="/documents?status=incoming" class="text-decoration-none">
+            <div class="card status-card status-incoming">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h5 class="card-title">All Incoming Docs</h5>
+                            <h2>{{ incoming_count }}</h2>
+                            <p class="mb-0">Total incoming documents</p>
+                        </div>
+                        <i class="fas fa-inbox fa-2x opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-6 col-lg-3 mb-3">
+        <a href="/documents?status=pending" class="text-decoration-none">
+            <div class="card status-card status-pending">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h5 class="card-title">Pending Docs</h5>
+                            <h2>{{ pending_count }}</h2>
+                            <p class="mb-0">Documents awaiting action</p>
+                        </div>
+                        <i class="fas fa-clock fa-2x opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-6 col-lg-3 mb-3">
+        <a href="/documents?status=received" class="text-decoration-none">
+            <div class="card status-card status-received">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h5 class="card-title">Received Docs</h5>
+                            <h2>{{ received_count }}</h2>
+                            <p class="mb-0">Documents received</p>
+                        </div>
+                        <i class="fas fa-check-circle fa-2x opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-6 col-lg-3 mb-3">
+        <a href="/documents?status=ended" class="text-decoration-none">
+            <div class="card status-card status-ended">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h5 class="card-title">Ended Docs</h5>
+                            <h2>{{ ended_count }}</h2>
+                            <p class="mb-0">Completed documents</p>
+                        </div>
+                        <i class="fas fa-flag-checkered fa-2x opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </a>
+    </div>
+</div>
+
+<!-- Deadline Tracking -->
+<div class="card mb-4">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">Upcoming Deadlines</h5>
+        <a href="/documents?filter=deadline" class="btn btn-sm btn-outline-secondary">View All</a>
+    </div>
+    <div class="card-body p-0">
+        <div class="list-group list-group-flush">
+            <div class="list-group-item">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="mb-1"><a href="/document/DOC-001" class="text-reset">DOC-001: Annual Budget Approval</a></h6>
+                        <p class="mb-0 text-muted small">Ministry of Health</p>
+                    </div>
+                    <div class="text-right">
+                        <div class="badge badge-danger mb-1">Due Tomorrow</div>
+                        <div class="text-muted small">March 15, 2025</div>
+                    </div>
+                </div>
+                <div class="progress mt-2" style="height: 5px;">
+                    <div class="progress-bar bg-danger" role="progressbar" style="width: 90%;" aria-valuenow="90" aria-valuemin="0" aria-valuemax="100"></div>
+                </div>
+            </div>
+            <div class="list-group-item">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="mb-1"><a href="/document/DOC-002" class="text-reset">DOC-002: Quarterly Report</a></h6>
+                        <p class="mb-0 text-muted small">Research Department</p>
+                    </div>
+                    <div class="text-right">
+                        <div class="badge badge-warning mb-1">Due in 5 days</div>
+                        <div class="text-muted small">March 20, 2025</div>
+                    </div>
+                </div>
+                <div class="progress mt-2" style="height: 5px;">
+                    <div class="progress-bar bg-warning" role="progressbar" style="width: 70%;" aria-valuenow="70" aria-valuemin="0" aria-valuemax="100"></div>
+                </div>
+            </div>
+            <div class="list-group-item">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="mb-1"><a href="/document/DOC-003" class="text-reset">DOC-003: Budget Allocation</a></h6>
+                        <p class="mb-0 text-muted small">Finance Department</p>
+                    </div>
+                    <div class="text-right">
+                        <div class="badge badge-info mb-1">Due in 10 days</div>
+                        <div class="text-muted small">March 25, 2025</div>
+                    </div>
+                </div>
+                <div class="progress mt-2" style="height: 5px;">
+                    <div class="progress-bar bg-info" role="progressbar" style="width: 40%;" aria-valuenow="40" aria-valuemin="0" aria-valuemax="100"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="card mb-4">
+    <div class="card-header bg-white">
+        <h5 class="mb-0">Quick Actions</h5>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-6 col-lg-3 mb-3">
+                <a href="/compose" class="btn btn-kemri btn-block d-flex align-items-center justify-content-center">
+                    <i class="fas fa-plus mr-2"></i> New Document
+                </a>
+            </div>
+            <div class="col-md-6 col-lg-3 mb-3">
+                <a href="/reports" class="btn btn-success btn-block d-flex align-items-center justify-content-center">
+                    <i class="fas fa-chart-line mr-2"></i> Generate Report
+                </a>
+            </div>
+            <div class="col-md-6 col-lg-3 mb-3">
+                <a href="/maintenance" class="btn btn-info btn-block d-flex align-items-center justify-content-center">
+                    <i class="fas fa-cogs mr-2"></i> System Settings
+                </a>
+            </div>
+            <div class="col-md-6 col-lg-3 mb-3">
+                <a href="#" class="btn btn-warning btn-block d-flex align-items-center justify-content-center" data-toggle="modal" data-target="#exportModal">
+                    <i class="fas fa-file-export mr-2"></i> Export Documents
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 3D Document Status Visualization -->
+<div class="card mb-4">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">Document Status Visualization</h5>
+        <div class="btn-group btn-group-sm">
+            <button class="btn btn-outline-secondary active" id="view3d" aria-label="Switch to 3D view">3D View</button>
+            <button class="btn btn-outline-secondary" id="viewChart" aria-label="Switch to chart view">Chart View</button>
+        </div>
+    </div>
+    <div class="card-body">
+        <div id="status-visualization" style="height: 300px;"></div>
+        <div id="chart-visualization" style="height: 300px; display: none;"></div>
+    </div>
+</div>
+
+<!-- Documents Table -->
+<div class="card">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center flex-wrap">
+        <h5 class="mb-0 mr-2">Recent Documents</h5>
+        <div class="d-flex flex-wrap">
+            <div class="dropdown mr-2 mb-2 mb-md-0">
+                <button class="btn btn-sm btn-outline-kemri dropdown-toggle" type="button" id="sortDropdown" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false" aria-label="Sort documents">
+                    Sort by: Date
+                </button>
+                <div class="dropdown-menu dropdown-menu-right" aria-labelledby="sortDropdown">
+                    <a class="dropdown-item active" href="#">Date (newest first)</a>
+                    <a class="dropdown-item" href="#">Date (oldest first)</a>
+                    <a class="dropdown-item" href="#">Priority (highest first)</a>
+                    <a class="dropdown-item" href="#">Status</a>
+                </div>
+            </div>
+            <a href="/compose" class="btn btn-sm btn-kemri">
+                <i class="fas fa-plus mr-1"></i> New Document
+            </a>
+        </div>
+    </div>
+    <div class="card-body p-0 p-md-3">
+        <div class="table-responsive">
+            <table class="table table-striped table-kemri">
+                <thead>
+                    <tr>
+                        <th>Doc. Code</th>
+                        <th>Sender</th>
+                        <th>Details</th>
+                        <th>Required Action</th>
+                        <th>Date</th>
+                        <th>Status</th>
+                        <th>Assigned To</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if documents %}
+                        {% for doc in documents %}
+                        <tr>
+                            <td><a href="/document/{{ doc.code }}" class="text-kemri">{{ doc.code }}</a></td>
+                            <td>{{ doc.sender }}</td>
+                            <td>{{ doc.details }}</td>
+                            <td>{{ doc.required_action }}</td>
+                            <td>{{ doc.date }}</td>
+                            <td>
+                                {% if doc.status == 'Incoming' %}
+                                <span class="status-badge status-badge-incoming" style="background-color: var(--kemri-primary);">{{ doc.status }}</span>
+                                {% elif doc.status == 'Pending' %}
+                                <span class="status-badge status-badge-pending">{{ doc.status }}</span>
+                                {% elif doc.status == 'Received' %}
+                                <span class="status-badge status-badge-received">{{ doc.status }}</span>
+                                {% elif doc.status == 'Ended' %}
+                                <span class="status-badge" style="background-color: var(--kemri-accent);">{{ doc.status }}</span>
+                                {% else %}
+                                <span class="status-badge" style="background-color: #9E9E9E;">{{ doc.status }}</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="dropdown">
+                                    <button class="btn btn-sm btn-outline-kemri dropdown-toggle" type="button" id="assignDropdown{{ doc.code }}" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false" aria-label="Assign document">
+                                        {{ doc.current_holder|default('Assign...') }}
+                                    </button>
+                                    <div class="dropdown-menu dropdown-menu-right" aria-labelledby="assignDropdown{{ doc.code }}">
+                                        <h6 class="dropdown-header">Assign To</h6>
+                                        <a class="dropdown-item assign-user" href="#" data-doc-id="{{ doc.code }}" data-user-id="1">John Doe</a>
+                                        <a class="dropdown-item assign-user" href="#" data-doc-id="{{ doc.code }}" data-user-id="2">Jane Smith</a>
+                                        <a class="dropdown-item assign-user" href="#" data-doc-id="{{ doc.code }}" data-user-id="3">Mark Johnson</a>
+                                        <a class="dropdown-item assign-user" href="#" data-doc-id="{{ doc.code }}" data-user-id="4">Sarah Williams</a>
+                                        <div class="dropdown-divider"></div>
+                                        <a class="dropdown-item text-kemri" href="/document/{{ doc.code }}/assign">Advanced Assignment</a>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <div class="btn-group btn-group-sm">
+                                    <a href="/document/{{ doc.code }}" class="btn btn-kemri" aria-label="View document">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    <a href="/document/{{ doc.code }}/edit" class="btn btn-secondary" aria-label="Edit document">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    <button type="button" class="btn btn-info" data-toggle="modal" data-target="#workflowModal" data-doc-id="{{ doc.code }}" aria-label="Workflow actions">
+                                        <i class="fas fa-tasks"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-danger" data-toggle="modal" data-target="#deleteModal" data-doc-id="{{ doc.code }}" aria-label="Delete document">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="8" class="text-center">No documents found. <a href="/compose" class="text-kemri">Upload your first document</a>.</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Export Modal -->
+<div class="modal fade" id="exportModal" tabindex="-1" role="dialog" aria-labelledby="exportModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-kemri text-white">
+                <h5 class="modal-title" id="exportModalLabel">Export Documents</h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="exportForm">
+                    <div class="form-group">
+                        <label for="exportFormat">Export Format</label>
+                        <select class="form-control" id="exportFormat" name="format">
+                            <option value="excel">Excel (.xlsx)</option>
+                            <option value="csv">CSV</option>
+                            <option value="pdf">PDF</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Document Type</label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" value="incoming" id="exportIncoming" name="types[]" checked>
+                            <label class="form-check-label" for="exportIncoming">
+                                Incoming Documents
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" value="outgoing" id="exportOutgoing" name="types[]" checked>
+                            <label class="form-check-label" for="exportOutgoing">
+                                Outgoing Documents
+                            </label>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Date Range</label>
+                        <div class="row">
+                            <div class="col-6">
+                                <input type="date" class="form-control" name="startDate" placeholder="Start Date">
+                            </div>
+                            <div class="col-6">
+                                <input type="date" class="form-control" name="endDate" placeholder="End Date">
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal" aria-label="Cancel export">Cancel</button>
+                <button type="button" class="btn btn-kemri" id="exportBtn" aria-label="Export documents">Export</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1" role="dialog" aria-labelledby="deleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="deleteModalLabel">Confirm Delete</h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                Are you sure you want to delete this document? This action cannot be undone.
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal" aria-label="Cancel delete">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmDelete" aria-label="Confirm delete document">Delete</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Workflow Action Modal -->
+<div class="modal fade" id="workflowModal" tabindex="-1" role="dialog" aria-labelledby="workflowModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-kemri text-white">
+                <h5 class="modal-title" id="workflowModalLabel">Document Workflow Actions</h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div id="docInfo" class="mb-4">
+                    <h6 class="document-code mb-2">DOC-001</h6>
+                    <p class="document-details mb-1">Annual Budget Approval</p>
+                    <span class="document-status status-badge status-badge-pending">Pending</span>
+                </div>
+                
+                <div class="list-group mb-3">
+                    <button type="button" class="list-group-item list-group-item-action workflow-action" data-action="approve">
+                        <div class="d-flex align-items-center">
+                            <div class="action-icon text-success mr-3">
+                                <i class="fas fa-check-circle fa-2x"></i>
+                            </div>
+                            <div>
+                                <h6 class="mb-1">Approve Document</h6>
+                                <p class="mb-0 text-muted small">Approve and move to next stage</p>
+                            </div>
+                        </div>
+                    </button>
+                    <button type="button" class="list-group-item list-group-item-action workflow-action" data-action="review">
+                        <div class="d-flex align-items-center">
+                            <div class="action-icon text-info mr-3">
+                                <i class="fas fa-comment-alt fa-2x"></i>
+                            </div>
+                            <div>
+                                <h6 class="mb-1">Add Review Comments</h6>
+                                <p class="mb-0 text-muted small">Add comments without changing status</p>
+                            </div>
+                        </div>
+                    </button>
+                    <button type="button" class="list-group-item list-group-item-action workflow-action" data-action="reject">
+                        <div class="d-flex align-items-center">
+                            <div class="action-icon text-danger mr-3">
+                                <i class="fas fa-times-circle fa-2x"></i>
+                            </div>
+                            <div>
+                                <h6 class="mb-1">Reject Document</h6>
+                                <p class="mb-0 text-muted small">Reject and return to sender</p>
+                            </div>
+                        </div>
+                    </button>
+                    <button type="button" class="list-group-item list-group-item-action workflow-action" data-action="forward">
+                        <div class="d-flex align-items-center">
+                            <div class="action-icon text-primary mr-3">
+                                <i class="fas fa-share fa-2x"></i>
+                            </div>
+                            <div>
+                                <h6 class="mb-1">Forward Document</h6>
+                                <p class="mb-0 text-muted small">Send to another department or person</p>
+                            </div>
+                        </div>
+                    </button>
+                </div>
+                
+                <form id="workflowCommentForm">
+                    <div class="form-group">
+                        <label for="workflowComment">Comment (Optional)</label>
+                        <textarea class="form-control" id="workflowComment" rows="3" placeholder="Add a comment about this action..."></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-kemri" id="submitWorkflowAction" disabled>Submit Action</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Include Three.js for 3D visualization -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<!-- Include Chart.js for the alternative visualization -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    // Dashboard functionality
+    document.addEventListener('DOMContentLoaded', function() {
+        // Filter button functionality
+        const filterButtons = document.querySelectorAll('.filter-btn');
+        const filterInput = document.getElementById('filterInput');
+        
+        filterButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                // Remove active class from all buttons
+                filterButtons.forEach(btn => btn.classList.remove('active'));
+                // Add active class to clicked button
+                this.classList.add('active');
+                // Update the hidden filter input
+                filterInput.value = this.dataset.filter;
+                // Submit the form
+                document.getElementById('searchForm').submit();
+            });
+        });
+        
+        // Toggle between 3D and Chart views
+        const view3dBtn = document.getElementById('view3d');
+        const viewChartBtn = document.getElementById('viewChart');
+        const viz3d = document.getElementById('status-visualization');
+        const vizChart = document.getElementById('chart-visualization');
+        
+        view3dBtn.addEventListener('click', function() {
+            view3dBtn.classList.add('active');
+            viewChartBtn.classList.remove('active');
+            viz3d.style.display = 'block';
+            vizChart.style.display = 'none';
+        });
+        
+        viewChartBtn.addEventListener('click', function() {
+            viewChartBtn.classList.add('active');
+            view3dBtn.classList.remove('active');
+            vizChart.style.display = 'block';
+            viz3d.style.display = 'none';
+            
+            // Create chart if it doesn't exist
+            if (!window.statusChart) {
+                initChart();
+            }
+        });
+        
+        // Set up delete confirmation
+        const deleteModal = document.getElementById('deleteModal');
+        deleteModal.addEventListener('show.bs.modal', function(event) {
+            const button = event.relatedTarget;
+            const docId = button.getAttribute('data-doc-id');
+            const confirmDeleteBtn = document.getElementById('confirmDelete');
+            
+            confirmDeleteBtn.setAttribute('data-doc-id', docId);
+        });
+        
+        document.getElementById('confirmDelete').addEventListener('click', function() {
+            const docId = this.getAttribute('data-doc-id');
+            // Submit delete request
+            window.location.href = `/document/${docId}/delete`;
+        });
+        
+        // Initialize 3D visualization
+        init3DViz();
+        
+        // Export button functionality
+        document.getElementById('exportBtn').addEventListener('click', function() {
+            const formData = new FormData(document.getElementById('exportForm'));
+            // Convert FormData to a query string
+            const params = new URLSearchParams(formData);
+            window.location.href = `/export?${params.toString()}`;
+        });
+        
+        // Setup workflow actions
+        const workflowModal = document.getElementById('workflowModal');
+        const workflowActions = document.querySelectorAll('.workflow-action');
+        const submitWorkflowBtn = document.getElementById('submitWorkflowAction');
+        let selectedAction = null;
+        let currentDocId = null;
+        
+        workflowModal.addEventListener('show.bs.modal', function(event) {
+            const button = event.relatedTarget;
+            currentDocId = button.getAttribute('data-doc-id');
+            
+            // Update modal with document info (in a real app, this would fetch from server)
+            const docCode = currentDocId;
+            const docDetails = button.closest('tr').querySelector('td:nth-child(3)').textContent;
+            const docStatus = button.closest('tr').querySelector('td:nth-child(6) .status-badge').textContent;
+            
+            document.querySelector('#docInfo .document-code').textContent = docCode;
+            document.querySelector('#docInfo .document-details').textContent = docDetails;
+            document.querySelector('#docInfo .document-status').textContent = docStatus;
+            
+            // Reset form
+            document.getElementById('workflowCommentForm').reset();
+            workflowActions.forEach(action => action.classList.remove('active'));
+            submitWorkflowBtn.disabled = true;
+            selectedAction = null;
+        });
+        
+        // Handle workflow action selection
+        workflowActions.forEach(action => {
+            action.addEventListener('click', function() {
+                workflowActions.forEach(a => a.classList.remove('active'));
+                this.classList.add('active');
+                selectedAction = this.getAttribute('data-action');
+                submitWorkflowBtn.disabled = false;
+            });
+        });
+        
+        // Handle workflow action submission
+        submitWorkflowBtn.addEventListener('click', function() {
+            if (!selectedAction || !currentDocId) return;
+            
+            const comment = document.getElementById('workflowComment').value;
+            
+            // In a real app, this would be an AJAX request to the server
+            console.log(`Performing ${selectedAction} action on document ${currentDocId}`);
+            console.log(`Comment: ${comment}`);
+            
+            // Simulate successful action
+            alert(`${selectedAction.charAt(0).toUpperCase() + selectedAction.slice(1)} action completed successfully!`);
+            
+            // Close modal
+            $('#workflowModal').modal('hide');
+            
+            // In a real app, you might refresh the page or update the UI
+        });
+        
+        // Handle document assignment
+        const assignLinks = document.querySelectorAll('.assign-user');
+        assignLinks.forEach(link => {
+            link.addEventListener('click', function(e) {
+                e.preventDefault();
+                
+                const docId = this.getAttribute('data-doc-id');
+                const userId = this.getAttribute('data-user-id');
+                const userName = this.textContent;
+                
+                // In a real app, this would be an AJAX request to the server
+                console.log(`Assigning document ${docId} to user ${userId} (${userName})`);
+                
+                // Update UI to show assignment
+                const assignButton = document.getElementById(`assignDropdown${docId}`);
+                if (assignButton) {
+                    assignButton.textContent = userName;
+                }
+                
+                // Close dropdown
+                $(this).closest('.dropdown-menu').prev().dropdown('toggle');
+            });
+        });
+    });
+    
+    // Chart.js visualization
+    function initChart() {
+        const ctx = document.getElementById('chart-visualization').getContext('2d');
+        
+        // Get document counts from data attributes (safer approach)
+        const incomingCount = parseInt("{{ incoming_count|default(0) }}") || 0;
+        const pendingCount = parseInt("{{ pending_count|default(0) }}") || 0;
+        const receivedCount = parseInt("{{ received_count|default(0) }}") || 0;
+        const endedCount = parseInt("{{ ended_count|default(0) }}") || 0;
+        
+        window.statusChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: ['Incoming', 'Pending', 'Received', 'Ended'],
+                datasets: [{
+                    label: 'Document Count',
+                    data: [incomingCount, pendingCount, receivedCount, endedCount],
+                    backgroundColor: [
+                        '#2196F3',
+                        '#FFC107',
+                        '#4CAF50',
+                        '#F44336'
+                    ],
+                    borderColor: [
+                        '#1976D2',
+                        '#FF8F00',
+                        '#2E7D32',
+                        '#B71C1C'
+                    ],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        precision: 0
+                    }
+                }
+            }
+        });
+    }
+    
+    // 3D visualization using Three.js
+    function init3DViz() {
+        // Initialize scene
+        const container = document.getElementById('status-visualization');
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, container.clientWidth / container.clientHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        
+        renderer.setSize(container.clientWidth, container.clientHeight);
+        renderer.setClearColor(0xf0f0f0, 1);
+        container.appendChild(renderer.domElement);
+        
+        // Add lights
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+        scene.add(ambientLight);
+        
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        directionalLight.position.set(1, 1, 1);
+        scene.add(directionalLight);
+        
+        // Create document status cubes
+        const geometry = new THREE.BoxGeometry(1, 1, 1);
+        
+        // Get counts from server-side variables - converted to JavaScript variables to avoid template syntax in JS
+        const incomingCount = parseInt("{{ incoming_count|default(0) }}") || 0;
+        const pendingCount = parseInt("{{ pending_count|default(0) }}") || 0;
+        const receivedCount = parseInt("{{ received_count|default(0) }}") || 0;
+        const endedCount = parseInt("{{ ended_count|default(0) }}") || 0;
+        
+        // Incoming documents
+        const incomingMaterial = new THREE.MeshLambertMaterial({ color: 0x2196F3 });
+        for (let i = 0; i < incomingCount; i++) {
+            const cube = new THREE.Mesh(geometry, incomingMaterial);
+            cube.position.set(-3 + Math.random(), Math.random() * 2, -3 + Math.random() * 2);
+            scene.add(cube);
+        }
+        
+        // Pending documents
+        const pendingMaterial = new THREE.MeshLambertMaterial({ color: 0xFFC107 });
+        for (let i = 0; i < pendingCount; i++) {
+            const cube = new THREE.Mesh(geometry, pendingMaterial);
+            cube.position.set(-1 + Math.random(), Math.random() * 2, -1 + Math.random() * 2);
+            scene.add(cube);
+        }
+        
+        // Received documents
+        const receivedMaterial = new THREE.MeshLambertMaterial({ color: 0x4CAF50 });
+        for (let i = 0; i < receivedCount; i++) {
+            const cube = new THREE.Mesh(geometry, receivedMaterial);
+            cube.position.set(1 + Math.random(), Math.random() * 2, 1 + Math.random() * 2);
+            scene.add(cube);
+        }
+        
+        // Ended documents
+        const endedMaterial = new THREE.MeshLambertMaterial({ color: 0xF44336 });
+        for (let i = 0; i < endedCount; i++) {
+            const cube = new THREE.Mesh(geometry, endedMaterial);
+            cube.position.set(3 + Math.random(), Math.random() * 2, 3 + Math.random() * 2);
+            scene.add(cube);
+        }
+        
+        // Add labels for better understanding
+        const labels = [];
+        
+        addLabel("Incoming", -3, 3, -3, 0x2196F3);
+        addLabel("Pending", -1, 3, -1, 0xFFC107);
+        addLabel("Received", 1, 3, 1, 0x4CAF50);
+        addLabel("Ended", 3, 3, 3, 0xF44336);
+        
+        function addLabel(text, x, y, z, color) {
+            const div = document.createElement('div');
+            div.className = 'status-label';
+            div.textContent = text;
+            div.style.position = 'absolute';
+            div.style.color = '#' + color.toString(16).padStart(6, '0');
+            div.style.fontWeight = 'bold';
+            div.style.backgroundColor = 'rgba(255,255,255,0.7)';
+            div.style.padding = '2px 6px';
+            div.style.borderRadius = '4px';
+            div.style.userSelect = 'none';
+            div.style.pointerEvents = 'none';
+            
+            container.appendChild(div);
+            
+            function updatePosition() {
+                // Project 3D position to 2D screen coordinates
+                const vector = new THREE.Vector3(x, y, z);
+                vector.project(camera);
+                
+                const widthHalf = container.clientWidth / 2;
+                const heightHalf = container.clientHeight / 2;
+                
+                div.style.left = (vector.x * widthHalf + widthHalf) + 'px';
+                div.style.top = (- vector.y * heightHalf + heightHalf) + 'px';
+            }
+            
+            // Initialize and update on each frame
+            updatePosition();
+            labels.push(updatePosition);
+        }
+        
+        // Position camera
+        camera.position.z = 8;
+        camera.position.y = 4;
+        camera.lookAt(0, 0, 0);
+        
+        // Animation
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            // Rotate scene slightly
+            scene.rotation.y += 0.005;
+            
+            // Update label positions
+            labels.forEach(updateFn => updateFn());
+            
+            renderer.render(scene, camera);
+        }
+        
+        animate();
+        
+        // Handle window resize
+        window.addEventListener('resize', function() {
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        });
+    }
+</script>
+{% endblock %} 
