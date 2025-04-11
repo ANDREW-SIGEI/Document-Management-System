@@ -206,25 +206,66 @@ with app.app_context():
 
 @app.route('/')
 def index():
-    """Render the index page"""
-    nav = [
-        {"url": url_for("dashboard"), "name": "Dashboard", "icon": "tachometer-alt"},
-        {"url": url_for("incoming"), "name": "Incoming", "icon": "inbox"},
-        {"url": url_for("outgoing"), "name": "Outgoing", "icon": "paper-plane"},
-        {"url": url_for("compose"), "name": "Compose", "icon": "edit"},
-        {"url": url_for("track_document"), "name": "Track Document", "icon": "search"},
-        {"url": url_for("maintenance"), "name": "Maintenance", "icon": "cogs"},
-        {"url": url_for("reports"), "name": "Reports", "icon": "chart-bar"},
-        {"url": url_for("user_management"), "name": "User Management", "icon": "users-cog"},
-        {"url": url_for("my_account"), "name": "My Account", "icon": "user"},
-    ]
+    """Homepage route - redirects to dashboard or login"""
+    # Check if user is authenticated here (not implemented in this demo)
+    # In a real app, you would use something like: if current_user.is_authenticated
+    authenticated = False
     
-    return render_template('index.html', navigation=nav)
+    if authenticated:
+        return redirect(url_for('dashboard'))
+    else:
+        return redirect(url_for('login'))
 
-@app.route('/dashboard')
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    """Login route for user authentication"""
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        remember = request.form.get('remember', False) == 'on'
+        
+        # Simple authentication for demonstration
+        # In a real app, you would check against database and use password hashing
+        if username == 'admin' and password == 'password':
+            # Successful login - redirect to dashboard
+            flash('Login successful!', 'success')
+            return redirect(url_for('dashboard'))
+        else:
+            # Failed login
+            flash('Invalid username or password', 'danger')
+    
+    # GET request or failed login - show login form
+    return render_template('login.html')
+
+@app.route('/dashboard', methods=['GET', 'POST'])
 def dashboard():
-    users = User.query.all()
-    return render_template('dashboard_new.html', users=users)
+    # Count documents by status
+    incoming_count = Document.query.filter_by(status='Incoming').count()
+    pending_count = Document.query.filter_by(status='Pending').count()
+    received_count = Document.query.filter_by(status='Received').count()
+    ended_count = Document.query.filter_by(status='Ended').count()
+    
+    # Get recent documents
+    recent_documents = Document.query.order_by(Document.created_at.desc()).limit(10).all()
+    
+    # For each document, add a deadline field if it doesn't exist
+    for doc in recent_documents:
+        if not hasattr(doc, 'deadline'):
+            # Calculate a mock deadline based on priority
+            days = 7  # Normal priority
+            if doc.priority == 'Priority':
+                days = 5
+            elif doc.priority == 'Urgent':
+                days = 2
+            doc.deadline = (doc.created_at + timedelta(days=days)).strftime('%Y-%m-%d')
+    
+    return render_template('dashboard.html', 
+                          users=User.query.all(),
+                          documents=recent_documents,
+                          incoming_count=incoming_count,
+                          pending_count=pending_count,
+                          received_count=received_count,
+                          ended_count=ended_count)
 
 @app.route('/compose', methods=['GET', 'POST'])
 def compose():
@@ -2212,6 +2253,92 @@ def export_document_history(document_code):
         app.logger.error(f"Error exporting document history: {str(e)}")
         flash(f'Error exporting document history: {str(e)}', 'danger')
         return redirect(url_for('track_document'))
+
+@app.route('/document/update-status', methods=['POST'])
+def update_document_status():
+    """Update a document's status from the dashboard or other forms"""
+    document_code = request.form.get('document_code')
+    new_status = request.form.get('status')
+    notes = request.form.get('notes', '')
+    
+    if not document_code or not new_status:
+        flash('Missing required information', 'danger')
+        return redirect(url_for('dashboard'))
+    
+    # Find the document in the database
+    document = Document.query.filter_by(code=document_code).first()
+    
+    if document:
+        old_status = document.status
+        document.status = new_status
+        document.updated_at = datetime.utcnow()
+        
+        # Create an action record
+        action = DocumentAction(
+            document_id=document.id,
+            action=f'Status updated to {new_status}',
+            user='Admin',  # In a real app, this would be the current user
+            action_description=notes,
+            status_before=old_status,
+            status_after=new_status
+        )
+        
+        db.session.add(action)
+        db.session.commit()
+        
+        flash(f'Document {document_code} status updated to {new_status}', 'success')
+        return redirect(url_for('dashboard'))
+    
+    # If not in database, check JSON file
+    elif os.path.exists('document_tracking.json'):
+        try:
+            with open('document_tracking.json', 'r') as f:
+                tracking_data = json.load(f)
+            
+            # Find document in tracking data
+            document_index = None
+            for i, doc in enumerate(tracking_data.get('documents', [])):
+                if doc.get('code') == document_code:
+                    document_index = i
+                    break
+            
+            if document_index is not None:
+                old_status = tracking_data['documents'][document_index].get('status', '')
+                
+                # Create action record
+                action = {
+                    'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                    'user': 'Admin User',  # In a real app, get the current user
+                    'action': 'Status Changed',
+                    'notes': notes,
+                    'previous_status': old_status,
+                    'new_status': new_status
+                }
+                
+                # Update document
+                tracking_data['documents'][document_index]['status'] = new_status
+                
+                # Add to actions
+                if 'actions' not in tracking_data['documents'][document_index]:
+                    tracking_data['documents'][document_index]['actions'] = []
+                
+                tracking_data['documents'][document_index]['actions'].append(action)
+                
+                # Update audit trail
+                tracking_data['documents'][document_index]['audit_trail']['last_modified_by'] = "1"
+                tracking_data['documents'][document_index]['audit_trail']['last_modified_on'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                
+                # Save updated data
+                with open('document_tracking.json', 'w') as f:
+                    json.dump(tracking_data, f, indent=4)
+                
+                flash(f'Document {document_code} status updated to {new_status}', 'success')
+                return redirect(url_for('dashboard'))
+        except Exception as e:
+            app.logger.error(f"Error updating document status: {str(e)}")
+    
+    flash(f'Document {document_code} not found', 'danger')
+    return redirect(url_for('dashboard'))
 
 if __name__ == '__main__':
     app.run(debug=True) 

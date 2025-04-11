@@ -3,141 +3,445 @@
 {% block title %}Dashboard - Document Management System{% endblock %}
 
 {% block content %}
-<h1 class="mb-4">Dashboard</h1>
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>Dashboard</h1>
+    <div class="btn-group">
+        <a href="/compose" class="btn btn-primary">
+            <i class="fas fa-plus-circle mr-1"></i> New Document
+        </a>
+        <button type="button" class="btn btn-outline-primary dropdown-toggle dropdown-toggle-split" data-toggle="dropdown" aria-expanded="false">
+            <span class="sr-only">Toggle Dropdown</span>
+        </button>
+        <div class="dropdown-menu dropdown-menu-right">
+            <a class="dropdown-item" href="/compose?type=incoming"><i class="fas fa-inbox mr-2"></i>New Incoming</a>
+            <a class="dropdown-item" href="/compose?type=outgoing"><i class="fas fa-paper-plane mr-2"></i>New Outgoing</a>
+            <div class="dropdown-divider"></div>
+            <a class="dropdown-item" href="/track_document"><i class="fas fa-search mr-2"></i>Track Document</a>
+        </div>
+    </div>
+</div>
 
-<!-- Search and Filters -->
-<div class="card mb-4">
-    <div class="card-body">
-        <div class="row">
-            <div class="col-md-8">
-                <div class="input-group">
-                    <input type="text" class="form-control" placeholder="Search documents...">
-                    <div class="input-group-append">
-                        <button class="btn btn-primary" type="button" aria-label="Search">
-                            <i class="fas fa-search"></i>
-                        </button>
+<!-- Stats Overview Cards -->
+<div class="row mb-4">
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-left-primary shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                            Incoming Documents</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ incoming_count|default(0) }}</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-inbox fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+                <div class="mt-2">
+                    <a href="/incoming" class="btn btn-sm btn-outline-primary btn-block">View All</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-left-warning shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                            Pending Documents</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ pending_count|default(0) }}</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-clock fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+                <div class="mt-2">
+                    <a href="/incoming?status=Pending" class="btn btn-sm btn-outline-warning btn-block">View All</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-left-success shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                            Received Documents</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ received_count|default(0) }}</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-check-circle fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+                <div class="mt-2">
+                    <a href="/incoming?status=Received" class="btn btn-sm btn-outline-success btn-block">View All</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-left-danger shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-danger text-uppercase mb-1">
+                            Urgent Documents</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ (documents|selectattr('priority', 'equalto', 'Urgent')|list|length)|default(0) }}</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-exclamation-circle fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+                <div class="mt-2">
+                    <a href="/incoming?priority=Urgent" class="btn btn-sm btn-outline-danger btn-block">View All</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Search and Quick Actions -->
+<div class="row mb-4">
+    <!-- Search -->
+    <div class="col-lg-8">
+        <div class="card shadow mb-4">
+            <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                <h6 class="m-0 font-weight-bold text-primary">Quick Search</h6>
+            </div>
+            <div class="card-body">
+                <form action="/track_document" method="get">
+                    <div class="input-group">
+                        <input type="text" class="form-control bg-light border-0" placeholder="Search documents by code, sender, or keywords..." name="search">
+                        <div class="input-group-append">
+                            <button class="btn btn-primary" type="submit" aria-label="Search">
+                                <i class="fas fa-search fa-sm"></i>
+                            </button>
+                        </div>
+                    </div>
+                </form>
+                <div class="mt-3">
+                    <div class="btn-group btn-group-sm w-100 mb-3" role="group">
+                        <a href="/incoming" class="btn btn-outline-primary">All Docs</a>
+                        <a href="/incoming?priority=Urgent" class="btn btn-outline-danger">Urgent</a>
+                        <a href="/incoming?priority=Priority" class="btn btn-outline-warning">Priority</a>
+                        <a href="/outgoing" class="btn btn-outline-info">Outgoing</a>
                     </div>
                 </div>
             </div>
-            <div class="col-md-4">
-                <div class="btn-group btn-group-sm w-100" role="group">
-                    <button type="button" class="btn btn-outline-primary active">All</button>
-                    <button type="button" class="btn btn-outline-warning">Priority</button>
-                    <button type="button" class="btn btn-outline-danger">Urgent</button>
-                    <button type="button" class="btn btn-outline-secondary">Usual</button>
+        </div>
+    </div>
+    
+    <!-- Quick Actions -->
+    <div class="col-lg-4">
+        <div class="card shadow mb-4">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">Quick Actions</h6>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <a href="/compose" class="btn btn-primary btn-block mb-2">
+                        <i class="fas fa-file-alt mr-1"></i> New Document
+                    </a>
+                    <a href="/track_document" class="btn btn-info btn-block mb-2">
+                        <i class="fas fa-search mr-1"></i> Track Document
+                    </a>
+                    <a href="/reports" class="btn btn-success btn-block mb-2">
+                        <i class="fas fa-chart-bar mr-1"></i> Generate Report
+                    </a>
+                    <button type="button" class="btn btn-secondary btn-block" data-toggle="modal" data-target="#qrScannerModal">
+                        <i class="fas fa-qrcode mr-1"></i> Scan QR Code
+                    </button>
                 </div>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Status Cards -->
+<!-- Recent Documents and Activity -->
 <div class="row">
-    <div class="col-md-3">
-        <div class="card status-card status-incoming">
+    <!-- Recent Documents -->
+    <div class="col-lg-8">
+        <div class="card shadow mb-4">
+            <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                <h6 class="m-0 font-weight-bold text-primary">Recent Documents</h6>
+                <div class="dropdown no-arrow">
+                    <a class="dropdown-toggle" href="#" role="button" id="dropdownMenuLink" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                        <i class="fas fa-ellipsis-v fa-sm fa-fw text-gray-400"></i>
+                    </a>
+                    <div class="dropdown-menu dropdown-menu-right shadow animated--fade-in" aria-labelledby="dropdownMenuLink">
+                        <div class="dropdown-header">View Options:</div>
+                        <a class="dropdown-item" href="/incoming">All Incoming</a>
+                        <a class="dropdown-item" href="/outgoing">All Outgoing</a>
+                        <div class="dropdown-divider"></div>
+                        <a class="dropdown-item" href="/reports">Generate Report</a>
+                    </div>
+                </div>
+            </div>
             <div class="card-body">
-                <h5 class="card-title">All Incoming Docs</h5>
-                <h2>{{ incoming_count }}</h2>
-                <p class="mb-0">Total incoming documents</p>
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Doc. Code</th>
+                                <th>Sender</th>
+                                <th>Details</th>
+                                <th>Status</th>
+                                <th>Date</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for doc in documents|default([]) %}
+                            <tr>
+                                <td><a href="/document/{{ doc.code }}" class="font-weight-bold text-primary">{{ doc.code }}</a></td>
+                                <td>{{ doc.sender }}</td>
+                                <td>{{ doc.details|truncate(30) }}</td>
+                                <td>
+                                    {% if doc.status == 'Incoming' %}
+                                    <span class="badge badge-info">Incoming</span>
+                                    {% elif doc.status == 'Pending' %}
+                                    <span class="badge badge-warning">Pending</span>
+                                    {% elif doc.status == 'Received' %}
+                                    <span class="badge badge-success">Received</span>
+                                    {% elif doc.status == 'Outgoing' %}
+                                    <span class="badge badge-primary">Outgoing</span>
+                                    {% elif doc.status == 'Ended' %}
+                                    <span class="badge badge-secondary">Ended</span>
+                                    {% else %}
+                                    <span class="badge badge-light">{{ doc.status }}</span>
+                                    {% endif %}
+                                    
+                                    {% if doc.priority == 'Urgent' %}
+                                    <span class="badge badge-danger">Urgent</span>
+                                    {% elif doc.priority == 'Priority' %}
+                                    <span class="badge badge-warning">Priority</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ doc.date_of_letter|default(doc.date) }}</td>
+                                <td>
+                                    <div class="btn-group btn-group-sm">
+                                        <a href="/document/{{ doc.code }}" class="btn btn-outline-primary btn-sm" data-toggle="tooltip" title="View Details">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                        <button type="button" class="btn btn-outline-success btn-sm" onclick="updateStatus('{{ doc.code }}', 'Received')" data-toggle="tooltip" title="Mark Received">
+                                            <i class="fas fa-check"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="6" class="text-center">No documents found</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="card-footer">
+                <a href="/incoming" class="btn btn-outline-primary btn-sm">View All Incoming</a>
+                <a href="/outgoing" class="btn btn-outline-primary btn-sm">View All Outgoing</a>
             </div>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="card status-card status-pending">
+
+    <!-- Document Overview -->
+    <div class="col-lg-4">
+        <div class="card shadow mb-4">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">Document Overview</h6>
+            </div>
             <div class="card-body">
-                <h5 class="card-title">Pending Docs</h5>
-                <h2>{{ pending_count }}</h2>
-                <p class="mb-0">Documents awaiting action</p>
+                <div class="chart-pie pt-4 pb-2">
+                    <canvas id="documentStatusChart"></canvas>
+                </div>
+                <div class="mt-4 text-center small">
+                    <span class="mr-2">
+                        <i class="fas fa-circle text-info"></i> Incoming
+                    </span>
+                    <span class="mr-2">
+                        <i class="fas fa-circle text-warning"></i> Pending
+                    </span>
+                    <span class="mr-2">
+                        <i class="fas fa-circle text-success"></i> Received
+                    </span>
+                    <span class="mr-2">
+                        <i class="fas fa-circle text-primary"></i> Outgoing
+                    </span>
+                </div>
             </div>
         </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card status-card status-received">
-            <div class="card-body">
-                <h5 class="card-title">Received Docs</h5>
-                <h2>{{ received_count }}</h2>
-                <p class="mb-0">Documents received</p>
+
+        <!-- Deadline Reminders -->
+        <div class="card shadow mb-4">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold text-primary">Upcoming Deadlines</h6>
             </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card status-card status-ended">
             <div class="card-body">
-                <h5 class="card-title">Ended Docs</h5>
-                <h2>{{ ended_count }}</h2>
-                <p class="mb-0">Completed documents</p>
+                <div class="list-group">
+                    {% set upcoming_deadlines = documents|selectattr('deadline')|list|sort(attribute='deadline') %}
+                    {% for doc in upcoming_deadlines[:3]|default([]) %}
+                    <a href="/document/{{ doc.code }}" class="list-group-item list-group-item-action flex-column align-items-start">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1">{{ doc.code }}</h6>
+                            <small class="text-{{ 'danger' if doc.priority == 'Urgent' else 'warning' if doc.priority == 'Priority' else 'muted' }}">
+                                {{ doc.deadline }}
+                            </small>
+                        </div>
+                        <p class="mb-1">{{ doc.details|truncate(40) }}</p>
+                        <small>Required: {{ doc.required_action }}</small>
+                    </a>
+                    {% else %}
+                    <div class="text-center py-3">
+                        <span class="text-muted">No upcoming deadlines</span>
+                    </div>
+                    {% endfor %}
+                </div>
+                <div class="mt-3 text-center">
+                    <a href="/reports?view=deadlines" class="btn btn-sm btn-outline-primary">View All Deadlines</a>
+                </div>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Documents Table -->
-<div class="card mt-4">
-    <div class="card-header bg-white">
-        <h5 class="mb-0">Document List</h5>
-    </div>
-    <div class="card-body">
-        <div class="table-responsive">
-            <table class="table table-striped">
-                <thead>
-                    <tr>
-                        <th>Doc. Code</th>
-                        <th>Sender</th>
-                        <th>Details</th>
-                        <th>Required Action</th>
-                        <th>Date of Letter</th>
-                        <th>Status</th>
-                        <th>Action</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td><a href="#" class="text-primary">DOC-001</a></td>
-                        <td>Ministry of Health</td>
-                        <td>Annual Budget Approval</td>
-                        <td>Review and Endorse</td>
-                        <td>2025-03-15</td>
-                        <td><span class="status-badge status-badge-pending">Pending</span></td>
-                        <td>
-                            <button class="btn btn-sm btn-primary">View</button>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td><a href="#" class="text-primary">DOC-002</a></td>
-                        <td>Research Department</td>
-                        <td>Quarterly Report</td>
-                        <td>Review</td>
-                        <td>2025-03-20</td>
-                        <td><span class="status-badge status-badge-pending">Pending</span></td>
-                        <td>
-                            <button class="btn btn-sm btn-primary">View</button>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td><a href="#" class="text-primary">DOC-003</a></td>
-                        <td>Finance Department</td>
-                        <td>Budget Allocation</td>
-                        <td>Approve</td>
-                        <td>2025-03-25</td>
-                        <td><span class="status-badge status-badge-pending">Pending</span></td>
-                        <td>
-                            <button class="btn btn-sm btn-primary">View</button>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td><a href="#" class="text-primary">DOC-004</a></td>
-                        <td>HR Department</td>
-                        <td>Staff Recruitment</td>
-                        <td>Review and Comment</td>
-                        <td>2025-03-30</td>
-                        <td><span class="status-badge status-badge-received">Received</span></td>
-                        <td>
-                            <button class="btn btn-sm btn-primary">View</button>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
+<!-- QR Scanner Modal -->
+<div class="modal fade" id="qrScannerModal" tabindex="-1" aria-labelledby="qrScannerModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="qrScannerModalLabel">Scan Document QR Code</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body text-center">
+                <div id="qrScanner" class="mb-3">
+                    <div class="p-5 bg-light border rounded-lg">
+                        <i class="fas fa-qrcode fa-5x text-muted mb-3"></i>
+                        <p class="mb-0">Camera access would be requested here in a real application.</p>
+                    </div>
+                </div>
+                <div class="d-none" id="scanResult">
+                    <div class="alert alert-success">
+                        Document code detected: <strong id="scannedCode">DOC-2025-001</strong>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" onclick="simulateScan()">Simulate Scan</button>
+                <a href="#" id="viewDocumentBtn" class="btn btn-success d-none">View Document</a>
+            </div>
         </div>
     </div>
 </div>
+
+<!-- Status Update Modal -->
+<div class="modal fade" id="statusUpdateModal" tabindex="-1" aria-labelledby="statusUpdateModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="statusUpdateModalLabel">Update Document Status</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form id="statusUpdateForm" action="/document/update-status" method="post">
+                <div class="modal-body">
+                    <input type="hidden" id="documentCode" name="document_code" value="">
+                    <div class="form-group">
+                        <label for="newStatus">New Status</label>
+                        <select class="form-control" id="newStatus" name="status">
+                            <option value="Incoming">Incoming</option>
+                            <option value="Pending">Pending</option>
+                            <option value="Received">Received</option>
+                            <option value="Outgoing">Outgoing</option>
+                            <option value="Ended">Ended</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="statusNotes">Notes</label>
+                        <textarea class="form-control" id="statusNotes" name="notes" rows="3" placeholder="Add notes about this status change..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Update Status</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@2.9.4/dist/Chart.min.js"></script>
+<script>
+    // Document Status Chart
+    document.addEventListener('DOMContentLoaded', function() {
+        var ctx = document.getElementById('documentStatusChart');
+        var myPieChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Incoming', 'Pending', 'Received', 'Outgoing'],
+                datasets: [{
+                    data: [
+                        {{ incoming_count|default(5) }}, 
+                        {{ pending_count|default(12) }}, 
+                        {{ received_count|default(8) }}, 
+                        {{ ended_count|default(3) }}
+                    ],
+                    backgroundColor: ['#36b9cc', '#f6c23e', '#1cc88a', '#4e73df'],
+                    hoverBackgroundColor: ['#2c9faf', '#dda20a', '#17a673', '#2e59d9'],
+                    hoverBorderColor: "rgba(234, 236, 244, 1)",
+                }],
+            },
+            options: {
+                maintainAspectRatio: false,
+                tooltips: {
+                    backgroundColor: "rgb(255,255,255)",
+                    bodyFontColor: "#858796",
+                    borderColor: '#dddfeb',
+                    borderWidth: 1,
+                    xPadding: 15,
+                    yPadding: 15,
+                    displayColors: false,
+                    caretPadding: 10,
+                },
+                legend: {
+                    display: false
+                },
+                cutoutPercentage: 80,
+            },
+        });
+    });
+    
+    // Update document status
+    function updateStatus(docCode, status) {
+        $('#documentCode').val(docCode);
+        $('#newStatus').val(status);
+        $('#statusUpdateModal').modal('show');
+    }
+    
+    // Simulate QR scan
+    function simulateScan() {
+        // In a real app, this would be handled by a proper QR scanner
+        setTimeout(() => {
+            document.getElementById('qrScanner').classList.add('d-none');
+            document.getElementById('scanResult').classList.remove('d-none');
+            document.getElementById('viewDocumentBtn').classList.remove('d-none');
+            document.getElementById('viewDocumentBtn').href = "/document/DOC-2025-001";
+        }, 1000);
+    }
+    
+    // Initialize tooltips
+    $(function () {
+        $('[data-toggle="tooltip"]').tooltip()
+    })
+</script>
+{% endblock %}
 {% endblock %} 
