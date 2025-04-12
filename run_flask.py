@@ -5,7 +5,7 @@ import traceback
 try:
     from app_fixed import app
     print("Successfully imported app from app_fixed.py")
-    app.run(debug=True, host='0.0.0.0')
+    app.run(debug=True, host='0.0.0.0', port=5000)
 except Exception as e:
     print(f"Error when running app: {e}")
     traceback.print_exc()

@@ -1,632 +1,1507 @@
 {% extends 'layout.html' %}
 
-{% block title %}Maintenance - Document Management System{% endblock %}
+{% block title %}System Maintenance - Document Management System{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap">
-    <h1>System Maintenance</h1>
-    <div class="d-flex gap-2 mt-2 mt-md-0">
-        <a href="{{ url_for('maintenance') }}" class="btn btn-outline-primary">
-            <i class="fas fa-sync-alt"></i> Refresh Data
-        </a>
-    </div>
-</div>
-
-{% with messages = get_flashed_messages(with_categories=true) %}
-  {% if messages %}
-    {% for category, message in messages %}
-      <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-        {{ message }}
-        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-          <span aria-hidden="true">&times;</span>
-        </button>
-      </div>
-    {% endfor %}
-  {% endif %}
-{% endwith %}
-
-<div class="row">
-    <!-- System Stats -->
-    <div class="col-md-6">
-        <div class="card mb-4">
-            <div class="card-header bg-white">
-                <h5 class="mb-0">System Statistics</h5>
-            </div>
-            <div class="card-body">
-                <div class="row mb-3">
-                    <div class="col-md-6">
-                        <strong>Total Documents:</strong>
-                    </div>
-                    <div class="col-md-6">
-                        {{ total_documents }}
-                    </div>
-                </div>
-                <div class="row mb-3">
-                    <div class="col-md-6">
-                        <strong>Storage Used:</strong>
-                    </div>
-                    <div class="col-md-6">
-                        {{ storage_used }}
-                    </div>
-                </div>
-                <div class="row mb-3">
-                    <div class="col-md-6">
-                        <strong>Last Backup:</strong>
-                    </div>
-                    <div class="col-md-6">
-                        {{ last_backup|default('Never') }}
-                    </div>
-                </div>
-                <div class="row mb-3">
-                    <div class="col-md-6">
-                        <strong>System Version:</strong>
-                    </div>
-                    <div class="col-md-6">
-                        1.0.0
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- System Health -->
-        <div class="card mb-4">
-            <div class="card-header bg-white">
-                <h5 class="mb-0">System Health</h5>
-            </div>
-            <div class="card-body">
-                <div class="row mb-3">
-                    <div class="col-md-6">
-                        <strong>Database Status:</strong>
-                    </div>
-                    <div class="col-md-6">
-                        <span class="badge badge-success">Operational</span>
-                    </div>
-                </div>
-                <div class="row mb-3">
-                    <div class="col-md-6">
-                        <strong>Storage Status:</strong>
-                    </div>
-                    <div class="col-md-6">
-                        <span class="badge badge-success">85% Available</span>
-                    </div>
-                </div>
-                <div class="row mb-3">
-                    <div class="col-md-6">
-                        <strong>Memory Usage:</strong>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="progress" style="height: 15px;">
-                            <div class="progress-bar bg-success" role="progressbar" style="width: 25%;" aria-valuenow="25" aria-valuemin="0" aria-valuemax="100">25%</div>
-                        </div>
-                    </div>
-                </div>
-                <div class="row mb-3">
-                    <div class="col-md-6">
-                        <strong>Last System Check:</strong>
-                    </div>
-                    <div class="col-md-6">
-                        {{ now.strftime('%Y-%m-%d %H:%M') }}
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- Maintenance Actions -->
-    <div class="col-md-6">
-        <div class="card mb-4">
-            <div class="card-header bg-white">
-                <h5 class="mb-0">Maintenance Actions</h5>
-            </div>
-            <div class="card-body">
-                <div class="list-group">
-                    <div class="list-group-item">
-                        <div class="d-flex w-100 justify-content-between">
-                            <h6 class="mb-1">Backup Database</h6>
-                            <form action="{{ url_for('maintenance_action') }}" method="post">
-                                <input type="hidden" name="action" value="backup">
-                                <button type="submit" class="btn btn-sm btn-primary" aria-label="Run backup database">Run Now</button>
-                            </form>
-                        </div>
-                        <small class="text-muted">Create a backup of the entire system database</small>
-                    </div>
-                    <div class="list-group-item">
-                        <div class="d-flex w-100 justify-content-between">
-                            <h6 class="mb-1">Clean Temporary Files</h6>
-                            <form action="{{ url_for('maintenance_action') }}" method="post">
-                                <input type="hidden" name="action" value="clean">
-                                <button type="submit" class="btn btn-sm btn-primary" aria-label="Run clean temporary files">Run Now</button>
-                            </form>
-                        </div>
-                        <small class="text-muted">Remove temporary files to free up storage space</small>
-                    </div>
-                    <div class="list-group-item">
-                        <div class="d-flex w-100 justify-content-between">
-                            <h6 class="mb-1">Optimize Database</h6>
-                            <form action="{{ url_for('maintenance_action') }}" method="post">
-                                <input type="hidden" name="action" value="optimize">
-                                <button type="submit" class="btn btn-sm btn-primary" aria-label="Run optimize database">Run Now</button>
-                            </form>
-                        </div>
-                        <small class="text-muted">Optimize database for improved performance</small>
-                    </div>
-                    <div class="list-group-item">
-                        <div class="d-flex w-100 justify-content-between">
-                            <h6 class="mb-1">Check for Updates</h6>
-                            <form action="{{ url_for('maintenance_action') }}" method="post">
-                                <input type="hidden" name="action" value="update">
-                                <button type="submit" class="btn btn-sm btn-primary" aria-label="Run check for updates">Run Now</button>
-                            </form>
-                        </div>
-                        <small class="text-muted">Check for system updates and security patches</small>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Scheduled Tasks -->
-        <div class="card mb-4">
-            <div class="card-header bg-white d-flex justify-content-between align-items-center">
-                <h5 class="mb-0">Scheduled Tasks</h5>
-                <button class="btn btn-sm btn-outline-primary">Add Task</button>
-            </div>
-            <div class="card-body p-0">
-                <ul class="list-group list-group-flush">
-                    <li class="list-group-item">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <h6 class="mb-1">Daily Backup</h6>
-                                <small class="text-muted">Every day at 02:00 AM</small>
-                            </div>
-                            <div class="form-check form-switch">
-                                <input class="form-check-input" type="checkbox" id="dailyBackup" checked aria-label="Toggle daily backup">
-                                <label class="form-check-label visually-hidden" for="dailyBackup">Toggle daily backup</label>
-                            </div>
-                        </div>
-                    </li>
-                    <li class="list-group-item">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <h6 class="mb-1">Weekly Cleanup</h6>
-                                <small class="text-muted">Every Sunday at 03:00 AM</small>
-                            </div>
-                            <div class="form-check form-switch">
-                                <input class="form-check-input" type="checkbox" id="weeklyCleanup" checked aria-label="Toggle weekly cleanup">
-                                <label class="form-check-label visually-hidden" for="weeklyCleanup">Toggle weekly cleanup</label>
-                            </div>
-                        </div>
-                    </li>
-                    <li class="list-group-item">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <h6 class="mb-1">Monthly Report</h6>
-                                <small class="text-muted">1st day of month at 06:00 AM</small>
-                            </div>
-                            <div class="form-check form-switch">
-                                <input class="form-check-input" type="checkbox" id="monthlyReport" checked aria-label="Toggle monthly report">
-                                <label class="form-check-label visually-hidden" for="monthlyReport">Toggle monthly report</label>
-                            </div>
-                        </div>
-                    </li>
-                </ul>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- System Logs -->
-<div class="card">
-    <div class="card-header bg-white d-flex justify-content-between align-items-center">
-        <h5 class="mb-0">System Logs</h5>
+<div class="container-fluid px-0">
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
-            <button class="btn btn-sm btn-outline-info mr-2" data-toggle="modal" data-target="#adminActivityModal">
-                <i class="fas fa-user-shield mr-1"></i> Admin Activity
-            </button>
-            <select class="form-control form-control-sm d-inline-block" style="width: auto;" aria-label="Filter logs by type">
-                <option>All Types</option>
-                <option>Info</option>
-                <option>Success</option>
-                <option>Warning</option>
-                <option>Error</option>
-            </select>
-            <button class="btn btn-sm btn-outline-secondary ml-2" aria-label="Export logs">Export Logs</button>
+            <h1 class="h3 mb-0 text-gray-800">
+                <i class="fas fa-tools text-primary mr-2"></i>System Maintenance
+            </h1>
+            <p class="text-muted">Manage system health, performance, and configurations</p>
         </div>
-    </div>
-    <div class="card-body">
-        <div class="table-responsive">
-            <table class="table table-striped">
-                <thead>
-                    <tr>
-                        <th>Timestamp</th>
-                        <th>Type</th>
-                        <th>User</th>
-                        <th>Action</th>
-                        <th>Details</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for log in logs %}
-                    <tr>
-                        <td>{{ log.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</td>
-                        <td><span class="badge badge-{{ 'info' if log.log_type == 'Info' else 'success' if log.log_type == 'Success' else 'warning' if log.log_type == 'Warning' else 'danger' }}">{{ log.log_type }}</span></td>
-                        <td>{{ log.user }}</td>
-                        <td>{{ log.action }}</td>
-                        <td>{{ log.details }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>
-    <div class="card-footer bg-white">
-        <nav aria-label="System logs pagination">
-            <ul class="pagination pagination-sm justify-content-center mb-0">
-                <li class="page-item disabled">
-                    <a class="page-link" href="#" tabindex="-1">Previous</a>
-                </li>
-                <li class="page-item active"><a class="page-link" href="#">1</a></li>
-                <li class="page-item"><a class="page-link" href="#">2</a></li>
-                <li class="page-item"><a class="page-link" href="#">3</a></li>
-                <li class="page-item">
-                    <a class="page-link" href="#">Next</a>
-                </li>
-            </ul>
-        </nav>
-    </div>
-</div>
-
-<!-- Disk Space Management -->
-<div class="card mb-4">
-    <div class="card-header bg-white">
-        <h5 class="mb-0">Disk Space Management</h5>
-    </div>
-    <div class="card-body">
-        <div class="row mb-3">
-            <div class="col-md-3">
-                <strong>Main Drive:</strong>
-            </div>
-            <div class="col-md-9">
-                <div class="progress" style="height: 20px;">
-                    <div class="progress-bar bg-info" role="progressbar" style="width: 65%;" aria-valuenow="65" aria-valuemin="0" aria-valuemax="100">65% Used</div>
-                </div>
-                <small class="text-muted">18.5 GB free of 50 GB</small>
-            </div>
-        </div>
-        <div class="row mb-3">
-            <div class="col-md-3">
-                <strong>Backup Drive:</strong>
-            </div>
-            <div class="col-md-9">
-                <div class="progress" style="height: 20px;">
-                    <div class="progress-bar bg-success" role="progressbar" style="width: 40%;" aria-valuenow="40" aria-valuemin="0" aria-valuemax="100">40% Used</div>
-                </div>
-                <small class="text-muted">60 GB free of 100 GB</small>
-            </div>
-        </div>
-        <div class="row mb-3">
-            <div class="col-md-3">
-                <strong>Archive Drive:</strong>
-            </div>
-            <div class="col-md-9">
-                <div class="progress" style="height: 20px;">
-                    <div class="progress-bar bg-warning" role="progressbar" style="width: 85%;" aria-valuenow="85" aria-valuemin="0" aria-valuemax="100">85% Used</div>
-                </div>
-                <small class="text-muted">30 GB free of 200 GB</small>
-            </div>
-        </div>
-        <div class="d-flex justify-content-end mt-3">
-            <form action="{{ url_for('maintenance_action') }}" method="post">
-                <input type="hidden" name="action" value="disk_cleanup">
-                <button type="submit" class="btn btn-primary btn-sm" aria-label="Clean up disk space">
-                    <i class="fas fa-broom mr-1"></i> Clean Up Space
+        <div class="d-flex">
+            <div class="dropdown mr-2">
+                <button class="btn btn-primary dropdown-toggle" type="button" id="maintenanceActions" data-toggle="dropdown" aria-expanded="false">
+                    <i class="fas fa-bolt mr-1"></i> Quick Actions
                 </button>
-            </form>
+                <div class="dropdown-menu dropdown-menu-right shadow animated--fade-in" aria-labelledby="maintenanceActions">
+                    <h6 class="dropdown-header">System Tasks</h6>
+                    <form action="{{ url_for('maintenance_action') }}" method="post" class="px-2 py-1">
+                        <input type="hidden" name="action" value="backup">
+                        <button type="submit" class="dropdown-item">
+                            <i class="fas fa-database mr-1 text-primary"></i> Backup Database
+                        </button>
+                    </form>
+                    <form action="{{ url_for('maintenance_action') }}" method="post" class="px-2 py-1">
+                        <input type="hidden" name="action" value="optimize">
+                        <button type="submit" class="dropdown-item">
+                            <i class="fas fa-tachometer-alt mr-1 text-success"></i> Optimize Performance
+                        </button>
+                    </form>
+                    <div class="dropdown-divider"></div>
+                    <h6 class="dropdown-header">Advanced Options</h6>
+                    <a class="dropdown-item" href="#" data-toggle="modal" data-target="#exportLogsModal">
+                        <i class="fas fa-file-export mr-1 text-info"></i> Export System Logs
+                    </a>
+                    <a class="dropdown-item" href="#systemConfigTab" onclick="$('#systemTabContent a[href=\'#systemConfigTab\']').tab('show')">
+                        <i class="fas fa-cogs mr-1 text-warning"></i> System Configuration
+                    </a>
+                </div>
+            </div>
+            <a href="{{ url_for('maintenance') }}" class="btn btn-outline-primary">
+                <i class="fas fa-sync-alt mr-1"></i> Refresh
+            </a>
         </div>
     </div>
-</div>
 
-<!-- Document Indexing -->
-<div class="card mb-4">
-    <div class="card-header bg-white d-flex justify-content-between align-items-center">
-        <h5 class="mb-0">Document Indexing</h5>
-        <span class="badge badge-success">Running</span>
-    </div>
-    <div class="card-body">
-        <p class="text-muted">Document indexing helps maintain optimal search performance.</p>
-        <div class="row mb-3">
-            <div class="col-md-4">
-                <strong>Last Indexed:</strong>
-            </div>
-            <div class="col-md-8">
-                {{ now.strftime('%Y-%m-%d %H:%M') }}
-            </div>
-        </div>
-        <div class="row mb-3">
-            <div class="col-md-4">
-                <strong>Documents Indexed:</strong>
-            </div>
-            <div class="col-md-8">
-                {{ total_documents }}
+    <!-- Status Indicators -->
+    <div class="row mb-4">
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-primary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">System Status</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">
+                                <span class="badge badge-success">Operational</span>
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-server fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
-        <div class="row mb-3">
-            <div class="col-md-4">
-                <strong>Indexing Frequency:</strong>
-            </div>
-            <div class="col-md-8">
-                Every 6 hours
-            </div>
-        </div>
-        <div class="d-flex justify-content-end">
-            <form action="{{ url_for('maintenance_action') }}" method="post" class="mr-2">
-                <input type="hidden" name="action" value="reindex">
-                <button type="submit" class="btn btn-primary btn-sm" aria-label="Reindex documents">
-                    <i class="fas fa-sync-alt mr-1"></i> Reindex Now
-                </button>
-            </form>
-            <button class="btn btn-outline-secondary btn-sm" data-toggle="modal" data-target="#indexSettingsModal" aria-label="Configure indexing settings">
-                <i class="fas fa-cog mr-1"></i> Configure
-            </button>
-        </div>
-    </div>
-</div>
 
-<!-- JavaScript for Maintenance Page -->
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-success shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">Database Health</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">Good</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-database fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-info shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">Storage Usage</div>
+                            <div class="row no-gutters align-items-center">
+                                <div class="col-auto">
+                                    <div class="h5 mb-0 mr-3 font-weight-bold text-gray-800">65%</div>
+                                </div>
+                                <div class="col">
+                                    <div class="progress progress-sm mr-2">
+                                        <div class="progress-bar bg-info" role="progressbar" style="width: 65%" aria-valuenow="65" aria-valuemin="0" aria-valuemax="100"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-hdd fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-warning shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">Last Backup</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ last_backup|default('Never') }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-calendar-alt fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alert Messages -->
+    <div id="alert-container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                        {% if category == 'success' %}<i class="fas fa-check-circle mr-2"></i>{% endif %}
+                        {% if category == 'danger' %}<i class="fas fa-exclamation-triangle mr-2"></i>{% endif %}
+                        {% if category == 'warning' %}<i class="fas fa-exclamation-circle mr-2"></i>{% endif %}
+                        {% if category == 'info' %}<i class="fas fa-info-circle mr-2"></i>{% endif %}
+                        {{ message }}
+                        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+    </div>
+
+    <!-- Tabs Navigation -->
+    <ul class="nav nav-tabs mb-4" id="systemTabs" role="tablist">
+        <li class="nav-item">
+            <a class="nav-link active" id="dashboard-tab" data-toggle="tab" href="#dashboardTab" role="tab" aria-controls="dashboard" aria-selected="true">
+                <i class="fas fa-tachometer-alt mr-1"></i> Dashboard
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" id="storage-tab" data-toggle="tab" href="#storageTab" role="tab" aria-controls="storage" aria-selected="false">
+                <i class="fas fa-hdd mr-1"></i> Storage
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" id="database-tab" data-toggle="tab" href="#databaseTab" role="tab" aria-controls="database" aria-selected="false">
+                <i class="fas fa-database mr-1"></i> Database
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" id="logs-tab" data-toggle="tab" href="#logsTab" role="tab" aria-controls="logs" aria-selected="false">
+                <i class="fas fa-list mr-1"></i> Logs
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" id="system-config-tab" data-toggle="tab" href="#systemConfigTab" role="tab" aria-controls="systemConfig" aria-selected="false">
+                <i class="fas fa-cogs mr-1"></i> System Config
+            </a>
+        </li>
+    </ul>
+
+    <!-- Tab Content -->
+    <div class="tab-content" id="systemTabContent">
+        <!-- Dashboard Tab -->
+        <div class="tab-pane fade show active" id="dashboardTab" role="tabpanel" aria-labelledby="dashboard-tab">
+            <div class="row">
+                <!-- System Stats -->
+                <div class="col-lg-6">
+                    <div class="card shadow mb-4">
+                        <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                            <h6 class="m-0 font-weight-bold text-primary">System Statistics</h6>
+                            <div class="dropdown no-arrow">
+                                <a class="dropdown-toggle" href="#" role="button" id="dropdownMenuLink" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                                    <i class="fas fa-ellipsis-v fa-sm fa-fw text-gray-400"></i>
+                                </a>
+                                <div class="dropdown-menu dropdown-menu-right shadow animated--fade-in" aria-labelledby="dropdownMenuLink">
+                                    <div class="dropdown-header">Actions:</div>
+                                    <a class="dropdown-item" href="#" onclick="refreshSystemStats()"><i class="fas fa-sync-alt fa-sm fa-fw mr-2 text-gray-400"></i>Refresh Stats</a>
+                                    <a class="dropdown-item" href="#" onclick="exportSystemStats()"><i class="fas fa-download fa-sm fa-fw mr-2 text-gray-400"></i>Export</a>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <strong>Total Documents:</strong>
+                                </div>
+                                <div class="col-md-6">
+                                    <span id="totalDocsCount" class="badge badge-primary">{{ total_documents }}</span>
+                                </div>
+                            </div>
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <strong>Storage Used:</strong>
+                                </div>
+                                <div class="col-md-6">
+                                    <span id="storageUsed" class="badge badge-info">{{ storage_used }}</span>
+                                </div>
+                            </div>
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <strong>System Uptime:</strong>
+                                </div>
+                                <div class="col-md-6">
+                                    <span id="systemUptime" class="badge badge-success">28 days, 5 hours</span>
+                                </div>
+                            </div>
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <strong>Active Users:</strong>
+                                </div>
+                                <div class="col-md-6">
+                                    <span id="activeUsers" class="badge badge-primary">3 users</span>
+                                </div>
+                            </div>
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <strong>System Version:</strong>
+                                </div>
+                                <div class="col-md-6">
+                                    <span>1.0.0</span>
+                                    <span class="badge badge-success ml-2">Up to date</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- System Performance -->
+                    <div class="card shadow mb-4">
+                        <div class="card-header py-3">
+                            <h6 class="m-0 font-weight-bold text-primary">Performance Metrics</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <strong>CPU Usage:</strong>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="progress" style="height: 15px;">
+                                        <div class="progress-bar bg-success" role="progressbar" style="width: 25%;" aria-valuenow="25" aria-valuemin="0" aria-valuemax="100">25%</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <strong>Memory Usage:</strong>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="progress" style="height: 15px;">
+                                        <div class="progress-bar bg-info" role="progressbar" style="width: 42%;" aria-valuenow="42" aria-valuemin="0" aria-valuemax="100">42%</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <strong>Disk I/O:</strong>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="progress" style="height: 15px;">
+                                        <div class="progress-bar bg-warning" role="progressbar" style="width: 60%;" aria-valuenow="60" aria-valuemin="0" aria-valuemax="100">60%</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <strong>Network:</strong>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="progress" style="height: 15px;">
+                                        <div class="progress-bar bg-primary" role="progressbar" style="width: 18%;" aria-valuenow="18" aria-valuemin="0" aria-valuemax="100">18%</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <strong>Database Connections:</strong>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="progress" style="height: 15px;">
+                                        <div class="progress-bar bg-info" role="progressbar" style="width: 30%;" aria-valuenow="30" aria-valuemin="0" aria-valuemax="100">30%</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mt-3 text-center">
+                                <small class="text-muted">Performance data updated at: {{ now.strftime('%Y-%m-%d %H:%M') }}</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Maintenance Actions -->
+                <div class="col-lg-6">
+                    <div class="card shadow mb-4">
+                        <div class="card-header py-3 d-flex align-items-center justify-content-between">
+                            <h6 class="m-0 font-weight-bold text-primary">Maintenance Tasks</h6>
+                            <button type="button" class="btn btn-sm btn-outline-primary" data-toggle="modal" data-target="#scheduledTasksModal">
+                                <i class="fas fa-calendar-alt mr-1"></i> Scheduled Tasks
+                            </button>
+                        </div>
+                        <div class="card-body">
+                            <div class="list-group shadow-sm">
+                                <div class="list-group-item list-group-item-action">
+                                    <div class="d-flex w-100 justify-content-between align-items-center">
+                                        <div>
+                                            <h6 class="mb-1">Backup Database</h6>
+                                            <small class="text-muted">Create a secure backup of the entire system database</small>
+                                        </div>
+                                        <form action="{{ url_for('maintenance_action') }}" method="post">
+                                            <input type="hidden" name="action" value="backup">
+                                            <button type="submit" id="backup-btn" class="btn btn-primary btn-sm">
+                                                <i class="fas fa-play mr-1"></i> Run Now
+                                            </button>
+                                        </form>
+                                    </div>
+                                </div>
+                                <div class="list-group-item list-group-item-action">
+                                    <div class="d-flex w-100 justify-content-between align-items-center">
+                                        <div>
+                                            <h6 class="mb-1">Clean Temporary Files</h6>
+                                            <small class="text-muted">Remove temporary and cached files to free up storage space</small>
+                                        </div>
+                                        <form action="{{ url_for('maintenance_action') }}" method="post">
+                                            <input type="hidden" name="action" value="clean">
+                                            <button type="submit" id="clean-btn" class="btn btn-primary btn-sm">
+                                                <i class="fas fa-play mr-1"></i> Run Now
+                                            </button>
+                                        </form>
+                                    </div>
+                                </div>
+                                <div class="list-group-item list-group-item-action">
+                                    <div class="d-flex w-100 justify-content-between align-items-center">
+                                        <div>
+                                            <h6 class="mb-1">Optimize Database</h6>
+                                            <small class="text-muted">Optimize database structure and queries for improved performance</small>
+                                        </div>
+                                        <form action="{{ url_for('maintenance_action') }}" method="post">
+                                            <input type="hidden" name="action" value="optimize">
+                                            <button type="submit" id="optimize-btn" class="btn btn-primary btn-sm">
+                                                <i class="fas fa-play mr-1"></i> Run Now
+                                            </button>
+                                        </form>
+                                    </div>
+                                </div>
+                                <div class="list-group-item list-group-item-action">
+                                    <div class="d-flex w-100 justify-content-between align-items-center">
+                                        <div>
+                                            <h6 class="mb-1">Check for Updates</h6>
+                                            <small class="text-muted">Check for system updates and security patches</small>
+                                        </div>
+                                        <form action="{{ url_for('maintenance_action') }}" method="post">
+                                            <input type="hidden" name="action" value="update">
+                                            <button type="submit" id="update-btn" class="btn btn-primary btn-sm">
+                                                <i class="fas fa-play mr-1"></i> Run Now
+                                            </button>
+                                        </form>
+                                    </div>
+                                </div>
+                                <div class="list-group-item list-group-item-action">
+                                    <div class="d-flex w-100 justify-content-between align-items-center">
+                                        <div>
+                                            <h6 class="mb-1">Reindex Documents</h6>
+                                            <small class="text-muted">Rebuild the document search index to improve search performance</small>
+                                        </div>
+                                        <form action="{{ url_for('maintenance_action') }}" method="post">
+                                            <input type="hidden" name="action" value="reindex">
+                                            <button type="submit" id="reindex-btn" class="btn btn-primary btn-sm">
+                                                <i class="fas fa-play mr-1"></i> Run Now
+                                            </button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Health Monitoring -->
+                    <div class="card shadow mb-4">
+                        <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                            <h6 class="m-0 font-weight-bold text-primary">System Health Monitoring</h6>
+                            <span class="badge badge-success">All Systems Operational</span>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-sm table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Component</th>
+                                            <th>Status</th>
+                                            <th>Last Check</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td>Web Server</td>
+                                            <td><span class="badge badge-success">Operational</span></td>
+                                            <td>{{ now.strftime('%H:%M') }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td>Database Server</td>
+                                            <td><span class="badge badge-success">Operational</span></td>
+                                            <td>{{ now.strftime('%H:%M') }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td>File Storage</td>
+                                            <td><span class="badge badge-success">Operational</span></td>
+                                            <td>{{ now.strftime('%H:%M') }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td>Email Service</td>
+                                            <td><span class="badge badge-warning">Degraded</span></td>
+                                            <td>{{ now.strftime('%H:%M') }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td>Search Index</td>
+                                            <td><span class="badge badge-success">Operational</span></td>
+                                            <td>{{ now.strftime('%H:%M') }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td>API Services</td>
+                                            <td><span class="badge badge-success">Operational</span></td>
+                                            <td>{{ now.strftime('%H:%M') }}</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="mt-3">
+                                <canvas id="systemHealthChart" width="400" height="200"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Storage Tab -->
+        <div class="tab-pane fade" id="storageTab" role="tabpanel" aria-labelledby="storage-tab">
+            <div class="row">
+                <!-- Storage Overview -->
+                <div class="col-lg-8">
+                    <div class="card shadow mb-4">
+                        <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                            <h6 class="m-0 font-weight-bold text-primary">Storage Overview</h6>
+                            <div>
+                                <form action="{{ url_for('maintenance_action') }}" method="post" class="d-inline">
+                                    <input type="hidden" name="action" value="disk_cleanup">
+                                    <button type="submit" class="btn btn-sm btn-primary">
+                                        <i class="fas fa-broom mr-1"></i> Clean Up
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="row mb-4">
+                                <div class="col-md-4">
+                                    <div class="storage-chart-container text-center mb-3">
+                                        <canvas id="mainDriveChart" width="150" height="150"></canvas>
+                                        <h6 class="mt-2">Main Drive</h6>
+                                        <p class="mb-0 text-muted small">18.5 GB free of 50 GB</p>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="storage-chart-container text-center mb-3">
+                                        <canvas id="backupDriveChart" width="150" height="150"></canvas>
+                                        <h6 class="mt-2">Backup Drive</h6>
+                                        <p class="mb-0 text-muted small">60 GB free of 100 GB</p>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="storage-chart-container text-center mb-3">
+                                        <canvas id="archiveDriveChart" width="150" height="150"></canvas>
+                                        <h6 class="mt-2">Archive Drive</h6>
+                                        <p class="mb-0 text-muted small">30 GB free of 200 GB</p>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <h6 class="font-weight-bold text-primary">Detailed Storage Information</h6>
+                            
+                            <!-- Main Drive -->
+                            <div class="row mb-3">
+                                <div class="col-md-3">
+                                    <strong>Main Drive:</strong>
+                                </div>
+                                <div class="col-md-9">
+                                    <div class="progress" style="height: 20px;">
+                                        <div class="progress-bar bg-info" role="progressbar" style="width: 65%;" aria-valuenow="65" aria-valuemin="0" aria-valuemax="100">65% Used</div>
+                                    </div>
+                                    <div class="d-flex justify-content-between mt-1">
+                                        <small class="text-muted">Used: 31.5 GB</small>
+                                        <small class="text-muted">Free: 18.5 GB</small>
+                                        <small class="text-muted">Total: 50 GB</small>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Backup Drive -->
+                            <div class="row mb-3">
+                                <div class="col-md-3">
+                                    <strong>Backup Drive:</strong>
+                                </div>
+                                <div class="col-md-9">
+                                    <div class="progress" style="height: 20px;">
+                                        <div class="progress-bar bg-success" role="progressbar" style="width: 40%;" aria-valuenow="40" aria-valuemin="0" aria-valuemax="100">40% Used</div>
+                                    </div>
+                                    <div class="d-flex justify-content-between mt-1">
+                                        <small class="text-muted">Used: 40 GB</small>
+                                        <small class="text-muted">Free: 60 GB</small>
+                                        <small class="text-muted">Total: 100 GB</small>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Archive Drive -->
+                            <div class="row mb-3">
+                                <div class="col-md-3">
+                                    <strong>Archive Drive:</strong>
+                                </div>
+                                <div class="col-md-9">
+                                    <div class="progress" style="height: 20px;">
+                                        <div class="progress-bar bg-warning" role="progressbar" style="width: 85%;" aria-valuenow="85" aria-valuemin="0" aria-valuemax="100">85% Used</div>
+                                    </div>
+                                    <div class="d-flex justify-content-between mt-1">
+                                        <small class="text-muted">Used: 170 GB</small>
+                                        <small class="text-muted">Free: 30 GB</small>
+                                        <small class="text-muted">Total: 200 GB</small>
+                                    </div>
+                                    <div class="alert alert-warning mt-2 mb-0 p-2">
+                                        <i class="fas fa-exclamation-triangle mr-1"></i> 
+                                        <small>Low disk space warning. Consider archiving or removing old documents.</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-footer bg-white">
+                            <small class="text-muted">Storage information last updated: {{ now.strftime('%Y-%m-%d %H:%M') }}</small>
+                        </div>
+                    </div>
+                    
+                    <!-- Storage Usage Breakdown -->
+                    <div class="card shadow mb-4">
+                        <div class="card-header py-3">
+                            <h6 class="m-0 font-weight-bold text-primary">Storage Usage Breakdown</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <canvas id="storageTypeChart" width="300" height="300"></canvas>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="table-responsive">
+                                        <table class="table table-hover">
+                                            <thead>
+                                                <tr>
+                                                    <th>File Type</th>
+                                                    <th>Count</th>
+                                                    <th>Size</th>
+                                                    <th>%</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <tr>
+                                                    <td><i class="far fa-file-pdf text-danger mr-1"></i> PDF Documents</td>
+                                                    <td>143</td>
+                                                    <td>8.2 GB</td>
+                                                    <td>32%</td>
+                                                </tr>
+                                                <tr>
+                                                    <td><i class="far fa-file-word text-primary mr-1"></i> Word Documents</td>
+                                                    <td>87</td>
+                                                    <td>4.5 GB</td>
+                                                    <td>18%</td>
+                                                </tr>
+                                                <tr>
+                                                    <td><i class="far fa-file-excel text-success mr-1"></i> Excel Documents</td>
+                                                    <td>65</td>
+                                                    <td>3.8 GB</td>
+                                                    <td>15%</td>
+                                                </tr>
+                                                <tr>
+                                                    <td><i class="far fa-file-image text-warning mr-1"></i> Images</td>
+                                                    <td>210</td>
+                                                    <td>2.7 GB</td>
+                                                    <td>11%</td>
+                                                </tr>
+                                                <tr>
+                                                    <td><i class="far fa-file-video text-info mr-1"></i> Video Files</td>
+                                                    <td>12</td>
+                                                    <td>5.4 GB</td>
+                                                    <td>21%</td>
+                                                </tr>
+                                                <tr>
+                                                    <td><i class="far fa-file-alt text-secondary mr-1"></i> Other Files</td>
+                                                    <td>26</td>
+                                                    <td>0.8 GB</td>
+                                                    <td>3%</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Storage Management -->
+                <div class="col-lg-4">
+                    <!-- Quick Actions -->
+                    <div class="card shadow mb-4">
+                        <div class="card-header py-3">
+                            <h6 class="m-0 font-weight-bold text-primary">Storage Actions</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="d-grid gap-2">
+                                <a href="#" class="btn btn-primary btn-block mb-2" data-toggle="modal" data-target="#storageCleanupModal">
+                                    <i class="fas fa-broom mr-1"></i> Advanced Cleanup
+                                </a>
+                                <a href="#" class="btn btn-info btn-block mb-2" data-toggle="modal" data-target="#storageAnalysisModal">
+                                    <i class="fas fa-chart-pie mr-1"></i> Analyze Storage
+                                </a>
+                                <a href="#" class="btn btn-success btn-block mb-2" data-toggle="modal" data-target="#backupStorageModal">
+                                    <i class="fas fa-cloud-upload-alt mr-1"></i> Backup Config
+                                </a>
+                                <a href="#" class="btn btn-warning btn-block mb-2" data-toggle="modal" data-target="#archiveModal">
+                                    <i class="fas fa-archive mr-1"></i> Archive Old Files
+                                </a>
+                                <a href="#" class="btn btn-secondary btn-block mb-2" data-toggle="modal" data-target="#alertSettingsModal">
+                                    <i class="fas fa-bell mr-1"></i> Storage Alerts
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Storage Health -->
+                    <div class="card shadow mb-4">
+                        <div class="card-header py-3">
+                            <h6 class="m-0 font-weight-bold text-primary">Storage Health</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <span>Main Drive Health</span>
+                                    <span class="badge badge-success">Good</span>
+                                </div>
+                                <div class="progress" style="height: 5px;">
+                                    <div class="progress-bar bg-success" role="progressbar" style="width: 92%;" aria-valuenow="92" aria-valuemin="0" aria-valuemax="100"></div>
+                                </div>
+                                <small class="text-muted">Last checked: Today at 08:30</small>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <span>Backup Drive Health</span>
+                                    <span class="badge badge-success">Good</span>
+                                </div>
+                                <div class="progress" style="height: 5px;">
+                                    <div class="progress-bar bg-success" role="progressbar" style="width: 97%;" aria-valuenow="97" aria-valuemin="0" aria-valuemax="100"></div>
+                                </div>
+                                <small class="text-muted">Last checked: Today at 08:30</small>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <span>Archive Drive Health</span>
+                                    <span class="badge badge-warning">Fair</span>
+                                </div>
+                                <div class="progress" style="height: 5px;">
+                                    <div class="progress-bar bg-warning" role="progressbar" style="width: 75%;" aria-valuenow="75" aria-valuemin="0" aria-valuemax="100"></div>
+                                </div>
+                                <small class="text-muted">Last checked: Today at 08:30</small>
+                            </div>
+                            
+                            <div class="alert alert-info mb-0">
+                                <i class="fas fa-info-circle mr-1"></i> Regular disk health checks are scheduled every day at 2:00 AM.
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Storage Tips -->
+                    <div class="card shadow mb-4">
+                        <div class="card-header py-3">
+                            <h6 class="m-0 font-weight-bold text-primary">Storage Tips</h6>
+                        </div>
+                        <div class="card-body">
+                            <ul class="storage-tips pl-3">
+                                <li class="mb-2">Archive documents older than 2 years to free up space</li>
+                                <li class="mb-2">Convert large images to optimized formats</li>
+                                <li class="mb-2">Remove duplicate files to save space</li>
+                                <li class="mb-2">Set up automated archiving policies for completed documents</li>
+                                <li class="mb-2">Consider upgrading archive storage in next quarter</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Database Tab -->
+        <div class="tab-pane fade" id="databaseTab" role="tabpanel" aria-labelledby="database-tab">
+            <div class="row">
+                <!-- Database Overview -->
+                <div class="col-lg-8">
+                    <div class="card shadow mb-4">
+                        <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                            <h6 class="m-0 font-weight-bold text-primary">Database Overview</h6>
+                            <div>
+                                <form action="{{ url_for('maintenance_action') }}" method="post" class="d-inline">
+                                    <input type="hidden" name="action" value="optimize">
+                                    <button type="submit" class="btn btn-sm btn-primary">
+                                        <i class="fas fa-database mr-1"></i> Optimize
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-4">
+                                        <h6 class="font-weight-bold text-primary">Database Status</h6>
+                                        <div class="row no-gutters align-items-center">
+                                            <div class="col mr-2">
+                                                <div class="text-xs font-weight-bold text-gray-800 mb-1">Connection Status</div>
+                                                <div class="mb-2">
+                                                    <span class="badge badge-success"><i class="fas fa-check-circle mr-1"></i> Connected</span>
+                                                </div>
+                                                <div class="text-xs font-weight-bold text-gray-800 mb-1">Database Type</div>
+                                                <div class="mb-2">SQLite</div>
+                                                <div class="text-xs font-weight-bold text-gray-800 mb-1">Version</div>
+                                                <div class="mb-2">3.36.0</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="mb-4">
+                                        <h6 class="font-weight-bold text-primary">Database Metrics</h6>
+                                        <div class="row no-gutters align-items-center">
+                                            <div class="col mr-2">
+                                                <div class="text-xs font-weight-bold text-gray-800 mb-1">Database Size</div>
+                                                <div class="mb-2">12.8 MB</div>
+                                                <div class="text-xs font-weight-bold text-gray-800 mb-1">Active Connections</div>
+                                                <div class="mb-2">4</div>
+                                                <div class="text-xs font-weight-bold text-gray-800 mb-1">Query Cache Hit Rate</div>
+                                                <div class="mb-2">94%</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="col-md-6">
+                                    <div class="mb-4">
+                                        <h6 class="font-weight-bold text-primary mb-3">Database Performance</h6>
+                                        <canvas id="databasePerformanceChart" width="300" height="200"></canvas>
+                                    </div>
+                                    
+                                    <div class="mb-4">
+                                        <h6 class="font-weight-bold text-primary">Last Maintenance</h6>
+                                        <div class="row no-gutters align-items-center">
+                                            <div class="col mr-2">
+                                                <div class="text-xs font-weight-bold text-gray-800 mb-1">Last Optimization</div>
+                                                <div class="mb-2">2025-04-10 14:30</div>
+                                                <div class="text-xs font-weight-bold text-gray-800 mb-1">Last Backup</div>
+                                                <div class="mb-2">{{ last_backup|default('Never') }}</div>
+                                                <div class="text-xs font-weight-bold text-gray-800 mb-1">Last Integrity Check</div>
+                                                <div class="mb-2">2025-04-11 02:00</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Database Tables -->
+                    <div class="card shadow mb-4">
+                        <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                            <h6 class="m-0 font-weight-bold text-primary">Database Tables</h6>
+                            <div>
+                                <button class="btn btn-sm btn-outline-primary" data-toggle="modal" data-target="#sqlConsoleModal">
+                                    <i class="fas fa-terminal mr-1"></i> SQL Console
+                                </button>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-bordered table-hover" id="databaseTablesTable" width="100%" cellspacing="0">
+                                    <thead>
+                                        <tr>
+                                            <th>Table Name</th>
+                                            <th>Rows</th>
+                                            <th>Size</th>
+                                            <th>Last Modified</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td>users</td>
+                                            <td>42</td>
+                                            <td>0.2 MB</td>
+                                            <td>2025-04-11</td>
+                                            <td>
+                                                <div class="btn-group btn-group-sm">
+                                                    <button class="btn btn-outline-primary" title="View Structure" data-toggle="modal" data-target="#tableStructureModal" data-table="users">
+                                                        <i class="fas fa-table"></i>
+                                                    </button>
+                                                    <button class="btn btn-outline-info" title="Browse Data" data-toggle="modal" data-target="#browseDataModal" data-table="users">
+                                                        <i class="fas fa-search"></i>
+                                                    </button>
+                                                    <button class="btn btn-outline-success" title="Optimize" data-toggle="modal" data-target="#optimizeTableModal" data-table="users">
+                                                        <i class="fas fa-magic"></i>
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td>documents</td>
+                                            <td>{{ total_documents }}</td>
+                                            <td>5.4 MB</td>
+                                            <td>2025-04-11</td>
+                                            <td>
+                                                <div class="btn-group btn-group-sm">
+                                                    <button class="btn btn-outline-primary" title="View Structure" data-toggle="modal" data-target="#tableStructureModal" data-table="documents">
+                                                        <i class="fas fa-table"></i>
+                                                    </button>
+                                                    <button class="btn btn-outline-info" title="Browse Data" data-toggle="modal" data-target="#browseDataModal" data-table="documents">
+                                                        <i class="fas fa-search"></i>
+                                                    </button>
+                                                    <button class="btn btn-outline-success" title="Optimize" data-toggle="modal" data-target="#optimizeTableModal" data-table="documents">
+                                                        <i class="fas fa-magic"></i>
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td>document_actions</td>
+                                            <td>256</td>
+                                            <td>1.8 MB</td>
+                                            <td>2025-04-11</td>
+                                            <td>
+                                                <div class="btn-group btn-group-sm">
+                                                    <button class="btn btn-outline-primary" title="View Structure" data-toggle="modal" data-target="#tableStructureModal" data-table="document_actions">
+                                                        <i class="fas fa-table"></i>
+                                                    </button>
+                                                    <button class="btn btn-outline-info" title="Browse Data" data-toggle="modal" data-target="#browseDataModal" data-table="document_actions">
+                                                        <i class="fas fa-search"></i>
+                                                    </button>
+                                                    <button class="btn btn-outline-success" title="Optimize" data-toggle="modal" data-target="#optimizeTableModal" data-table="document_actions">
+                                                        <i class="fas fa-magic"></i>
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td>login_activities</td>
+                                            <td>128</td>
+                                            <td>0.9 MB</td>
+                                            <td>2025-04-11</td>
+                                            <td>
+                                                <div class="btn-group btn-group-sm">
+                                                    <button class="btn btn-outline-primary" title="View Structure" data-toggle="modal" data-target="#tableStructureModal" data-table="login_activities">
+                                                        <i class="fas fa-table"></i>
+                                                    </button>
+                                                    <button class="btn btn-outline-info" title="Browse Data" data-toggle="modal" data-target="#browseDataModal" data-table="login_activities">
+                                                        <i class="fas fa-search"></i>
+                                                    </button>
+                                                    <button class="btn btn-outline-success" title="Optimize" data-toggle="modal" data-target="#optimizeTableModal" data-table="login_activities">
+                                                        <i class="fas fa-magic"></i>
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td>system_logs</td>
+                                            <td>512</td>
+                                            <td>4.5 MB</td>
+                                            <td>2025-04-11</td>
+                                            <td>
+                                                <div class="btn-group btn-group-sm">
+                                                    <button class="btn btn-outline-primary" title="View Structure" data-toggle="modal" data-target="#tableStructureModal" data-table="system_logs">
+                                                        <i class="fas fa-table"></i>
+                                                    </button>
+                                                    <button class="btn btn-outline-info" title="Browse Data" data-toggle="modal" data-target="#browseDataModal" data-table="system_logs">
+                                                        <i class="fas fa-search"></i>
+                                                    </button>
+                                                    <button class="btn btn-outline-success" title="Optimize" data-toggle="modal" data-target="#optimizeTableModal" data-table="system_logs">
+                                                        <i class="fas fa-magic"></i>
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Database Management -->
+                <div class="col-lg-4">
+                    <!-- Database Actions -->
+                    <div class="card shadow mb-4">
+                        <div class="card-header py-3">
+                            <h6 class="m-0 font-weight-bold text-primary">Database Actions</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="d-grid gap-2">
+                                <form action="{{ url_for('maintenance_action') }}" method="post" class="mb-2">
+                                    <input type="hidden" name="action" value="backup">
+                                    <button type="submit" class="btn btn-primary btn-block">
+                                        <i class="fas fa-download mr-1"></i> Backup Database
+                                    </button>
+                                </form>
+                                <form action="{{ url_for('maintenance_action') }}" method="post" class="mb-2">
+                                    <input type="hidden" name="action" value="optimize">
+                                    <button type="submit" class="btn btn-success btn-block">
+                                        <i class="fas fa-magic mr-1"></i> Optimize Database
+                                    </button>
+                                </form>
+                                <button class="btn btn-info btn-block mb-2" data-toggle="modal" data-target="#indexManagementModal">
+                                    <i class="fas fa-sitemap mr-1"></i> Manage Indexes
+                                </button>
+                                <button class="btn btn-warning btn-block mb-2" data-toggle="modal" data-target="#vacuumModal">
+                                    <i class="fas fa-compress-arrows-alt mr-1"></i> Vacuum Database
+                                </button>
+                                <button class="btn btn-secondary btn-block mb-2" data-toggle="modal" data-target="#integrityCheckModal">
+                                    <i class="fas fa-shield-alt mr-1"></i> Integrity Check
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Backup History -->
+                    <div class="card shadow mb-4">
+                        <div class="card-header py-3">
+                            <h6 class="m-0 font-weight-bold text-primary">Backup History</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-sm">
+                                    <thead>
+                                        <tr>
+                                            <th>Date</th>
+                                            <th>Size</th>
+                                            <th>Status</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td>2025-04-11</td>
+                                            <td>12.5 MB</td>
+                                            <td><span class="badge badge-success">Success</span></td>
+                                            <td>
+                                                <button class="btn btn-sm btn-outline-primary" title="Download">
+                                                    <i class="fas fa-download"></i>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td>2025-04-10</td>
+                                            <td>12.3 MB</td>
+                                            <td><span class="badge badge-success">Success</span></td>
+                                            <td>
+                                                <button class="btn btn-sm btn-outline-primary" title="Download">
+                                                    <i class="fas fa-download"></i>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td>2025-04-09</td>
+                                            <td>12.0 MB</td>
+                                            <td><span class="badge badge-success">Success</span></td>
+                                            <td>
+                                                <button class="btn btn-sm btn-outline-primary" title="Download">
+                                                    <i class="fas fa-download"></i>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td>2025-04-08</td>
+                                            <td>11.8 MB</td>
+                                            <td><span class="badge badge-success">Success</span></td>
+                                            <td>
+                                                <button class="btn btn-sm btn-outline-primary" title="Download">
+                                                    <i class="fas fa-download"></i>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td>2025-04-07</td>
+                                            <td>11.5 MB</td>
+                                            <td><span class="badge badge-success">Success</span></td>
+                                            <td>
+                                                <button class="btn btn-sm btn-outline-primary" title="Download">
+                                                    <i class="fas fa-download"></i>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="text-center mt-3">
+                                <a href="#" class="btn btn-sm btn-outline-primary">View All Backups</a>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Database Health -->
+                    <div class="card shadow mb-4">
+                        <div class="card-header py-3">
+                            <h6 class="m-0 font-weight-bold text-primary">Database Health</h6>
+                        </div>
+                        <div class="card-body pb-0">
+                            <div class="mb-4">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <span>Connections</span>
+                                    <span class="badge badge-success">Optimal</span>
+                                </div>
+                                <div class="progress" style="height: 5px;">
+                                    <div class="progress-bar bg-success" role="progressbar" style="width: 25%;" aria-valuenow="25" aria-valuemin="0" aria-valuemax="100"></div>
+                                </div>
+                                <small class="text-muted">4 of 20 maximum connections</small>
+                            </div>
+                            
+                            <div class="mb-4">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <span>Cache Utilization</span>
+                                    <span class="badge badge-success">Good</span>
+                                </div>
+                                <div class="progress" style="height: 5px;">
+                                    <div class="progress-bar bg-success" role="progressbar" style="width: 82%;" aria-valuenow="82" aria-valuemin="0" aria-valuemax="100"></div>
+                                </div>
+                                <small class="text-muted">82% cache hit rate</small>
+                            </div>
+                            
+                            <div class="mb-4">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <span>Index Fragmentation</span>
+                                    <span class="badge badge-warning">Moderate</span>
+                                </div>
+                                <div class="progress" style="height: 5px;">
+                                    <div class="progress-bar bg-warning" role="progressbar" style="width: 42%;" aria-valuenow="42" aria-valuemin="0" aria-valuemax="100"></div>
+                                </div>
+                                <small class="text-muted">42% fragmentation detected</small>
+                            </div>
+                            
+                            <div class="mb-4">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <span>Query Performance</span>
+                                    <span class="badge badge-success">Good</span>
+                                </div>
+                                <div class="progress" style="height: 5px;">
+                                    <div class="progress-bar bg-success" role="progressbar" style="width: 88%;" aria-valuenow="88" aria-valuemin="0" aria-valuemax="100"></div>
+                                </div>
+                                <small class="text-muted">Average query time: 12ms</small>
+                            </div>
+                        </div>
+                        <div class="card-footer bg-white">
+                            <div class="alert alert-info mb-0 p-2">
+                                <i class="fas fa-info-circle mr-1"></i> <small>Optimization recommended to improve index fragmentation.</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Logs Tab -->
+        <div class="tab-pane fade" id="logsTab" role="tabpanel" aria-labelledby="logs-tab">
+            <div class="row">
+                <!-- Log Viewer -->
+                <div class="col-lg-8">
+                    <div class="card shadow mb-4">
+                        <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                            <h6 class="m-0 font-weight-bold text-primary">System Logs</h6>
+                            <div class="d-flex">
+                                <div class="input-group input-group-sm mr-2" style="width: 200px;">
+                                    <input type="text" class="form-control" placeholder="Search logs..." id="logSearchInput">
+                                    <div class="input-group-append">
+                                        <button class="btn btn-outline-secondary" type="button" id="logSearchBtn">
+                                            <i class="fas fa-search"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <select class="custom-select custom-select-sm mr-2" id="logTypeFilter" style="width: 120px;">
+                                    <option value="all">All Types</option>
+                                    <option value="Info">Info</option>
+                                    <option value="Success">Success</option>
+                                    <option value="Warning">Warning</option>
+                                    <option value="Error">Error</option>
+                                </select>
+                                <button class="btn btn-sm btn-outline-primary" data-toggle="modal" data-target="#exportLogsModal">
+                                    <i class="fas fa-download mr-1"></i> Export
+                                </button>
+                            </div>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-striped table-hover" id="systemLogsTable">
+                                    <thead>
+                                        <tr>
+                                            <th>Timestamp</th>
+                                            <th>Type</th>
+                                            <th>User</th>
+                                            <th>Action</th>
+                                            <th>Details</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for log in logs %}
+                                        <tr class="log-row log-type-{{ log.log_type|lower }}">
+                                            <td>{{ log.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                                            <td>
+                                                {% if log.log_type == 'Info' %}
+                                                <span class="badge badge-info">Info</span>
+                                                {% elif log.log_type == 'Success' %}
+                                                <span class="badge badge-success">Success</span>
+                                                {% elif log.log_type == 'Warning' %}
+                                                <span class="badge badge-warning">Warning</span>
+                                                {% elif log.log_type == 'Error' %}
+                                                <span class="badge badge-danger">Error</span>
+                                                {% else %}
+                                                <span class="badge badge-secondary">{{ log.log_type }}</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>{{ log.user }}</td>
+                                            <td>{{ log.action }}</td>
+                                            <td>{{ log.details }}</td>
+                                            <td>
+                                                <button class="btn btn-sm btn-outline-info" title="View Details" onclick="viewLogDetails('{{ loop.index }}')">
+                                                    <i class="fas fa-eye"></i>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div class="card-footer bg-white d-flex justify-content-between align-items-center">
+                            <div>
+                                <small class="text-muted">Showing <span id="logCount">{{ logs|length }}</span> logs</small>
+                            </div>
+                            <nav aria-label="System logs pagination">
+                                <ul class="pagination pagination-sm mb-0">
+                                    <li class="page-item disabled">
+                                        <a class="page-link" href="#" tabindex="-1">Previous</a>
+                                    </li>
+                                    <li class="page-item active"><a class="page-link" href="#">1</a></li>
+                                    <li class="page-item"><a class="page-link" href="#">2</a></li>
+                                    <li class="page-item"><a class="page-link" href="#">3</a></li>
+                                    <li class="page-item">
+                                        <a class="page-link" href="#">Next</a>
+                                    </li>
+                                </ul>
+                            </nav>
+                        </div>
+                    </div>
+                    
+                    <!-- Log Analytics -->
+                    <div class="card shadow mb-4">
+                        <div class="card-header py-3">
+                            <h6 class="m-0 font-weight-bold text-primary">Log Analytics</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-8">
+                                    <canvas id="logActivityChart" width="400" height="200"></canvas>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="mt-3">
+                                        <h6 class="font-weight-bold">Log Summary</h6>
+                                        <div class="d-flex justify-content-between my-2">
+                                            <span><i class="fas fa-circle text-info mr-1"></i> Info:</span>
+                                            <span class="badge badge-light">{{ logs|selectattr('log_type', 'equalto', 'Info')|list|length }}</span>
+                                        </div>
+                                        <div class="d-flex justify-content-between my-2">
+                                            <span><i class="fas fa-circle text-success mr-1"></i> Success:</span>
+                                            <span class="badge badge-light">{{ logs|selectattr('log_type', 'equalto', 'Success')|list|length }}</span>
+                                        </div>
+                                        <div class="d-flex justify-content-between my-2">
+                                            <span><i class="fas fa-circle text-warning mr-1"></i> Warning:</span>
+                                            <span class="badge badge-light">{{ logs|selectattr('log_type', 'equalto', 'Warning')|list|length }}</span>
+                                        </div>
+                                        <div class="d-flex justify-content-between my-2">
+                                            <span><i class="fas fa-circle text-danger mr-1"></i> Error:</span>
+                                            <span class="badge badge-light">{{ logs|selectattr('log_type', 'equalto', 'Error')|list|length }}</span>
+                                        </div>
+                                    </div>
+                                    <div class="mt-4">
+                                        <h6 class="font-weight-bold">Top Users</h6>
+                                        <div class="d-flex justify-content-between my-2">
+                                            <span>System:</span>
+                                            <span class="badge badge-light">{{ logs|selectattr('user', 'equalto', 'System')|list|length }}</span>
+                                        </div>
+                                        <div class="d-flex justify-content-between my-2">
+                                            <span>Admin:</span>
+                                            <span class="badge badge-light">{{ logs|selectattr('user', 'equalto', 'Admin')|list|length }}</span>
+                                        </div>
+                                        <div class="d-flex justify-content-between my-2">
+                                            <span>admin:</span>
+                                            <span class="badge badge-light">{{ logs|selectattr('user', 'equalto', 'admin')|list|length }}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Log Management -->
+                <div class="col-lg-4">
+                    <!-- Log Actions -->
+                    <div class="card shadow mb-4">
+                        <div class="card-header py-3">
+                            <h6 class="m-0 font-weight-bold text-primary">Log Actions</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="d-grid gap-2">
+                                <button class="btn btn-primary btn-block mb-2" data-toggle="modal" data-target="#exportLogsModal">
+                                    <i class="fas fa-file-export mr-1"></i> Export Logs
+                                </button>
+                                <button class="btn btn-info btn-block mb-2" data-toggle="modal" data-target="#filterLogsModal">
+                                    <i class="fas fa-filter mr-1"></i> Advanced Filters
+                                </button>
+                                <button class="btn btn-success btn-block mb-2" id="refreshLogsBtn">
+                                    <i class="fas fa-sync-alt mr-1"></i> Refresh Logs
+                                </button>
+                                <button class="btn btn-warning btn-block mb-2" data-toggle="modal" data-target="#logRetentionModal">
+                                    <i class="fas fa-clock mr-1"></i> Log Retention
+                                </button>
+                                <button class="btn btn-danger btn-block mb-2" data-toggle="modal" data-target="#clearLogsModal">
+                                    <i class="fas fa-trash-alt mr-1"></i> Clear Logs
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Admin Activity -->
+                    <div class="card shadow mb-4">
+                        <div class="card-header py-3">
+                            <h6 class="m-0 font-weight-bold text-primary">Admin Activity</h6>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="list-group list-group-flush">
+                                <div class="list-group-item">
+                                    <div class="d-flex w-100 justify-content-between">
+                                        <h6 class="mb-1">Database Backup</h6>
+                                        <small>{{ timestamp_2hr_ago }}</small>
+                                    </div>
+                                    <small class="text-muted">admin</small>
+                                    <p class="mb-1 small">System backup completed successfully</p>
+                                </div>
+                                <div class="list-group-item">
+                                    <div class="d-flex w-100 justify-content-between">
+                                        <h6 class="mb-1">User Created</h6>
+                                        <small>{{ timestamp_1day_ago }}</small>
+                                    </div>
+                                    <small class="text-muted">admin</small>
+                                    <p class="mb-1 small">Created new user account 'john.doe'</p>
+                                </div>
+                                <div class="list-group-item">
+                                    <div class="d-flex w-100 justify-content-between">
+                                        <h6 class="mb-1">System Optimization</h6>
+                                        <small>{{ timestamp_2day_ago }}</small>
+                                    </div>
+                                    <small class="text-muted">admin</small>
+                                    <p class="mb-1 small">Database optimized and temporary files cleaned</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-footer text-center bg-white">
+                            <a href="#" data-toggle="modal" data-target="#adminActivityModal" class="btn btn-sm btn-outline-primary">View All Activity</a>
+                        </div>
+                    </div>
+                    
+                    <!-- Log Settings -->
+                    <div class="card shadow mb-4">
+                        <div class="card-header py-3">
+                            <h6 class="m-0 font-weight-bold text-primary">Log Settings</h6>
+                        </div>
+                        <div class="card-body">
+                            <form id="logSettingsForm">
+                                <div class="form-group">
+                                    <label for="logLevel">Minimum Log Level</label>
+                                    <select class="form-control" id="logLevel">
+                                        <option>All</option>
+                                        <option>Info</option>
+                                        <option>Success</option>
+                                        <option>Warning</option>
+                                        <option>Error</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="logRetention">Log Retention Period</label>
+                                    <select class="form-control" id="logRetention">
+                                        <option>7 days</option>
+                                        <option selected>30 days</option>
+                                        <option>90 days</option>
+                                        <option>180 days</option>
+                                        <option>365 days</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <div class="custom-control custom-switch">
+                                        <input type="checkbox" class="custom-control-input" id="enableAuditLogging" checked>
+                                        <label class="custom-control-label" for="enableAuditLogging">Enable Audit Logging</label>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <div class="custom-control custom-switch">
+                                        <input type="checkbox" class="custom-control-input" id="enableErrorNotifications" checked>
+                                        <label class="custom-control-label" for="enableErrorNotifications">Error Notifications</label>
+                                    </div>
+                                </div>
+                                <div class="form-group mb-0">
+                                    <div class="custom-control custom-switch">
+                                        <input type="checkbox" class="custom-control-input" id="enableSecurityLogging" checked>
+                                        <label class="custom-control-label" for="enableSecurityLogging">Security Event Logging</label>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                        <div class="card-footer bg-white text-right">
+                            <button type="button" class="btn btn-primary btn-sm" id="saveLogSettingsBtn">Save Settings</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- System Config Tab -->
+        <div class="tab-pane fade" id="systemConfigTab" role="tabpanel" aria-labelledby="system-config-tab">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">System Configuration</h6>
+                </div>
+                <div class="card-body">
+                    <form id="systemConfigForm">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h5 class="text-primary">General Settings</h5>
+                                <div class="form-group">
+                                    <label for="siteName">Site Name</label>
+                                    <input type="text" class="form-control" id="siteName" value="KEMRI Document Management System">
+                                </div>
+                                <div class="form-group">
+                                    <label for="adminEmail">Administrator Email</label>
+                                    <input type="email" class="form-control" id="adminEmail" value="admin@example.com">
+                                </div>
+                                <div class="form-group">
+                                    <label for="defaultLanguage">Default Language</label>
+                                    <select class="form-control" id="defaultLanguage">
+                                        <option selected>English</option>
+                                        <option>French</option>
+                                        <option>Spanish</option>
+                                        <option>Swahili</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="defaultTimeZone">Time Zone</label>
+                                    <select class="form-control" id="defaultTimeZone">
+                                        <option selected>Africa/Nairobi (EAT)</option>
+                                        <option>UTC</option>
+                                        <option>Europe/London</option>
+                                        <option>America/New_York</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <h5 class="text-primary">Security Settings</h5>
+                                <div class="form-group">
+                                    <label for="sessionTimeout">Session Timeout (minutes)</label>
+                                    <input type="number" class="form-control" id="sessionTimeout" value="30">
+                                </div>
+                                <div class="form-group">
+                                    <label for="passwordPolicy">Password Policy</label>
+                                    <select class="form-control" id="passwordPolicy">
+                                        <option>Basic</option>
+                                        <option selected>Standard</option>
+                                        <option>Strong</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <div class="custom-control custom-switch">
+                                        <input type="checkbox" class="custom-control-input" id="enableTwoFactor">
+                                        <label class="custom-control-label" for="enableTwoFactor">Enable Two-Factor Authentication</label>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <div class="custom-control custom-switch">
+                                        <input type="checkbox" class="custom-control-input" id="enableSSL" checked>
+                                        <label class="custom-control-label" for="enableSSL">Force SSL</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="text-right mt-3">
+                            <button type="button" class="btn btn-secondary mr-2">Reset to Defaults</button>
+                            <button type="button" class="btn btn-primary">Save Changes</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal windows would go here in a complete implementation -->
+
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@2.9.4/dist/Chart.min.js"></script>
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Toggle switches for scheduled tasks
-    const switches = document.querySelectorAll('.form-check-input');
-    switches.forEach(switchEl => {
-        switchEl.addEventListener('change', function() {
-            const taskName = this.id;
-            const isEnabled = this.checked;
-            
-            // Call the API to update the task status
-            fetch('{{ url_for("toggle_scheduled_task") }}', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
+    // Sample chart initialization (would be expanded in a complete implementation)
+    document.addEventListener('DOMContentLoaded', function() {
+        // Filter logs functionality
+        document.getElementById('logTypeFilter').addEventListener('change', function() {
+            filterLogs();
+        });
+
+        document.getElementById('logSearchInput').addEventListener('keyup', function() {
+            filterLogs();
+        });
+
+        function filterLogs() {
+            var filterValue = document.getElementById('logTypeFilter').value;
+            var searchValue = document.getElementById('logSearchInput').value.toLowerCase();
+            var rows = document.querySelectorAll('#systemLogsTable tbody tr');
+            var count = 0;
+
+            rows.forEach(function(row) {
+                var type = row.querySelector('td:nth-child(2) span').textContent;
+                var textContent = row.textContent.toLowerCase();
+                var typeMatch = filterValue === 'all' || type === filterValue;
+                var searchMatch = searchValue === '' || textContent.includes(searchValue);
+
+                if (typeMatch && searchMatch) {
+                    row.style.display = '';
+                    count++;
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+
+            document.getElementById('logCount').textContent = count;
+        }
+
+        // Initialize charts (dummy data)
+        if (document.getElementById('systemHealthChart')) {
+            var ctx = document.getElementById('systemHealthChart').getContext('2d');
+            var healthChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: ['7 days ago', '6 days ago', '5 days ago', '4 days ago', '3 days ago', '2 days ago', 'Today'],
+                    datasets: [{
+                        label: 'System Health',
+                        data: [95, 96, 94, 98, 97, 99, 98],
+                        backgroundColor: 'rgba(78, 115, 223, 0.05)',
+                        borderColor: 'rgba(78, 115, 223, 1)',
+                        pointBackgroundColor: 'rgba(78, 115, 223, 1)',
+                        pointBorderColor: '#fff',
+                        pointRadius: 3,
+                        borderWidth: 2,
+                        tension: 0.3
+                    }]
                 },
-                body: JSON.stringify({
-                    taskId: taskName,
-                    enabled: isEnabled
-                }),
-            })
-            .then(response => response.json())
-            .then(data => {
-                console.log('Success:', data);
-                showToast(`Task ${taskName.replace(/([A-Z])/g, ' $1').trim()} is now ${isEnabled ? 'enabled' : 'disabled'}.`);
-            })
-            .catch((error) => {
-                console.error('Error:', error);
-                this.checked = !isEnabled; // Revert the switch
-                showToast('An error occurred while updating the task.', 'danger');
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        yAxes: [{
+                            ticks: {
+                                min: 80,
+                                max: 100
+                            }
+                        }]
+                    }
+                }
             });
-        });
+        }
+
+        // More chart initializations would be added in a complete implementation
     });
-    
-    // Filter logs by type
-    const logFilter = document.querySelector('select');
-    logFilter.addEventListener('change', function() {
-        const type = this.value;
-        const rows = document.querySelectorAll('tbody tr');
-        
-        rows.forEach(row => {
-            const logType = row.querySelector('td:nth-child(2) span').textContent;
-            if (type === 'All Types' || logType === type) {
-                row.style.display = '';
-            } else {
-                row.style.display = 'none';
-            }
-        });
-    });
-    
-    // Save indexing settings
-    const indexSettingsSaveBtn = document.querySelector('#indexSettingsModal .btn-primary');
-    if (indexSettingsSaveBtn) {
-        indexSettingsSaveBtn.addEventListener('click', function() {
-            const frequency = document.getElementById('indexFrequency').value;
-            const indexTitle = document.getElementById('indexTitle').checked;
-            const indexContent = document.getElementById('indexContent').checked;
-            const indexMetadata = document.getElementById('indexMetadata').checked;
-            const indexAttachments = document.getElementById('indexAttachments').checked;
-            const stopWords = document.getElementById('stopWords').value;
-            
-            // Call API to save settings
-            fetch('{{ url_for("update_indexing_settings") }}', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    frequency: frequency,
-                    indexFields: {
-                        title: indexTitle,
-                        content: indexContent,
-                        metadata: indexMetadata,
-                        attachments: indexAttachments
-                    },
-                    stopWords: stopWords
-                }),
-            })
-            .then(response => response.json())
-            .then(data => {
-                console.log('Success:', data);
-                $('#indexSettingsModal').modal('hide');
-                showToast('Indexing settings updated successfully!');
-            })
-            .catch((error) => {
-                console.error('Error:', error);
-                showToast('An error occurred while updating the settings.', 'danger');
-            });
-        });
+
+    // Mock function for action buttons
+    function viewLogDetails(logId) {
+        alert('Viewing details for log #' + logId);
     }
-    
-    // Fetch disk info periodically
-    function updateDiskInfo() {
-        fetch('{{ url_for("disk_info") }}')
-            .then(response => response.json())
-            .then(data => {
-                // This would update disk space info dynamically
-                console.log('Disk info updated', data);
-            })
-            .catch(error => {
-                console.error('Error fetching disk info:', error);
-            });
-    }
-    
-    // Update disk info every 5 minutes (simulated real-time updates)
-    setInterval(updateDiskInfo, 300000);
-    
-    // Helper function to show toast notifications
-    function showToast(message, type = 'success') {
-        const toastHTML = `
-            <div class="toast ${type === 'danger' ? 'bg-danger text-white' : ''}" role="alert" aria-live="assertive" aria-atomic="true" data-delay="3000">
-                <div class="toast-header">
-                    <strong class="mr-auto">System Notification</strong>
-                    <button type="button" class="ml-2 mb-1 close" data-dismiss="toast" aria-label="Close">
-                        <span aria-hidden="true">&times;</span>
-                    </button>
-                </div>
-                <div class="toast-body">
-                    ${message}
-                </div>
-            </div>
-        `;
-        
-        const toastContainer = document.createElement('div');
-        toastContainer.style.position = 'absolute';
-        toastContainer.style.top = '20px';
-        toastContainer.style.right = '20px';
-        toastContainer.style.zIndex = '1050';
-        toastContainer.innerHTML = toastHTML;
-        document.body.appendChild(toastContainer);
-        
-        $('.toast').toast('show');
-        
-        // Remove toast after it's hidden
-        $('.toast').on('hidden.bs.toast', function() {
-            toastContainer.remove();
-        });
-    }
-});
 </script>
-
-<!-- Modals -->
-<div class="modal fade" id="indexSettingsModal" tabindex="-1" role="dialog" aria-labelledby="indexSettingsModalLabel" aria-hidden="true">
-    <div class="modal-dialog" role="document">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="indexSettingsModalLabel">Indexing Settings</h5>
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
-                </button>
-            </div>
-            <div class="modal-body">
-                <form>
-                    <div class="form-group">
-                        <label for="indexFrequency">Indexing Frequency</label>
-                        <select class="form-control" id="indexFrequency">
-                            <option>Every hour</option>
-                            <option selected>Every 6 hours</option>
-                            <option>Every 12 hours</option>
-                            <option>Once a day</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="contentFields">Content Fields to Index</label>
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="indexTitle" checked>
-                            <label class="form-check-label" for="indexTitle">Document Title</label>
-                        </div>
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="indexContent" checked>
-                            <label class="form-check-label" for="indexContent">Document Content</label>
-                        </div>
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="indexMetadata" checked>
-                            <label class="form-check-label" for="indexMetadata">Document Metadata</label>
-                        </div>
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="indexAttachments">
-                            <label class="form-check-label" for="indexAttachments">Document Attachments</label>
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label for="stopWords">Custom Stop Words</label>
-                        <textarea class="form-control" id="stopWords" rows="3" placeholder="Enter custom stop words separated by commas"></textarea>
-                        <small class="form-text text-muted">Words that should be ignored during indexing.</small>
-                    </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary">Save Changes</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Admin Activity Modal -->
-<div class="modal fade" id="adminActivityModal" tabindex="-1" role="dialog" aria-labelledby="adminActivityModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg" role="document">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="adminActivityModalLabel">Administrator Activity Log</h5>
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
-                </button>
-            </div>
-            <div class="modal-body">
-                <div class="table-responsive">
-                    <table class="table table-sm table-striped">
-                        <thead>
-                            <tr>
-                                <th>Timestamp</th>
-                                <th>Admin User</th>
-                                <th>Action</th>
-                                <th>Details</th>
-                                <th>IP Address</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td>{{ now.strftime('%Y-%m-%d %H:%M:%S') }}</td>
-                                <td>admin</td>
-                                <td>System Configuration</td>
-                                <td>Changed indexing settings</td>
-                                <td>192.168.1.1</td>
-                            </tr>
-                            <tr>
-                                <td>{{ timestamp_2hr_ago }}</td>
-                                <td>admin</td>
-                                <td>User Management</td>
-                                <td>Created new user account</td>
-                                <td>192.168.1.1</td>
-                            </tr>
-                            <tr>
-                                <td>{{ timestamp_1day_ago }}</td>
-                                <td>admin</td>
-                                <td>Backup</td>
-                                <td>Initiated manual backup</td>
-                                <td>192.168.1.1</td>
-                            </tr>
-                            <tr>
-                                <td>{{ timestamp_2day_ago }}</td>
-                                <td>admin</td>
-                                <td>System Update</td>
-                                <td>Installed system update v1.0.2</td>
-                                <td>192.168.1.1</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
-                <button type="button" class="btn btn-primary">Export Log</button>
-            </div>
-        </div>
-    </div>
-</div>
 {% endblock %} 

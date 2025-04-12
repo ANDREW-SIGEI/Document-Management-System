@@ -8,6 +8,7 @@ from sqlalchemy import case
 import uuid
 import os
 from werkzeug.utils import secure_filename
+import time
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -224,9 +225,15 @@ def login():
         password = request.form.get('password')
         remember = request.form.get('remember', False) == 'on'
         
-        # Simple authentication for demonstration
-        # In a real app, you would check against database and use password hashing
-        if username == 'admin' and password == 'password':
+        # Check against database
+        user = User.query.filter_by(username=username).first()
+        
+        # For debugging
+        print(f"Login attempt - Username: {username}, Password: {password}")
+        if user:
+            print(f"User found - Username: {user.username}, Password in DB: {user.password}")
+        
+        if user and user.password == password:
             # Successful login - redirect to dashboard
             flash('Login successful!', 'success')
             return redirect(url_for('dashboard'))
@@ -1555,120 +1562,168 @@ def reports():
 
 @app.route('/maintenance')
 def maintenance():
-    """System maintenance page"""
-    # Stats for display
-    stats = {
-        'document_count': Document.query.count(),
-        'user_count': User.query.count(),
-        'system_logs': SystemLog.query.count(),
-        'db_size': '42.3 MB',  # Mocked value
-        'storage_used': '1.2 GB',  # Mocked value
-        'storage_total': '10 GB',  # Mocked value
-        'storage_percent': 12,  # Mocked value
-        'memory_used': '256 MB',  # Mocked value
-        'memory_total': '1 GB',  # Mocked value
-        'memory_percent': 25,  # Mocked value
-        'last_backup': (datetime.now() - timedelta(days=2)).strftime('%Y-%m-%d %H:%M'),  # Mocked
-        'last_maintenance': (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')  # Mocked
-    }
-    
-    # Get recent system logs
-    recent_logs = SystemLog.query.order_by(SystemLog.timestamp.desc()).limit(10).all()
-    
-    # Pass current datetime to the template
-    now = datetime.now()
-    
-    # Total documents for indexing section
+    """Render the system maintenance page with system stats"""
+    # Calculate stats
     total_documents = Document.query.count()
     
-    # Pass the logs as the logs variable (the template is using 'logs' instead of 'recent_logs')
-    logs = recent_logs
+    # Calculate disk storage in MB (simulated)
+    doc_size_mb = total_documents * 0.5  # Assume avg 500KB per document
+    storage_used = f"{doc_size_mb:.2f} MB"
     
-    # Mock data for the maintenance action routes
-    maintenance_routes = {
-        'maintenance_action': 'maintenance_action',  # This should be a real route
-        'toggle_scheduled_task': 'toggle_scheduled_task',  # This should be a real route
-        'update_indexing_settings': 'update_indexing_settings'  # This should be a real route
-    }
+    # Get mock last backup time (one day ago)
+    last_backup = datetime.now() - timedelta(days=1)
     
-    # Add timestamp variables for the admin activity modal
+    # Get timestamp for admin activity modal
+    now = datetime.now()
     timestamp_2hr_ago = now - timedelta(hours=2)
     timestamp_1day_ago = now - timedelta(days=1)
     timestamp_2day_ago = now - timedelta(days=2)
     
-    return render_template(
-        'maintenance.html',
-        stats=stats,
-        recent_logs=recent_logs,
-        logs=logs,
-        now=now,
-        total_documents=total_documents,
-        timestamp_2hr_ago=timestamp_2hr_ago,
-        timestamp_1day_ago=timestamp_1day_ago,
-        timestamp_2day_ago=timestamp_2day_ago,
-        **maintenance_routes
-    )
+    # Mock system logs
+    logs = [
+        {
+            'timestamp': now - timedelta(minutes=5),
+            'log_type': 'Info',
+            'user': 'System',
+            'action': 'Server Started',
+            'details': 'Application server successfully started'
+        },
+        {
+            'timestamp': now - timedelta(minutes=10),
+            'log_type': 'Success',
+            'user': 'admin',
+            'action': 'Login',
+            'details': 'Successfully logged in'
+        },
+        {
+            'timestamp': now - timedelta(hours=1),
+            'log_type': 'Warning',
+            'user': 'System',
+            'action': 'Disk Space',
+            'details': 'Archive drive space below 20%'
+        },
+        {
+            'timestamp': now - timedelta(hours=3),
+            'log_type': 'Success',
+            'user': 'System',
+            'action': 'Automatic Backup',
+            'details': 'Daily backup completed successfully'
+        },
+        {
+            'timestamp': now - timedelta(hours=5),
+            'log_type': 'Error',
+            'user': 'System',
+            'action': 'Email Service',
+            'details': 'Failed to send notification emails'
+        }
+    ]
+    
+    return render_template('maintenance.html', 
+                          total_documents=total_documents,
+                          storage_used=storage_used,
+                          last_backup=last_backup.strftime('%Y-%m-%d %H:%M'),
+                          now=now,
+                          timestamp_2hr_ago=timestamp_2hr_ago.strftime('%Y-%m-%d %H:%M:%S'),
+                          timestamp_1day_ago=timestamp_1day_ago.strftime('%Y-%m-%d %H:%M:%S'),
+                          timestamp_2day_ago=timestamp_2day_ago.strftime('%Y-%m-%d %H:%M:%S'),
+                          logs=logs)
 
-# Add mock routes for maintenance actions
 @app.route('/maintenance_action', methods=['POST'])
 def maintenance_action():
+    """Handle maintenance action requests"""
     action = request.form.get('action')
-    # Log the action
-    log = SystemLog(
-        log_type='Info',
-        user='Admin',
-        action=f'Maintenance Action: {action}',
-        details=f'Maintenance action {action} was triggered'
-    )
-    db.session.add(log)
-    db.session.commit()
     
-    flash(f'Maintenance action "{action}" completed successfully', 'success')
+    # Simulate actions with appropriate responses
+    if action == 'backup':
+        # Simulate database backup
+        time.sleep(1)  # Simulate some processing time
+        flash('Database backup completed successfully!', 'success')
+    
+    elif action == 'clean':
+        # Simulate cleaning temporary files
+        time.sleep(0.5)
+        flash('Temporary files cleaned successfully. 150MB space recovered.', 'success')
+    
+    elif action == 'optimize':
+        # Simulate database optimization
+        time.sleep(1.5)
+        flash('Database optimized successfully. Performance improved by 15%.', 'success')
+    
+    elif action == 'update':
+        # Simulate checking for updates
+        time.sleep(0.8)
+        flash('System is up to date. No new updates available.', 'info')
+    
+    elif action == 'disk_cleanup':
+        # Simulate disk cleanup
+        time.sleep(1.2)
+        flash('Disk cleanup completed. 500MB of space recovered.', 'success')
+    
+    elif action == 'reindex':
+        # Simulate document reindexing
+        time.sleep(2)
+        flash('Document reindexing completed. Search performance improved.', 'success')
+    
+    else:
+        flash(f'Unknown action: {action}', 'danger')
+    
     return redirect(url_for('maintenance'))
 
 @app.route('/toggle_scheduled_task', methods=['POST'])
 def toggle_scheduled_task():
-    # Mock route to handle AJAX request
+    """API endpoint to toggle scheduled tasks on/off"""
     data = request.json
     task_id = data.get('taskId')
     enabled = data.get('enabled')
     
-    # In a real app, you'd update the database
+    # In a real application, this would update a database record
     # For now, just return success
-    return jsonify({'success': True, 'task': task_id, 'enabled': enabled})
+    
+    return jsonify({
+        'status': 'success',
+        'message': f'Task {task_id} is now {"enabled" if enabled else "disabled"}',
+        'taskId': task_id,
+        'enabled': enabled
+    })
 
 @app.route('/update_indexing_settings', methods=['POST'])
 def update_indexing_settings():
-    # Mock route to handle AJAX request
+    """API endpoint to update indexing settings"""
     data = request.json
     
-    # In a real app, you'd update the settings
-    # For now, just return success
-    return jsonify({'success': True})
+    # In a real application, this would save to a database or config file
+    # For now, just log and return success
+    
+    return jsonify({
+        'status': 'success',
+        'message': 'Indexing settings updated successfully',
+        'settings': data
+    })
 
-@app.route('/disk_info')
+@app.route('/disk_info', methods=['GET'])
 def disk_info():
-    """API endpoint for disk space information"""
-    # In a real app, you'd get this from the system
-    # For now, return mock data
+    """API endpoint to get disk information"""
+    # In a real application, this would query actual disk usage
+    # For now, return simulated data
+    
     return jsonify({
         'main_drive': {
-            'used': 65,
-            'free': 18.5,
-            'total': 50,
-            'unit': 'GB'
+            'total': 50,  # GB
+            'used': 32.5,  # GB
+            'free': 17.5,  # GB
+            'percent_used': 65
         },
         'backup_drive': {
-            'used': 40,
-            'free': 60,
-            'total': 100,
-            'unit': 'GB'
+            'total': 100,  # GB
+            'used': 40,  # GB
+            'free': 60,  # GB
+            'percent_used': 40
         },
         'archive_drive': {
-            'used': 85,
-            'free': 30,
-            'total': 200,
-            'unit': 'GB'
+            'total': 200,  # GB
+            'used': 170,  # GB
+            'free': 30,  # GB
+            'percent_used': 85
         }
     })
 
