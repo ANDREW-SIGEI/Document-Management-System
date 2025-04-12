@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, Response
 from flask_sqlalchemy import SQLAlchemy
 from config import Config
 from datetime import datetime, timedelta
@@ -9,6 +9,8 @@ import uuid
 import os
 from werkzeug.utils import secure_filename
 import time
+import csv
+import io
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -1827,21 +1829,56 @@ def add_user():
 
 @app.route('/edit_user/<int:user_id>', methods=['POST'])
 def edit_user(user_id):
-    """Edit an existing user"""
+    """Edit an existing user with enhanced functionality"""
     user = User.query.get_or_404(user_id)
+    
+    # Store original values for logging changes
+    original_username = user.username
+    original_email = user.email
+    original_role = user.role
+    original_department = user.department
+    original_phone = user.phone
     
     # Update user information
     user.username = request.form.get('username', user.username)
     user.email = request.form.get('email', user.email)
     user.department = request.form.get('department', user.department)
-    user.role = request.form.get('role', user.role)
+    user.phone = request.form.get('phone', user.phone)
+    
+    # Handle status change through role field
+    status = request.form.get('status')
+    if status == 'inactive':
+        # Store previous role in a field or log, then set role to None
+        user.role = None 
+    else:
+        # If active, set role from form or use default
+        role = request.form.get('role')
+        if role:
+            user.role = role
+        elif not user.role:  # Only set default if currently None
+            user.role = 'User'
+    
+    # Build change details for log
+    changes = []
+    if original_username != user.username:
+        changes.append(f"Name: {original_username} → {user.username}")
+    if original_email != user.email:
+        changes.append(f"Email: {original_email} → {user.email}")
+    if original_department != user.department:
+        changes.append(f"Department: {original_department} → {user.department}")
+    if original_phone != user.phone:
+        changes.append(f"Phone: {original_phone} → {user.phone}")
+    if original_role != user.role:
+        changes.append(f"Role/Status: {original_role} → {user.role}")
+    
+    change_details = ", ".join(changes)
     
     # Log the action
     log = SystemLog(
         log_type='Info',
         user='Admin',
         action='User Updated',
-        details=f'User {user.username} (ID: {user_id}) was updated'
+        details=f'User {user.username} (ID: {user_id}) was updated. Changes: {change_details}'
     )
     db.session.add(log)
     db.session.commit()
@@ -2469,6 +2506,220 @@ def toggle_user_status(user_id):
     db.session.commit()
     
     flash(f'Status for {user.username} has been changed to {new_status}', 'success')
+    return redirect(url_for('user_management'))
+
+@app.route('/bulk_user_action', methods=['POST'])
+def bulk_user_action():
+    """Handle bulk actions on users"""
+    action = request.form.get('action')
+    user_ids = request.form.getlist('user_ids')
+    
+    if not action or not user_ids:
+        flash('No action or users selected', 'warning')
+        return redirect(url_for('user_management'))
+    
+    if action == 'activate':
+        # Activate users
+        for user_id in user_ids:
+            user = User.query.get(user_id)
+            if user and not user.role:
+                user.role = 'User'  # Set to basic user role
+        
+        db.session.commit()
+        flash(f'{len(user_ids)} users have been activated', 'success')
+    
+    elif action == 'deactivate':
+        # Deactivate users
+        for user_id in user_ids:
+            user = User.query.get(user_id)
+            if user and user.role:
+                user.role = None  # Set role to None to deactivate
+        
+        db.session.commit()
+        flash(f'{len(user_ids)} users have been deactivated', 'success')
+    
+    elif action == 'delete':
+        # Delete users
+        deleted_count = 0
+        admin_count = 0
+        
+        for user_id in user_ids:
+            user = User.query.get(user_id)
+            if user:
+                if user.role == 'Administrator':
+                    admin_count += 1
+                    continue  # Skip administrators
+                
+                db.session.delete(user)
+                deleted_count += 1
+        
+        # Log the action
+        log = SystemLog(
+            log_type='Warning',
+            user='Admin',
+            action='Bulk User Deletion',
+            details=f'Deleted {deleted_count} users through bulk action'
+        )
+        db.session.add(log)
+        db.session.commit()
+        
+        if admin_count > 0:
+            flash(f'{deleted_count} users deleted. {admin_count} administrators were skipped.', 'warning')
+        else:
+            flash(f'{deleted_count} users have been deleted', 'success')
+    
+    elif action == 'export':
+        # Create CSV data for export
+        import csv
+        import io
+        from flask import Response
+        
+        output = io.StringIO()
+        writer = csv.writer(output)
+        
+        # Write header
+        writer.writerow(['ID', 'Name', 'Email', 'Phone', 'Department', 'Role', 'Status', 'Last Login', 'Created At'])
+        
+        # Write user data
+        for user_id in user_ids:
+            user = User.query.get(user_id)
+            if user:
+                writer.writerow([
+                    user.id,
+                    user.username,
+                    user.email,
+                    user.phone or '',
+                    user.department or '',
+                    user.role or '',
+                    'Active' if user.role else 'Inactive',
+                    user.last_login.strftime('%Y-%m-%d %H:%M:%S') if user.last_login else '',
+                    user.created_at.strftime('%Y-%m-%d %H:%M:%S') if user.created_at else ''
+                ])
+        
+        # Log the action
+        log = SystemLog(
+            log_type='Info',
+            user='Admin',
+            action='User Export',
+            details=f'Exported {len(user_ids)} users to CSV'
+        )
+        db.session.add(log)
+        db.session.commit()
+        
+        # Prepare response with CSV data
+        output.seek(0)
+        return Response(
+            output,
+            mimetype="text/csv",
+            headers={"Content-Disposition": "attachment;filename=users_export.csv"}
+        )
+    
+    return redirect(url_for('user_management'))
+
+@app.route('/import_users', methods=['POST'])
+def import_users():
+    """Import users from a CSV file"""
+    if 'csvFile' not in request.files:
+        flash('No file uploaded', 'danger')
+        return redirect(url_for('user_management'))
+    
+    csv_file = request.files['csvFile']
+    
+    if csv_file.filename == '':
+        flash('No file selected', 'danger')
+        return redirect(url_for('user_management'))
+    
+    if not csv_file.filename.endswith('.csv'):
+        flash('File must be a CSV file', 'danger')
+        return redirect(url_for('user_management'))
+    
+    # Process CSV file
+    content = csv_file.read().decode('utf-8')
+    csv_data = content.splitlines()
+    
+    skip_header = request.form.get('skipHeader') == 'on'
+    if skip_header and len(csv_data) > 0:
+        csv_data = csv_data[1:]  # Skip header row
+    
+    success_count = 0
+    error_count = 0
+    error_rows = []
+    
+    for i, row in enumerate(csv_data):
+        if not row.strip():  # Skip empty rows
+            continue
+            
+        try:
+            # Split row by comma
+            parts = row.split(',')
+            
+            if len(parts) < 3:
+                error_count += 1
+                error_rows.append(f"Row {i+1}: Not enough columns")
+                continue
+            
+            # Get required fields
+            username = parts[0].strip()
+            email = parts[1].strip()
+            password = parts[2].strip()
+            
+            # Get optional fields if available
+            phone = parts[3].strip() if len(parts) > 3 else None
+            department = parts[4].strip() if len(parts) > 4 else None
+            role = parts[5].strip() if len(parts) > 5 else 'User'
+            
+            # Validate required fields
+            if not username or not email or not password:
+                error_count += 1
+                error_rows.append(f"Row {i+1}: Missing required field")
+                continue
+            
+            # Check if user already exists
+            if User.query.filter_by(email=email).first():
+                error_count += 1
+                error_rows.append(f"Row {i+1}: Email already exists")
+                continue
+            
+            # Create new user
+            new_user = User(
+                username=username,
+                email=email,
+                password=password,
+                phone=phone,
+                department=department,
+                role=role,
+                created_at=datetime.utcnow()
+            )
+            
+            db.session.add(new_user)
+            success_count += 1
+            
+        except Exception as e:
+            error_count += 1
+            error_rows.append(f"Row {i+1}: {str(e)}")
+    
+    # Commit changes
+    if success_count > 0:
+        # Log the action
+        log = SystemLog(
+            log_type='Info',
+            user='Admin',
+            action='User Import',
+            details=f'Imported {success_count} users from CSV file'
+        )
+        db.session.add(log)
+        db.session.commit()
+    
+    # Show summary
+    if error_count > 0:
+        error_details = '<br>'.join(error_rows[:5])
+        if len(error_rows) > 5:
+            error_details += f'<br>...and {len(error_rows) - 5} more errors'
+        
+        flash(f'Imported {success_count} users with {error_count} errors.<br>{error_details}', 'warning')
+    else:
+        flash(f'Successfully imported {success_count} users', 'success')
+    
     return redirect(url_for('user_management'))
 
 if __name__ == '__main__':

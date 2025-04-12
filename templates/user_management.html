@@ -5,9 +5,14 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h1>User Management</h1>
-    <button class="btn btn-primary" data-toggle="modal" data-target="#addUserModal">
-        <i class="fas fa-user-plus mr-1"></i> Add New User
-    </button>
+    <div>
+        <button class="btn btn-success mr-2" data-toggle="modal" data-target="#importUsersModal">
+            <i class="fas fa-file-import mr-1"></i> Import Users
+        </button>
+        <button class="btn btn-primary" data-toggle="modal" data-target="#addUserModal">
+            <i class="fas fa-user-plus mr-1"></i> Add New User
+        </button>
+    </div>
 </div>
 
 {% with messages = get_flashed_messages(with_categories=true) %}
@@ -26,7 +31,7 @@
 <!-- User Search and Filters -->
 <div class="card mb-4">
     <div class="card-body">
-        <div class="row">
+        <div class="row mb-3">
             <div class="col-md-8">
                 <div class="input-group">
                     <input type="text" id="userSearch" class="form-control" placeholder="Search users...">
@@ -43,6 +48,25 @@
                     <button type="button" class="btn btn-outline-success" data-filter="active">Active</button>
                     <button type="button" class="btn btn-outline-danger" data-filter="inactive">Inactive</button>
                 </div>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-md-8">
+                <div class="input-group">
+                    <select id="bulkAction" class="form-control" aria-label="Bulk Actions">
+                        <option value="">-- Bulk Actions --</option>
+                        <option value="activate">Activate Users</option>
+                        <option value="deactivate">Deactivate Users</option>
+                        <option value="delete">Delete Users</option>
+                        <option value="export">Export Users</option>
+                    </select>
+                    <div class="input-group-append">
+                        <button class="btn btn-secondary" type="button" id="applyBulkAction">Apply</button>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4 text-right">
+                <span class="text-muted"><span id="selectedCount">0</span> users selected</span>
             </div>
         </div>
     </div>
@@ -115,7 +139,9 @@
                                         data-username="{{ user.username }}" 
                                         data-email="{{ user.email }}" 
                                         data-role="{{ user.role }}" 
-                                        data-department="{{ user.department }}">
+                                        data-department="{{ user.department }}"
+                                        data-phone="{{ user.phone }}"
+                                        data-status="{{ 'active' if user.role else 'inactive' }}">
                                         <i class="fas fa-edit text-primary"></i> Edit User
                                     </a>
                                     <a class="dropdown-item reset-password" href="#" data-id="{{ user.id }}" data-username="{{ user.username }}">
@@ -292,9 +318,9 @@
 <div class="modal fade" id="editUserModal" tabindex="-1" role="dialog" aria-labelledby="editUserModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg" role="document">
         <div class="modal-content">
-            <div class="modal-header">
+            <div class="modal-header bg-primary text-white">
                 <h5 class="modal-title" id="editUserModalLabel">Edit User</h5>
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
                     <span aria-hidden="true">&times;</span>
                 </button>
             </div>
@@ -304,13 +330,54 @@
                         <div class="col-md-6">
                             <div class="form-group">
                                 <label for="edit-username">Full Name <span class="text-danger">*</span></label>
-                                <input type="text" class="form-control" id="edit-username" name="username" required>
+                                <div class="input-group">
+                                    <div class="input-group-prepend">
+                                        <span class="input-group-text"><i class="fas fa-user"></i></span>
+                                    </div>
+                                    <input type="text" class="form-control" id="edit-username" name="username" required>
+                                </div>
                             </div>
                         </div>
                         <div class="col-md-6">
                             <div class="form-group">
                                 <label for="edit-email">Email Address <span class="text-danger">*</span></label>
-                                <input type="email" class="form-control" id="edit-email" name="email" required>
+                                <div class="input-group">
+                                    <div class="input-group-prepend">
+                                        <span class="input-group-text"><i class="fas fa-envelope"></i></span>
+                                    </div>
+                                    <input type="email" class="form-control" id="edit-email" name="email" required>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="edit-phone">Phone Number</label>
+                                <div class="input-group">
+                                    <div class="input-group-prepend">
+                                        <span class="input-group-text"><i class="fas fa-phone"></i></span>
+                                    </div>
+                                    <input type="tel" class="form-control" id="edit-phone" name="phone" placeholder="+254 7xx xxx xxx">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="edit-department">Department</label>
+                                <div class="input-group">
+                                    <div class="input-group-prepend">
+                                        <span class="input-group-text"><i class="fas fa-building"></i></span>
+                                    </div>
+                                    <select class="form-control" id="edit-department" name="department">
+                                        <option value="IT Department">IT Department</option>
+                                        <option value="Finance">Finance</option>
+                                        <option value="HR">HR</option>
+                                        <option value="Marketing">Marketing</option>
+                                        <option value="Sales">Sales</option>
+                                        <option value="Research">Research</option>
+                                    </select>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -318,24 +385,30 @@
                         <div class="col-md-6">
                             <div class="form-group">
                                 <label for="edit-role">Role</label>
-                                <select class="form-control" id="edit-role" name="role">
-                                    <option value="User">User</option>
-                                    <option value="Manager">Manager</option>
-                                    <option value="Administrator">Administrator</option>
-                                </select>
+                                <div class="input-group">
+                                    <div class="input-group-prepend">
+                                        <span class="input-group-text"><i class="fas fa-user-tag"></i></span>
+                                    </div>
+                                    <select class="form-control" id="edit-role" name="role">
+                                        <option value="User">User</option>
+                                        <option value="Manager">Manager</option>
+                                        <option value="Administrator">Administrator</option>
+                                    </select>
+                                </div>
                             </div>
                         </div>
                         <div class="col-md-6">
                             <div class="form-group">
-                                <label for="edit-department">Department</label>
-                                <select class="form-control" id="edit-department" name="department">
-                                    <option value="IT Department">IT Department</option>
-                                    <option value="Finance">Finance</option>
-                                    <option value="HR">HR</option>
-                                    <option value="Marketing">Marketing</option>
-                                    <option value="Sales">Sales</option>
-                                    <option value="Research">Research</option>
-                                </select>
+                                <label for="edit-status">Status</label>
+                                <div class="input-group">
+                                    <div class="input-group-prepend">
+                                        <span class="input-group-text"><i class="fas fa-toggle-on"></i></span>
+                                    </div>
+                                    <select class="form-control" id="edit-status" name="status">
+                                        <option value="active">Active</option>
+                                        <option value="inactive">Inactive</option>
+                                    </select>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -375,6 +448,59 @@
     </div>
 </div>
 
+<!-- Import Users Modal -->
+<div class="modal fade" id="importUsersModal" tabindex="-1" role="dialog" aria-labelledby="importUsersModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title" id="importUsersModalLabel">Import Users</h5>
+                <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form action="{{ url_for('import_users') }}" method="POST" enctype="multipart/form-data">
+                <div class="modal-body">
+                    <p>Import multiple users at once using a CSV file. The file should contain the following columns:</p>
+                    <div class="alert alert-info small">
+                        <strong>Required columns:</strong> Name, Email, Password<br>
+                        <strong>Optional columns:</strong> Phone, Department, Role
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="csvFile">Upload CSV File</label>
+                        <div class="custom-file">
+                            <input type="file" class="custom-file-input" id="csvFile" name="csvFile" accept=".csv" required>
+                            <label class="custom-file-label" for="csvFile">Choose file</label>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <div class="custom-control custom-checkbox">
+                            <input type="checkbox" class="custom-control-input" id="skipHeader" name="skipHeader" checked>
+                            <label class="custom-control-label" for="skipHeader">Skip first row (header row)</label>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <div class="custom-control custom-checkbox">
+                            <input type="checkbox" class="custom-control-input" id="sendEmails" name="sendEmails">
+                            <label class="custom-control-label" for="sendEmails">Send welcome emails to imported users</label>
+                        </div>
+                    </div>
+                    
+                    <a href="#" class="btn btn-sm btn-outline-secondary" id="downloadTemplate">
+                        <i class="fas fa-download mr-1"></i> Download Template
+                    </a>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success">Import Users</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block scripts %}
@@ -408,6 +534,83 @@ $(document).ready(function() {
     // Select all checkboxes
     $('#selectAll').change(function() {
         $('.user-select').prop('checked', $(this).prop('checked'));
+        updateSelectedCount();
+    });
+    
+    // Update selected count when individual checkboxes change
+    $('.user-select').change(function() {
+        updateSelectedCount();
+    });
+    
+    // Function to update selected count
+    function updateSelectedCount() {
+        var count = $('.user-select:checked').length;
+        $('#selectedCount').text(count);
+    }
+    
+    // Apply bulk action
+    $('#applyBulkAction').click(function() {
+        var action = $('#bulkAction').val();
+        var selectedUsers = $('.user-select:checked');
+        
+        if (action === '') {
+            alert('Please select an action to perform');
+            return;
+        }
+        
+        if (selectedUsers.length === 0) {
+            alert('Please select at least one user');
+            return;
+        }
+        
+        // Collect selected user IDs
+        var userIds = [];
+        selectedUsers.each(function() {
+            userIds.push($(this).attr('id').replace('user', ''));
+        });
+        
+        // Confirm action
+        var confirmMessage = '';
+        switch(action) {
+            case 'activate':
+                confirmMessage = 'Are you sure you want to activate ' + userIds.length + ' users?';
+                break;
+            case 'deactivate':
+                confirmMessage = 'Are you sure you want to deactivate ' + userIds.length + ' users?';
+                break;
+            case 'delete':
+                confirmMessage = 'Are you sure you want to DELETE ' + userIds.length + ' users? This cannot be undone!';
+                break;
+            case 'export':
+                confirmMessage = 'Export ' + userIds.length + ' users to CSV?';
+                break;
+        }
+        
+        if (confirm(confirmMessage)) {
+            // Create and submit a form with the action and user IDs
+            var form = document.createElement('form');
+            form.method = 'POST';
+            form.action = '/bulk_user_action';
+            
+            // Add action
+            var actionInput = document.createElement('input');
+            actionInput.type = 'hidden';
+            actionInput.name = 'action';
+            actionInput.value = action;
+            form.appendChild(actionInput);
+            
+            // Add user IDs
+            userIds.forEach(function(id) {
+                var input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'user_ids';
+                input.value = id;
+                form.appendChild(input);
+            });
+            
+            document.body.appendChild(form);
+            form.submit();
+        }
     });
     
     // Edit user - populate modal
@@ -417,11 +620,15 @@ $(document).ready(function() {
         var email = $(this).data('email');
         var role = $(this).data('role');
         var department = $(this).data('department');
+        var phone = $(this).data('phone') || '';
+        var status = (role && role !== '') ? 'active' : 'inactive';
         
         $('#edit-username').val(username);
         $('#edit-email').val(email);
-        $('#edit-role').val(role);
-        $('#edit-department').val(department);
+        $('#edit-phone').val(phone);
+        $('#edit-role').val(role || 'User');
+        $('#edit-department').val(department || 'IT Department');
+        $('#edit-status').val(status);
         
         $('#editUserForm').attr('action', '/edit_user/' + id);
     });
@@ -479,6 +686,29 @@ $(document).ready(function() {
             e.preventDefault();
             alert('Password must be at least 6 characters long');
         }
+    });
+    
+    // Handle custom file input
+    $('.custom-file-input').on('change', function() {
+        var fileName = $(this).val().split('\\').pop();
+        $(this).next('.custom-file-label').html(fileName);
+    });
+    
+    // Template download
+    $('#downloadTemplate').click(function(e) {
+        e.preventDefault();
+        
+        // Create CSV content
+        var csvContent = "Name,Email,Password,Phone,Department,Role\n";
+        csvContent += "John Doe,john.doe@example.com,password123,+1234567890,IT Department,User\n";
+        csvContent += "Jane Smith,jane.smith@example.com,password123,+1234567891,Finance,Manager\n";
+        
+        // Create blob and download
+        var blob = new Blob([csvContent], { type: 'text/csv' });
+        var link = document.createElement('a');
+        link.href = window.URL.createObjectURL(blob);
+        link.download = "user_import_template.csv";
+        link.click();
     });
 });
 </script>
