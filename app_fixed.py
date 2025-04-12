@@ -1769,21 +1769,44 @@ def user_management():
 
 @app.route('/add_user', methods=['POST'])
 def add_user():
-    """Add a new user to the system"""
-    # In a real app, you'd validate the form data and handle errors
+    """Add a new user to the system with enhanced functionality"""
+    # Get form data
     username = request.form.get('username')
     email = request.form.get('email')
     department = request.form.get('department')
     role = request.form.get('role')
     password = request.form.get('password')
+    password_confirm = request.form.get('passwordConfirm')
+    phone = request.form.get('phone', '')
     
-    # Create a new user
+    # Enhanced validation
+    if not username or not email or not password:
+        flash('All required fields must be filled', 'danger')
+        return redirect(url_for('user_management'))
+    
+    if password != password_confirm:
+        flash('Passwords do not match', 'danger')
+        return redirect(url_for('user_management'))
+    
+    # Check if user already exists
+    if User.query.filter_by(username=username).first():
+        flash(f'Username "{username}" already exists', 'danger')
+        return redirect(url_for('user_management'))
+    
+    if User.query.filter_by(email=email).first():
+        flash(f'Email "{email}" already exists', 'danger')
+        return redirect(url_for('user_management'))
+    
+    # Create a new user with the provided information
     new_user = User(
         username=username,
         email=email,
+        phone=phone,
         department=department,
         role=role,
-        password=password  # In a real app, you'd hash this
+        password=password,  # In a real app, this would be hashed
+        created_at=datetime.utcnow(),
+        last_login=None  # No login yet
     )
     
     db.session.add(new_user)
@@ -1793,11 +1816,12 @@ def add_user():
         log_type='Info',
         user='Admin',
         action='User Created',
-        details=f'New user {username} ({email}) was created with role {role}'
+        details=f'New user {username} ({email}) was created with role {role} in department {department}'
     )
     db.session.add(log)
     db.session.commit()
     
+    # Provide a confirmation message
     flash(f'User {username} has been created successfully', 'success')
     return redirect(url_for('user_management'))
 
@@ -2394,6 +2418,58 @@ def update_document_status():
     
     flash(f'Document {document_code} not found', 'danger')
     return redirect(url_for('dashboard'))
+
+@app.route('/reset_password/<int:user_id>', methods=['POST'])
+def reset_password(user_id):
+    """Reset a user's password to a default value"""
+    user = User.query.get_or_404(user_id)
+    
+    # Set default password
+    default_password = "Password123"
+    user.password = default_password
+    
+    # Log the action
+    log = SystemLog(
+        log_type='Warning',
+        user='Admin',
+        action='Password Reset',
+        details=f'Password was reset for user {user.username} (ID: {user_id})'
+    )
+    db.session.add(log)
+    db.session.commit()
+    
+    flash(f'Password for {user.username} has been reset to "{default_password}"', 'success')
+    return redirect(url_for('user_management'))
+
+@app.route('/toggle_user_status/<int:user_id>', methods=['POST'])
+def toggle_user_status(user_id):
+    """Toggle a user's active status"""
+    user = User.query.get_or_404(user_id)
+    
+    # Toggle status by updating role
+    current_status = 'Active' if user.role else 'Inactive'
+    
+    if user.role:  # If has a role (active)
+        previous_role = user.role
+        user.role = None  # Set to inactive
+        new_status = 'Inactive'
+    else:  # If inactive
+        user.role = 'User'  # Reactivate as basic user
+        previous_role = None
+        new_status = 'Active'
+    
+    # Log the action
+    log = SystemLog(
+        log_type='Info',
+        user='Admin',
+        action='Status Change',
+        details=f'User {user.username} (ID: {user_id}) status changed from {current_status} to {new_status}'
+    )
+    db.session.add(log)
+    db.session.commit()
+    
+    flash(f'Status for {user.username} has been changed to {new_status}', 'success')
+    return redirect(url_for('user_management'))
 
 if __name__ == '__main__':
     app.run(debug=True) 
