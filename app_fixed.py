@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, Response
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, Response, session, send_file
 from flask_sqlalchemy import SQLAlchemy
 from config import Config
 from datetime import datetime, timedelta
@@ -11,6 +11,8 @@ from werkzeug.utils import secure_filename
 import time
 import csv
 import io
+from werkzeug.security import generate_password_hash, check_password_hash
+from functools import wraps
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -2762,6 +2764,339 @@ def test_form():
     </body>
     </html>
     '''
+
+@app.route('/database_management')
+@login_required
+def database_management():
+    # Check if the user is an admin
+    if not current_user().role == 'admin':
+        flash('You do not have permission to access this page.', 'danger')
+        return redirect(url_for('dashboard'))
+    
+    # Get all tables in the database
+    tables = []
+    for table_name in db.engine.table_names():
+        # Get row count for each table
+        row_count = db.session.execute(f"SELECT COUNT(*) FROM {table_name}").scalar()
+        
+        # Add table information
+        tables.append({
+            'name': table_name,
+            'description': get_table_description(table_name),
+            'row_count': row_count,
+            'size': get_table_size(table_name),
+            'last_updated': get_last_updated(table_name)
+        })
+    
+    # Get database backup information (mock data for now)
+    backups = [
+        {
+            'id': 1,
+            'filename': 'backup_20250411_full.db',
+            'created_by': 'admin',
+            'created_at': '2025-04-11 09:15:22',
+            'size_formatted': '4.2 MB',
+            'status': 'complete'
+        },
+        {
+            'id': 2,
+            'filename': 'backup_20250410_schema.db',
+            'created_by': 'system',
+            'created_at': '2025-04-10 00:00:01',
+            'size_formatted': '1.8 MB',
+            'status': 'complete'
+        }
+    ]
+    
+    # Mock data for integrity issues
+    integrity_issues_list = [
+        {
+            'id': 1,
+            'type': 'Foreign Key',
+            'table': 'documents',
+            'description': 'Document references non-existent user ID',
+            'date': '2025-04-12 14:22:10',
+            'status': 'unresolved'
+        },
+        {
+            'id': 2,
+            'type': 'Index',
+            'table': 'system_logs',
+            'description': 'Missing index on frequently queried column',
+            'date': '2025-04-11 10:15:33',
+            'status': 'resolved'
+        }
+    ]
+    
+    return render_template(
+        'database_management.html',
+        tables=tables,
+        backups=backups,
+        backup_count=len(backups),
+        integrity_issues=sum(1 for i in integrity_issues_list if i['status'] == 'unresolved'),
+        integrity_issues_list=integrity_issues_list,
+        maintenance_actions=3,
+        current_date=datetime.now().strftime('%Y%m%d')
+    )
+
+def get_table_description(table_name):
+    """Return a human-readable description for database tables"""
+    descriptions = {
+        'user': 'User accounts and authentication details',
+        'login_activity': 'User login history and session information',
+        'document': 'Document metadata and storage locations',
+        'system_log': 'System events and error logs',
+        'document_action': 'Actions performed on documents'
+    }
+    return descriptions.get(table_name, f'Table for storing {table_name.replace("_", " ")}')
+
+def get_table_size(table_name):
+    """Get the size of a database table (mock function)"""
+    # In a real implementation, this would query the database for actual size
+    # For SQLite, you might use PRAGMA page_count and page_size
+    import random
+    sizes = ['32 KB', '128 KB', '256 KB', '1.2 MB', '4.8 MB']
+    return random.choice(sizes)
+
+def get_last_updated(table_name):
+    """Get the last update time for a table (mock function)"""
+    # In a real implementation, this would query for the most recent modification
+    import random
+    from datetime import datetime, timedelta
+    days_ago = random.randint(0, 14)
+    return (datetime.now() - timedelta(days=days_ago)).strftime('%Y-%m-%d %H:%M:%S')
+
+@app.route('/database_logs')
+@login_required
+def database_logs():
+    # Check if the user is an admin
+    if not current_user().role == 'admin':
+        flash('You do not have permission to access this page.', 'danger')
+        return redirect(url_for('dashboard'))
+    
+    # Mock data for integrity checks
+    integrity_checks = [
+        {
+            'id': 1,
+            'date': '2025-04-12 14:30:22',
+            'run_by': 'admin',
+            'type': 'Full Scan',
+            'duration': '22 seconds',
+            'status': 'completed',
+            'issues_found': 1
+        },
+        {
+            'id': 2,
+            'date': '2025-04-05 09:15:45',
+            'run_by': 'system',
+            'type': 'Scheduled Scan',
+            'duration': '15 seconds',
+            'status': 'completed',
+            'issues_found': 0
+        }
+    ]
+    
+    # Mock data for vacuum operations
+    vacuum_operations = [
+        {
+            'id': 1,
+            'date': '2025-04-10 09:15:30',
+            'run_by': 'admin',
+            'tables': 'All Tables',
+            'space_saved': '60 KB',
+            'duration': '30 seconds',
+            'status': 'completed'
+        },
+        {
+            'id': 2,
+            'date': '2025-04-01 00:00:15',
+            'run_by': 'system',
+            'tables': 'document, system_log',
+            'space_saved': '42 KB',
+            'duration': '18 seconds',
+            'status': 'completed'
+        }
+    ]
+    
+    # Mock data for schema exports
+    schema_exports = [
+        {
+            'id': 1,
+            'date': '2025-04-08 11:45:15',
+            'exported_by': 'admin',
+            'format': 'SQL',
+            'file_size': '24 KB',
+            'status': 'completed'
+        },
+        {
+            'id': 2,
+            'date': '2025-04-01 00:15:22',
+            'exported_by': 'system',
+            'format': 'SQL',
+            'file_size': '23 KB',
+            'status': 'completed'
+        }
+    ]
+    
+    # Mock data for issues found
+    issues_found = [
+        {
+            'id': 1,
+            'date': '2025-04-12 14:30:15',
+            'table': 'document',
+            'type': 'Foreign Key',
+            'description': 'Document references non-existent user ID',
+            'status': 'unresolved'
+        },
+        {
+            'id': 2,
+            'date': '2025-04-01 00:00:45',
+            'table': 'login_activity',
+            'type': 'Orphaned Record',
+            'description': 'Login activity for deleted user',
+            'status': 'resolved'
+        }
+    ]
+    
+    return render_template(
+        'database_logs.html',
+        integrity_checks=integrity_checks,
+        vacuum_operations=vacuum_operations,
+        schema_exports=schema_exports,
+        issues_found=issues_found,
+        integrity_checks_total=len(integrity_checks),
+        vacuum_operations_total=len(vacuum_operations),
+        schema_exports_total=len(schema_exports),
+        issues_found_total=sum(1 for i in issues_found if i['status'] == 'unresolved')
+    )
+
+@app.route('/api/table-data')
+@login_required
+def get_table_data_api():
+    # Check if the user is an admin
+    if not current_user().role == 'admin':
+        return jsonify({'success': False, 'message': 'Permission denied'})
+    
+    table_name = request.args.get('table')
+    page = int(request.args.get('page', 1))
+    limit = int(request.args.get('limit', 10))
+    search = request.args.get('search', '')
+    
+    try:
+        # Determine if the table exists
+        if table_name not in db.engine.table_names():
+            return jsonify({'success': False, 'message': f'Table {table_name} does not exist'})
+        
+        # Get column names
+        columns = db.engine.execute(f"PRAGMA table_info({table_name})").fetchall()
+        column_names = [col[1] for col in columns]
+        
+        # Build the query
+        query = f"SELECT * FROM {table_name}"
+        count_query = f"SELECT COUNT(*) FROM {table_name}"
+        
+        # Add search if provided
+        if search:
+            search_conditions = " OR ".join([f"{col} LIKE '%{search}%'" for col in column_names])
+            query += f" WHERE {search_conditions}"
+            count_query += f" WHERE {search_conditions}"
+        
+        # Add pagination
+        offset = (page - 1) * limit
+        query += f" LIMIT {limit} OFFSET {offset}"
+        
+        # Execute the queries
+        rows = db.engine.execute(query).fetchall()
+        total_records = db.engine.execute(count_query).scalar()
+        
+        # Format the results
+        formatted_rows = []
+        for row in rows:
+            formatted_row = {}
+            for i, col in enumerate(column_names):
+                formatted_row[col] = row[i]
+            formatted_rows.append(formatted_row)
+        
+        # Calculate total pages
+        total_pages = (total_records + limit - 1) // limit
+        
+        return jsonify({
+            'success': True,
+            'columns': column_names,
+            'rows': formatted_rows,
+            'total_records': total_records,
+            'current_page': page,
+            'total_pages': total_pages
+        })
+    
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/backup_database', methods=['POST'])
+@login_required
+def backup_database():
+    # Check if the user is an admin
+    if not current_user().role == 'admin':
+        return jsonify({'success': False, 'message': 'Permission denied'})
+    
+    backup_name = request.form.get('backup_name', f'backup_{datetime.now().strftime("%Y%m%d_%H%M%S")}')
+    include_data = request.form.get('include_data') == 'on'
+    
+    try:
+        # Create the backups directory if it doesn't exist
+        backups_dir = os.path.join(app.root_path, 'backups')
+        if not os.path.exists(backups_dir):
+            os.makedirs(backups_dir)
+        
+        # Set the backup file path
+        backup_type = 'full' if include_data else 'schema'
+        backup_filename = f"{backup_name}_{backup_type}.db"
+        backup_path = os.path.join(backups_dir, backup_filename)
+        
+        # For SQLite, we can simply copy the database file for a full backup
+        if include_data:
+            import shutil
+            db_path = app.config['SQLALCHEMY_DATABASE_URI'].replace('sqlite:///', '')
+            shutil.copy2(db_path, backup_path)
+        else:
+            # For schema-only backup, use the schema_dump method
+            with open(backup_path, 'w') as f:
+                for line in db.engine.execute("SELECT sql FROM sqlite_master WHERE sql IS NOT NULL").fetchall():
+                    f.write(f"{line[0]};\n")
+        
+        # Log the backup
+        log = SystemLog(
+            action='database_backup',
+            details=f"Database backed up to {backup_filename}",
+            user_id=current_user().id
+        )
+        db.session.add(log)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Database backup created successfully: {backup_filename}'
+        })
+    
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Backup failed: {str(e)}'})
+
+# Define the login_required decorator
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user_id' not in session:
+            flash('Please log in to access this page.', 'warning')
+            return redirect(url_for('login', next=request.url))
+        return f(*args, **kwargs)
+    return decorated_function
+
+# Define current_user
+def current_user():
+    if 'user_id' in session:
+        user_id = session['user_id']
+        return User.query.get(user_id)
+    return None
 
 if __name__ == '__main__':
     app.run(debug=True) 

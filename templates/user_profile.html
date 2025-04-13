@@ -1,0 +1,371 @@
+{% extends 'base.html' %}
+
+{% block title %}User Profile - KEMRI Laboratory System{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <!-- Back button and page title -->
+    <div class="d-flex align-items-center mb-4">
+        <a href="{{ url_for('user_management') }}" class="btn btn-outline-primary me-3">
+            <i class="fas fa-arrow-left"></i> Back to User Management
+        </a>
+        <h2 class="mb-0">User Profile</h2>
+    </div>
+
+    <!-- Flash messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <div class="row">
+        <!-- User information card -->
+        <div class="col-lg-4 mb-4">
+            <div class="card">
+                <div class="card-body text-center">
+                    <div class="avatar-circle mb-3 mx-auto">
+                        <span class="avatar-initials">{{ user.name[:2].upper() }}</span>
+                    </div>
+                    <h3 class="card-title">{{ user.name }}</h3>
+                    
+                    <p class="text-muted mb-2">{{ user.job_title }}</p>
+                    
+                    <div class="d-flex justify-content-center mb-3">
+                        <span class="badge bg-{{ 'success' if user.status == 'active' else 'danger' }} px-3 py-2">
+                            {{ user.status.title() }}
+                        </span>
+                    </div>
+                    
+                    <div class="border-top pt-3 text-start">
+                        <div class="mb-2">
+                            <i class="fas fa-envelope text-primary me-2"></i> 
+                            <a href="mailto:{{ user.email }}">{{ user.email }}</a>
+                        </div>
+                        <div class="mb-2">
+                            <i class="fas fa-phone text-primary me-2"></i> 
+                            <span>{{ user.phone }}</span>
+                        </div>
+                        <div class="mb-2">
+                            <i class="fas fa-building text-primary me-2"></i> 
+                            <span>{{ user.department }}</span>
+                        </div>
+                        <div class="mb-2">
+                            <i class="fas fa-user-tag text-primary me-2"></i> 
+                            <span>{{ user.role }}</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card-footer bg-transparent">
+                    {% if can_edit %}
+                        <div class="d-grid gap-2">
+                            <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editUserModal">
+                                <i class="fas fa-edit"></i> Edit Profile
+                            </button>
+                            {% if user.status == 'active' %}
+                                <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deactivateModal">
+                                    <i class="fas fa-user-slash"></i> Deactivate Account
+                                </button>
+                            {% else %}
+                                <button type="button" class="btn btn-outline-success">
+                                    <i class="fas fa-user-check"></i> Activate Account
+                                </button>
+                            {% endif %}
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- User details and activity -->
+        <div class="col-lg-8">
+            <!-- Account details -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Account Details</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="text-muted small">Created At</label>
+                                <p>{{ user.created_at.strftime('%b %d, %Y') }}</p>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="text-muted small">Created By</label>
+                                <p>{{ user.created_by }}</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="text-muted small">Last Login</label>
+                                <p>{{ user.last_login.strftime('%b %d, %Y at %H:%M') if user.last_login else 'Never' }}</p>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="text-muted small">Login Count</label>
+                                <p>{{ user.login_count }} times</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-12">
+                            <label class="text-muted small">Bio</label>
+                            <p>{{ user.bio }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Tabs for activity and login history -->
+            <div class="card">
+                <div class="card-header">
+                    <ul class="nav nav-tabs card-header-tabs" id="activityTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="activity-tab" data-bs-toggle="tab" data-bs-target="#activity" type="button" role="tab" aria-controls="activity" aria-selected="true">
+                                <i class="fas fa-chart-line me-2"></i>Activity Log
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="login-tab" data-bs-toggle="tab" data-bs-target="#login" type="button" role="tab" aria-controls="login" aria-selected="false">
+                                <i class="fas fa-sign-in-alt me-2"></i>Login History
+                            </button>
+                        </li>
+                    </ul>
+                </div>
+                <div class="card-body">
+                    <div class="tab-content" id="activityTabsContent">
+                        <!-- Activity log tab -->
+                        <div class="tab-pane fade show active" id="activity" role="tabpanel" aria-labelledby="activity-tab">
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Timestamp</th>
+                                            <th>Action</th>
+                                            <th>Details</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for activity in recent_activity %}
+                                            <tr>
+                                                <td>{{ activity.timestamp.strftime('%b %d, %Y %H:%M') }}</td>
+                                                <td>{{ activity.action }}</td>
+                                                <td>{{ activity.details }}</td>
+                                            </tr>
+                                        {% endfor %}
+                                        {% if not recent_activity %}
+                                            <tr>
+                                                <td colspan="3" class="text-center">No activity recorded</td>
+                                            </tr>
+                                        {% endif %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        
+                        <!-- Login history tab -->
+                        <div class="tab-pane fade" id="login" role="tabpanel" aria-labelledby="login-tab">
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Date & Time</th>
+                                            <th>IP Address</th>
+                                            <th>Device</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for login in login_history %}
+                                            <tr>
+                                                <td>{{ login.timestamp.strftime('%b %d, %Y %H:%M') }}</td>
+                                                <td>{{ login.ip }}</td>
+                                                <td>{{ login.device }}</td>
+                                            </tr>
+                                        {% endfor %}
+                                        {% if not login_history %}
+                                            <tr>
+                                                <td colspan="3" class="text-center">No login history available</td>
+                                            </tr>
+                                        {% endif %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit User Modal -->
+<div class="modal fade" id="editUserModal" tabindex="-1" aria-labelledby="editUserModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <form action="{{ url_for('edit_user', user_id=user.id) }}" method="POST">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="editUserModalLabel">Edit User Profile</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="edit-username">Full Name</label>
+                                <input type="text" class="form-control" id="edit-username" name="username" value="{{ user.name }}" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="edit-email">Email</label>
+                                <input type="email" class="form-control" id="edit-email" name="email" value="{{ user.email }}" required>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="edit-phone">Phone Number</label>
+                                <input type="text" class="form-control" id="edit-phone" name="phone" value="{{ user.phone }}">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="edit-job-title">Job Title</label>
+                                <input type="text" class="form-control" id="edit-job-title" name="job_title" value="{{ user.job_title }}">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="edit-department">Department</label>
+                                <select class="form-select" id="edit-department" name="department">
+                                    <option value="IT Department" {{ 'selected' if user.department == 'IT Department' else '' }}>IT Department</option>
+                                    <option value="Lab Operations" {{ 'selected' if user.department == 'Lab Operations' else '' }}>Lab Operations</option>
+                                    <option value="Microbiology" {{ 'selected' if user.department == 'Microbiology' else '' }}>Microbiology</option>
+                                    <option value="Research" {{ 'selected' if user.department == 'Research' else '' }}>Research</option>
+                                    <option value="Administration" {{ 'selected' if user.department == 'Administration' else '' }}>Administration</option>
+                                    <option value="Quality Control" {{ 'selected' if user.department == 'Quality Control' else '' }}>Quality Control</option>
+                                    <option value="Finance" {{ 'selected' if user.department == 'Finance' else '' }}>Finance</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="edit-role">Role</label>
+                                <select class="form-select" id="edit-role" name="role">
+                                    <option value="Administrator" {{ 'selected' if user.role == 'Administrator' else '' }}>Administrator</option>
+                                    <option value="Manager" {{ 'selected' if user.role == 'Manager' else '' }}>Manager</option>
+                                    <option value="Lab Technician" {{ 'selected' if user.role == 'Lab Technician' else '' }}>Lab Technician</option>
+                                    <option value="Lead Scientist" {{ 'selected' if user.role == 'Lead Scientist' else '' }}>Lead Scientist</option>
+                                    <option value="User" {{ 'selected' if user.role == 'User' else '' }}>User</option>
+                                    <option value="Supervisor" {{ 'selected' if user.role == 'Supervisor' else '' }}>Supervisor</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-group mb-3">
+                        <label for="edit-bio">Bio</label>
+                        <textarea class="form-control" id="edit-bio" name="bio" rows="3">{{ user.bio }}</textarea>
+                    </div>
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" id="notify-user" name="notify_user">
+                        <label class="form-check-label" for="notify-user">
+                            Notify user about changes
+                        </label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Deactivate User Modal -->
+<div class="modal fade" id="deactivateModal" tabindex="-1" aria-labelledby="deactivateModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form action="{{ url_for('toggle_user_status', user_id=user.id) }}" method="POST">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="deactivateModalLabel">Deactivate User Account</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        Are you sure you want to deactivate this user account? The user will no longer be able to log in.
+                    </div>
+                    <p>User: <strong>{{ user.name }}</strong></p>
+                    <p>Email: <strong>{{ user.email }}</strong></p>
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" id="notify-deactivation" name="notify_user">
+                        <label class="form-check-label" for="notify-deactivation">
+                            Notify user about account deactivation
+                        </label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger">Deactivate Account</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Custom CSS for the user profile page -->
+<style>
+    .avatar-circle {
+        width: 100px;
+        height: 100px;
+        background-color: #007bff;
+        border-radius: 50%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+    
+    .avatar-initials {
+        color: white;
+        font-size: 42px;
+        font-weight: bold;
+        text-transform: uppercase;
+    }
+    
+    .card {
+        box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+        border-radius: 0.5rem;
+        border: none;
+    }
+    
+    .card-header {
+        background-color: white;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.125);
+    }
+    
+    .table {
+        font-size: 0.9rem;
+    }
+    
+    .badge {
+        font-weight: 500;
+        font-size: 0.85rem;
+    }
+</style>
+{% endblock %} 

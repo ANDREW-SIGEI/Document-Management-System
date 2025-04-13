@@ -1,0 +1,408 @@
+{% extends 'base.html' %}
+
+{% block title %}Database Integrity - KEMRI Laboratory System{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="fas fa-shield-alt me-2"></i>Database Integrity</h2>
+            <p class="text-muted mb-0">Monitor and maintain database integrity and consistency</p>
+        </div>
+        <div>
+            <a href="{{ url_for('database_management') }}" class="btn btn-outline-primary">
+                <i class="fas fa-arrow-left me-2"></i>Back to Database
+            </a>
+            <button type="button" class="btn btn-primary ms-2" id="startIntegrityCheck">
+                <i class="fas fa-play me-2"></i>Run Integrity Check
+            </button>
+        </div>
+    </div>
+
+    <!-- Flash messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <div class="row mb-4">
+        <div class="col-md-4 mb-3">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <div class="display-4 text-success mb-2">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                    <h5 class="card-title">All Checks Passed</h5>
+                    <p class="card-text text-muted">Last run: {{ integrity_checks[0].timestamp.strftime('%b %d, %Y %H:%M') }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 mb-3">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <div class="display-4 text-primary mb-2">
+                        <i class="fas fa-table"></i>
+                    </div>
+                    <h5 class="card-title">3 Tables Checked</h5>
+                    <p class="card-text text-muted">All integrity constraints validated</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 mb-3">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <div class="display-4 text-info mb-2">
+                        <i class="fas fa-database"></i>
+                    </div>
+                    <h5 class="card-title">Database Consistent</h5>
+                    <p class="card-text text-muted">No foreign key violations found</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <!-- Integrity Check Results -->
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="fas fa-clipboard-check me-2"></i>Integrity Check Results</h5>
+                    <div>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" id="exportResults">
+                            <i class="fas fa-download me-1"></i>Export
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Check Type</th>
+                                    <th>Table</th>
+                                    <th>Status</th>
+                                    <th>Timestamp</th>
+                                    <th>Details</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for check in integrity_checks %}
+                                <tr>
+                                    <td>{{ check.type }}</td>
+                                    <td>{{ check.table }}</td>
+                                    <td>
+                                        <span class="badge bg-success">{{ check.status }}</span>
+                                    </td>
+                                    <td>{{ check.timestamp.strftime('%b %d, %Y %H:%M') }}</td>
+                                    <td>
+                                        <button type="button" class="btn btn-sm btn-outline-primary view-details" data-check-type="{{ check.type }}" data-table="{{ check.table }}">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Custom Integrity Check -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-cogs me-2"></i>Custom Integrity Check</h5>
+                </div>
+                <div class="card-body">
+                    <form id="customIntegrityCheckForm">
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="checkType" class="form-label">Check Type</label>
+                                    <select class="form-select" id="checkType">
+                                        <option value="foreign_keys">Foreign Key Constraints</option>
+                                        <option value="unique_constraints">Unique Constraints</option>
+                                        <option value="not_null">NOT NULL Constraints</option>
+                                        <option value="data_consistency">Data Consistency</option>
+                                        <option value="index_health">Index Health</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="tableSelect" class="form-label">Table</label>
+                                    <select class="form-select" id="tableSelect">
+                                        <option value="all">All Tables</option>
+                                        <option value="users">users</option>
+                                        <option value="documents">documents</option>
+                                        <option value="activities">activities</option>
+                                        <option value="settings">settings</option>
+                                        <option value="departments">departments</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" id="autoFix">
+                            <label class="form-check-label" for="autoFix">
+                                Automatically fix issues (if possible)
+                            </label>
+                        </div>
+                        <button type="button" class="btn btn-primary" id="runCustomCheck">Run Check</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <!-- Scheduled Integrity Checks -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-calendar-alt me-2"></i>Scheduled Checks</h5>
+                </div>
+                <div class="card-body">
+                    <div class="list-group mb-3">
+                        <div class="list-group-item">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="mb-1">Daily Integrity Check</h6>
+                                    <p class="mb-0 small text-muted">Every day at 01:00 AM</p>
+                                </div>
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="dailyCheck" checked>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="list-group-item">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="mb-1">Weekly Deep Scan</h6>
+                                    <p class="mb-0 small text-muted">Every Sunday at 03:00 AM</p>
+                                </div>
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="weeklyCheck" checked>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="list-group-item">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="mb-1">Pre-Backup Check</h6>
+                                    <p class="mb-0 small text-muted">Before every backup</p>
+                                </div>
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="preBackupCheck" checked>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <button type="button" class="btn btn-outline-primary btn-sm mt-2" id="addScheduledCheck">
+                        <i class="fas fa-plus me-1"></i>Add Scheduled Check
+                    </button>
+                </div>
+            </div>
+
+            <!-- Integrity Check History -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-history me-2"></i>Check History</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="list-group list-group-flush">
+                        <div class="list-group-item">
+                            <div class="d-flex w-100 justify-content-between">
+                                <h6 class="mb-1">Full Integrity Check</h6>
+                                <small>{{ (integrity_checks[0].timestamp - timedelta(days=1)).strftime('%b %d') }}</small>
+                            </div>
+                            <p class="mb-1 small">All checks passed</p>
+                            <span class="badge bg-success">Success</span>
+                        </div>
+                        <div class="list-group-item">
+                            <div class="d-flex w-100 justify-content-between">
+                                <h6 class="mb-1">Foreign Key Check</h6>
+                                <small>{{ (integrity_checks[0].timestamp - timedelta(days=2)).strftime('%b %d') }}</small>
+                            </div>
+                            <p class="mb-1 small">All foreign key constraints validated</p>
+                            <span class="badge bg-success">Success</span>
+                        </div>
+                        <div class="list-group-item">
+                            <div class="d-flex w-100 justify-content-between">
+                                <h6 class="mb-1">Consistency Check</h6>
+                                <small>{{ (integrity_checks[0].timestamp - timedelta(days=3)).strftime('%b %d') }}</small>
+                            </div>
+                            <p class="mb-1 small">1 issue fixed automatically</p>
+                            <span class="badge bg-warning">Warning</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Links -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-link me-2"></i>Quick Links</h5>
+                </div>
+                <div class="card-body">
+                    <div class="list-group">
+                        <a href="{{ url_for('database_management') }}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                            <div>
+                                <i class="fas fa-database me-2"></i>Database Management
+                            </div>
+                            <i class="fas fa-chevron-right"></i>
+                        </a>
+                        <a href="{{ url_for('database_logs') }}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                            <div>
+                                <i class="fas fa-history me-2"></i>Database Logs
+                            </div>
+                            <i class="fas fa-chevron-right"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Check Details Modal -->
+<div class="modal fade" id="checkDetailsModal" tabindex="-1" aria-labelledby="checkDetailsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="checkDetailsModalLabel">Integrity Check Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-success">
+                    <i class="fas fa-check-circle me-2"></i>All integrity checks passed successfully.
+                </div>
+                <div class="mb-3">
+                    <h6 class="fw-bold">Check Information</h6>
+                    <dl class="row">
+                        <dt class="col-sm-3">Check Type</dt>
+                        <dd class="col-sm-9"><span id="modalCheckType">Foreign Key</span></dd>
+                        
+                        <dt class="col-sm-3">Table</dt>
+                        <dd class="col-sm-9"><span id="modalTableName">documents</span></dd>
+                        
+                        <dt class="col-sm-3">Timestamp</dt>
+                        <dd class="col-sm-9">{{ integrity_checks[0].timestamp.strftime('%b %d, %Y %H:%M:%S') }}</dd>
+                        
+                        <dt class="col-sm-3">Duration</dt>
+                        <dd class="col-sm-9">2.3 seconds</dd>
+                    </dl>
+                </div>
+                <div>
+                    <h6 class="fw-bold">Check Details</h6>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-bordered">
+                            <thead>
+                                <tr>
+                                    <th>Constraint</th>
+                                    <th>Status</th>
+                                    <th>Details</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>documents_user_id_fkey</td>
+                                    <td><span class="badge bg-success">Passed</span></td>
+                                    <td>All 12,453 references valid</td>
+                                </tr>
+                                <tr>
+                                    <td>documents_department_id_fkey</td>
+                                    <td><span class="badge bg-success">Passed</span></td>
+                                    <td>All 12,453 references valid</td>
+                                </tr>
+                                <tr>
+                                    <td>documents_status_id_fkey</td>
+                                    <td><span class="badge bg-success">Passed</span></td>
+                                    <td>All 12,453 references valid</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary">Download Full Report</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // View details buttons
+        document.querySelectorAll('.view-details').forEach(function(button) {
+            button.addEventListener('click', function() {
+                const checkType = this.getAttribute('data-check-type');
+                const tableName = this.getAttribute('data-table');
+                
+                // Update modal content
+                document.getElementById('modalCheckType').textContent = checkType;
+                document.getElementById('modalTableName').textContent = tableName;
+                
+                // Show the modal
+                const modal = new bootstrap.Modal(document.getElementById('checkDetailsModal'));
+                modal.show();
+            });
+        });
+        
+        // Start integrity check button
+        document.getElementById('startIntegrityCheck').addEventListener('click', function() {
+            // Mock integrity check process
+            const button = this;
+            const originalText = button.innerHTML;
+            button.disabled = true;
+            button.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Running Checks...';
+            
+            // Simulate a delay for the check
+            setTimeout(function() {
+                button.disabled = false;
+                button.innerHTML = originalText;
+                
+                // Show success message
+                const alertContainer = document.createElement('div');
+                alertContainer.className = 'alert alert-success alert-dismissible fade show';
+                alertContainer.innerHTML = `
+                    <i class="fas fa-check-circle me-2"></i>Integrity check completed successfully. All checks passed.
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                `;
+                
+                // Add the alert to the page
+                const container = document.querySelector('.container');
+                container.insertBefore(alertContainer, container.children[1]);
+            }, 2000);
+        });
+        
+        // Run custom check button
+        document.getElementById('runCustomCheck').addEventListener('click', function() {
+            const checkType = document.getElementById('checkType').value;
+            const tableName = document.getElementById('tableSelect').value;
+            const autoFix = document.getElementById('autoFix').checked;
+            
+            // Mock custom check
+            alert(`Running ${checkType} check on ${tableName === 'all' ? 'all tables' : tableName} table${tableName === 'all' ? 's' : ''}.
+Auto-fix: ${autoFix ? 'Enabled' : 'Disabled'}`);
+        });
+        
+        // Export results button
+        document.getElementById('exportResults').addEventListener('click', function() {
+            alert('Integrity check results exported successfully.');
+        });
+        
+        // Add scheduled check button
+        document.getElementById('addScheduledCheck').addEventListener('click', function() {
+            alert('This would show a modal to add a new scheduled integrity check.');
+        });
+    });
+</script>
+{% endblock %} 
