@@ -36,7 +36,40 @@ def load_users():
         except json.JSONDecodeError:
             # If file is corrupted, return empty list
             return []
-    return []
+    
+    # If file doesn't exist, initialize with default users for Render deployment
+    default_users = [
+        {
+            'id': 1,
+            'name': 'Admin User',
+            'email': 'admin@kemri.org',
+            'phone': '+254712345678',
+            'department': 'Administration',
+            'role': 'Administrator',
+            'status': 'active',
+            'created_at': datetime.now().replace(tzinfo=None).isoformat(),
+            'last_login': (datetime.now() - timedelta(days=2)).replace(tzinfo=None).isoformat(),
+            'login_count': 45,
+            'password': 'admin'  # Default password for demo
+        },
+        {
+            'id': 2,
+            'name': 'Lab Technician',
+            'email': 'lab.tech@kemri.org',
+            'phone': '+254723456789',
+            'department': 'Laboratory',
+            'role': 'Lab Technician',
+            'status': 'active',
+            'created_at': datetime.now().replace(tzinfo=None).isoformat(),
+            'last_login': (datetime.now() - timedelta(hours=5)).replace(tzinfo=None).isoformat(),
+            'login_count': 28,
+            'password': 'password'  # Default password for demo
+        }
+    ]
+    
+    # Save default users to file
+    save_users(default_users)
+    return default_users
 
 # Helper function to save users to file
 def save_users(users):
