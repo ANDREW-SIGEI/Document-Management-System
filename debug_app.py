@@ -9,7 +9,13 @@ import csv
 import argparse
 
 app = Flask(__name__)
-app.secret_key = 'debug-kemri-secret-key'
+app.secret_key = 'supersecretkey'  # change this to a more secure key in production
+
+# Custom Jinja2 filters
+@app.template_filter('number_format')
+def number_format_filter(value):
+    """Format a number with thousands separators."""
+    return "{:,}".format(int(value) if value is not None else 0)
 
 # Add application context processor for date functions
 @app.context_processor
