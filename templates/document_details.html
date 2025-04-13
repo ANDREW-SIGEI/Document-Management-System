@@ -188,10 +188,10 @@
                     <i class="fas fa-file-export mr-1"></i> Export History
                 </button>
                 <div class="dropdown-menu" aria-labelledby="exportDropdown">
-                    <a class="dropdown-item" href="{{ url_for('export_document_history', document_code=tracking_code, format='json') }}" target="_blank">
+                    <a class="dropdown-item" href="{{ url_for('export_document_history', document_code=document.code, format='json') }}" target="_blank">
                         <i class="fas fa-file-code mr-2"></i> JSON Format
                     </a>
-                    <a class="dropdown-item" href="{{ url_for('export_document_history', document_code=tracking_code, format='csv') }}" target="_blank">
+                    <a class="dropdown-item" href="{{ url_for('export_document_history', document_code=document.code, format='csv') }}" target="_blank">
                         <i class="fas fa-file-csv mr-2"></i> CSV Format
                     </a>
                 </div>
@@ -348,7 +348,7 @@
 <div class="modal fade" id="addActionModal" tabindex="-1" role="dialog" aria-labelledby="addActionModalLabel" aria-hidden="true">
     <div class="modal-dialog" role="document">
         <div class="modal-content">
-            <form action="{{ url_for('add_document_action', document_code=tracking_code) }}" method="POST">
+            <form action="{{ url_for('add_document_action', document_code=document.code) }}" method="POST">
                 <div class="modal-header">
                     <h5 class="modal-title" id="addActionModalLabel">Add Document Action</h5>
                     <button type="button" class="close" data-dismiss="modal" aria-label="Close">
@@ -401,7 +401,7 @@
 <div class="modal fade" id="changePriorityModal" tabindex="-1" role="dialog" aria-labelledby="changePriorityModalLabel" aria-hidden="true">
     <div class="modal-dialog" role="document">
         <div class="modal-content">
-            <form action="{{ url_for('set_document_priority', document_code=tracking_code) }}" method="POST">
+            <form action="{{ url_for('set_document_priority', document_code=document.code) }}" method="POST">
                 <div class="modal-header">
                     <h5 class="modal-title" id="changePriorityModalLabel">Change Document Priority</h5>
                     <button type="button" class="close" data-dismiss="modal" aria-label="Close">
@@ -434,7 +434,7 @@
 <div class="modal fade" id="reassignDocumentModal" tabindex="-1" role="dialog" aria-labelledby="reassignDocumentModalLabel" aria-hidden="true">
     <div class="modal-dialog" role="document">
         <div class="modal-content">
-            <form action="{{ url_for('reassign_document', document_code=tracking_code) }}" method="POST">
+            <form action="{{ url_for('reassign_document', document_code=document.code) }}" method="POST">
                 <div class="modal-header">
                     <h5 class="modal-title" id="reassignDocumentModalLabel">Reassign Document</h5>
                     <button type="button" class="close" data-dismiss="modal" aria-label="Close">
@@ -467,7 +467,7 @@
 <div class="modal fade" id="relatedDocumentModal" tabindex="-1" role="dialog" aria-labelledby="relatedDocumentModalLabel" aria-hidden="true">
     <div class="modal-dialog" role="document">
         <div class="modal-content">
-            <form action="{{ url_for('attach_related_document', document_code=tracking_code) }}" method="POST">
+            <form action="{{ url_for('attach_related_document', document_code=document.code) }}" method="POST">
                 <div class="modal-header">
                     <h5 class="modal-title" id="relatedDocumentModalLabel">Add Related Document</h5>
                     <button type="button" class="close" data-dismiss="modal" aria-label="Close">
@@ -508,7 +508,7 @@
 <div class="modal fade" id="markEndedModal" tabindex="-1" role="dialog" aria-labelledby="markEndedModalLabel" aria-hidden="true">
     <div class="modal-dialog" role="document">
         <div class="modal-content">
-            <form action="{{ url_for('add_document_action', document_code=tracking_code) }}" method="POST">
+            <form action="{{ url_for('add_document_action', document_code=document.code) }}" method="POST">
                 <input type="hidden" name="action_type" value="Ended">
                 <input type="hidden" name="new_status" value="Ended">
                 <div class="modal-header">
@@ -540,7 +540,7 @@
 <div class="modal fade" id="addCommentModal" tabindex="-1" role="dialog" aria-labelledby="addCommentModalLabel" aria-hidden="true">
     <div class="modal-dialog" role="document">
         <div class="modal-content">
-            <form action="{{ url_for('add_document_comment', document_code=tracking_code) }}" method="POST">
+            <form action="{{ url_for('add_document_comment', document_code=document.code) }}" method="POST">
                 <div class="modal-header">
                     <h5 class="modal-title" id="addCommentModalLabel">Add Comment</h5>
                     <button type="button" class="close" data-dismiss="modal" aria-label="Close">

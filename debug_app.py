@@ -1,9 +1,12 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session, make_response
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session, make_response, Response
 import random
 from datetime import datetime, timedelta
 import os
 import json
 import string
+from io import StringIO
+import csv
+import argparse
 
 app = Flask(__name__)
 app.secret_key = 'debug-kemri-secret-key'
@@ -138,47 +141,231 @@ def dashboard():
     
     return render_template('dashboard.html', user=user, is_admin=is_admin, dashboard=dashboard_data)
 
-@app.route('/track_document')
+@app.route('/track_document', methods=['GET', 'POST'])
 def track_document():
-    if 'user_id' not in session:
+    """Route for tracking documents by code. Handles both GET and POST requests."""
+    # Check for user login
+    if 'logged_in' not in session:
         return redirect(url_for('login'))
+    
+    # Initialize variables
+    recent_documents = []
+    search_results = []
+    is_search = False
+    search_params = {}
+    qr_code_value = ""
+    
+    # Handle POST request (direct document tracking)
+    if request.method == 'POST':
+        document_code = request.form.get('document_code')
+        if not document_code:
+            flash('Please enter a document code', 'danger')
+            return redirect(url_for('track_document'))
         
-    # Mock user data
-    user = {
-        'id': session.get('user_id'),
-        'username': session.get('username'),
-        'email': f"{session.get('username')}@example.com",
-        'role': session.get('role'),
-        'phone': '+1234567890',
-        'department': 'IT Department',
-        'is_active': True,
-        'last_login': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        # Check for the document in the system
+        # In a real system, you would search both DB and JSON sources
+        # For demo, we'll check our mock data
+        for doc_code in ['DOC-2025-001', 'DOC-2025-002', 'DOC-2025-003']:
+            if doc_code == document_code:
+                return redirect(url_for('document_details', doc_code=document_code))
+        
+        # If document not found
+        flash(f'Document with code {document_code} not found', 'danger')
+        return redirect(url_for('track_document'))
+    
+    # Handle GET request with code parameter (QR code scan or direct link)
+    code_param = request.args.get('code')
+    if code_param:
+        # Same logic as POST, but from URL parameter
+        for doc_code in ['DOC-2025-001', 'DOC-2025-002', 'DOC-2025-003']:
+            if doc_code == code_param:
+                return redirect(url_for('document_details', doc_code=code_param))
+        
+        # If not found, set QR code value to pre-populate the form
+        qr_code_value = code_param
+    
+    # Check for search parameters
+    sender = request.args.get('sender', '')
+    recipient = request.args.get('recipient', '')
+    date_range = request.args.get('date_range', '')
+    status = request.args.get('status', '')
+    
+    # If any search parameter is provided, perform search
+    if any([sender, recipient, date_range, status != '']):
+        is_search = True
+        search_params = {
+            'sender': sender,
+            'recipient': recipient,
+            'date_range': date_range,
+            'status': status
+        }
+        
+        # Mock document data - in a real system, this would filter based on the search parameters
+        current_date = datetime.now()
+        mock_docs = [
+            {
+                'id': 1,
+                'code': 'DOC-2025-001',
+                'filename': 'Sample Report 1',
+                'status': 'Incoming',
+                'sender': 'Ministry of Health',
+                'recipient': 'KEMRI Director',
+                'timestamp': (current_date - timedelta(days=2)).strftime('%Y-%m-%d %H:%M:%S'),
+                'source': 'database'
+            },
+            {
+                'id': 2, 
+                'code': 'DOC-2025-002',
+                'filename': 'Sample Report 2',
+                'status': 'Pending',
+                'sender': 'WHO',
+                'recipient': 'Research Department',
+                'timestamp': (current_date - timedelta(days=5)).strftime('%Y-%m-%d %H:%M:%S'),
+                'source': 'database'
+            },
+            {
+                'id': 3,
+                'code': 'DOC-2025-003',
+                'filename': 'Research Findings',
+                'status': 'Received',
+                'sender': 'Partner Lab',
+                'recipient': 'Science Department',
+                'timestamp': (current_date - timedelta(days=7)).strftime('%Y-%m-%d %H:%M:%S'),
+                'source': 'json'
+            }
+        ]
+        
+        # Filter results based on search parameters (simplified for demo)
+        search_results = []
+        for doc in mock_docs:
+            add_doc = True
+            
+            if sender and sender.lower() not in doc['sender'].lower():
+                add_doc = False
+            if recipient and recipient.lower() not in doc['recipient'].lower():
+                add_doc = False
+            if status and status != 'all' and doc['status'] != status:
+                add_doc = False
+                
+            if add_doc:
+                search_results.append(doc)
+    
+    # If no search, get recent documents
+    if not is_search:
+        # Mock documents data for recent documents
+        current_date = datetime.now()
+        recent_documents = [
+            {
+                'id': 1,
+                'code': 'DOC-2025-001',
+                'filename': 'Sample Report 1',
+                'status': 'Incoming',
+                'sender': 'Ministry of Health',
+                'recipient': 'KEMRI Director',
+                'timestamp': (current_date - timedelta(days=2)).strftime('%Y-%m-%d %H:%M:%S'),
+                'source': 'database'
+            },
+            {
+                'id': 2, 
+                'code': 'DOC-2025-002',
+                'filename': 'Sample Report 2',
+                'status': 'Pending',
+                'sender': 'WHO',
+                'recipient': 'Research Department',
+                'timestamp': (current_date - timedelta(days=5)).strftime('%Y-%m-%d %H:%M:%S'),
+                'source': 'database'
+            },
+            {
+                'id': 3,
+                'code': 'DOC-2025-003',
+                'filename': 'Research Findings',
+                'status': 'Received',
+                'sender': 'Partner Lab',
+                'recipient': 'Science Department',
+                'timestamp': (current_date - timedelta(days=7)).strftime('%Y-%m-%d %H:%M:%S'),
+                'source': 'json'
+            }
+        ]
+    
+    # Render the template with all necessary data
+    return render_template('track_document.html', 
+                          recent_documents=recent_documents,
+                          search_results=search_results,
+                          is_search=is_search,
+                          search_params=search_params,
+                          qr_code_value=qr_code_value,
+                          active_page='track_document')
+
+@app.route('/track_document_details/<document_code>')
+def track_document_details(document_code):
+    """Route for viewing tracking details of a specific document"""
+    if 'logged_in' not in session:
+        return redirect(url_for('login'))
+    
+    # Mock document data with tracking information
+    document = {
+        'code': document_code,
+        'title': f'Document {document_code}',
+        'type': 'Research Report',
+        'filename': f'{document_code}_report.pdf',
+        'date_created': datetime.now() - timedelta(days=10),
+        'status': 'In Transit',
+        'owner': 'John Researcher',
+        'department': 'Research',
+        'priority': 'Medium',
+        'tracking_id': f'TRK-{document_code}-{random.randint(1000, 9999)}',
+        'current_location': 'Document Processing Center',
+        'origin': 'Research Department',
+        'destination': 'Executive Office',
+        'estimated_arrival': datetime.now() + timedelta(days=2),
+        'tracking_history': [
+            {'location': 'Research Department', 'status': 'Dispatched', 'timestamp': datetime.now() - timedelta(days=3, hours=5), 'handler': 'John Researcher'},
+            {'location': 'Document Processing Center', 'status': 'In Transit', 'timestamp': datetime.now() - timedelta(days=2), 'handler': 'Mary Processor'},
+            {'location': 'Quality Assurance', 'status': 'Pending Review', 'timestamp': datetime.now() - timedelta(hours=12), 'handler': 'Quality Team'}
+        ],
+        'notes': 'Priority handling required for this document.'
     }
     
-    # Check if user is admin
-    is_admin = session.get('role') == 'admin'
+    return render_template('document_details.html', 
+                          document=document, 
+                          tracking=True,
+                          active_page='track_document')
+
+@app.route('/document_details/<doc_code>')
+def document_details(doc_code):
+    """Route for viewing details of a specific document"""
+    if 'logged_in' not in session:
+        return redirect(url_for('login'))
     
     # Mock document data
-    recent_documents = [
-        {
-            'id': 1,
-            'tracking_number': 'DOC-2025-001',
-            'title': 'Sample Report 1',
-            'status': 'In Progress',
-            'created_at': '2025-04-10 09:15:30',
-            'last_updated': '2025-04-12 14:30:22'
-        },
-        {
-            'id': 2,
-            'tracking_number': 'DOC-2025-002',
-            'title': 'Sample Report 2',
-            'status': 'Completed',
-            'created_at': '2025-04-08 11:45:15',
-            'last_updated': '2025-04-11 10:15:33'
-        }
-    ]
+    document = {
+        'code': doc_code,
+        'title': f'Document {doc_code}',
+        'type': 'Research Report',
+        'filename': f'{doc_code}_report.pdf',
+        'date_created': datetime.now() - timedelta(days=10),
+        'status': 'Received',
+        'owner': 'John Researcher',
+        'department': 'Research',
+        'priority': 'Medium',
+        'description': 'This is a detailed description of the document. It contains important information about the research conducted.',
+        'file_size': '2.4 MB',
+        'pages': 24,
+        'last_modified': datetime.now() - timedelta(hours=5),
+        'related_docs': ['DOC-2023-005', 'DOC-2023-008'],
+        'tags': ['research', 'report', 'analysis'],
+        'history': [
+            {'action': 'Created', 'user': 'John Researcher', 'timestamp': datetime.now() - timedelta(days=10)},
+            {'action': 'Submitted', 'user': 'John Researcher', 'timestamp': datetime.now() - timedelta(days=9)},
+            {'action': 'Reviewed', 'user': 'Sarah Manager', 'timestamp': datetime.now() - timedelta(days=7)},
+            {'action': 'Approved', 'user': 'Robert Director', 'timestamp': datetime.now() - timedelta(days=5)},
+            {'action': 'Published', 'user': 'Admin User', 'timestamp': datetime.now() - timedelta(days=2)}
+        ]
+    }
     
-    return render_template('track_document.html', user=user, is_admin=is_admin, recent_documents=recent_documents, documents=recent_documents)
+    return render_template('document_details.html', 
+                          document=document, 
+                          active_page='track_document')
 
 @app.route('/incoming')
 def incoming():
@@ -1817,7 +2004,230 @@ def user_profile(user_id):
                            login_history=login_history,
                            recent_activity=recent_activity)
 
+@app.route('/add_document_action/<document_code>', methods=['POST'])
+def add_document_action(document_code):
+    """Route for adding actions to documents"""
+    if 'logged_in' not in session:
+        return redirect(url_for('login'))
+    
+    # Get form data
+    action_type = request.form.get('action_type')
+    notes = request.form.get('notes', '')
+    new_status = request.form.get('new_status', '')
+    
+    # In a real app, we would save this action to the database or JSON file
+    # Mock response for demo purposes
+    flash(f'Action "{action_type}" added to document {document_code}', 'success')
+    
+    # If status was changed, notify the user
+    if new_status:
+        flash(f'Document status updated to {new_status}', 'info')
+    
+    return redirect(url_for('document_details', doc_code=document_code))
+
+@app.route('/add_document_comment/<document_code>', methods=['POST'])
+def add_document_comment(document_code):
+    """Route for adding comments to documents"""
+    if 'logged_in' not in session:
+        return redirect(url_for('login'))
+    
+    # Get form data
+    comment = request.form.get('comment')
+    is_private = request.form.get('is_private') == 'on'
+    
+    if not comment:
+        flash('Comment cannot be empty', 'danger')
+        return redirect(url_for('document_details', doc_code=document_code))
+    
+    # In a real app, we would save this comment to the database or JSON file
+    # Mock response for demo purposes
+    privacy_note = "private " if is_private else ""
+    flash(f'Added {privacy_note}comment to document {document_code}', 'success')
+    
+    return redirect(url_for('document_details', doc_code=document_code))
+
+@app.route('/set_document_priority/<document_code>', methods=['POST'])
+def set_document_priority(document_code):
+    """Route for changing document priority"""
+    if 'logged_in' not in session:
+        return redirect(url_for('login'))
+    
+    # Get form data
+    priority = request.form.get('priority')
+    reason = request.form.get('reason', '')
+    
+    # In a real app, we would update the document in the database or JSON file
+    # Mock response for demo purposes
+    flash(f'Document priority changed to {priority}', 'success')
+    
+    return redirect(url_for('document_details', doc_code=document_code))
+
+@app.route('/reassign_document/<document_code>', methods=['POST'])
+def reassign_document(document_code):
+    """Route for reassigning documents to different users"""
+    if 'logged_in' not in session:
+        return redirect(url_for('login'))
+    
+    # Get form data
+    new_assignee = request.form.get('new_assignee')
+    reason = request.form.get('reason', '')
+    
+    # In a real app, we would update the document in the database or JSON file
+    # Mock response for demo purposes
+    flash(f'Document reassigned to {new_assignee}', 'success')
+    
+    return redirect(url_for('document_details', doc_code=document_code))
+
+@app.route('/attach_related_document/<document_code>', methods=['POST'])
+def attach_related_document(document_code):
+    """Route for adding related documents"""
+    if 'logged_in' not in session:
+        return redirect(url_for('login'))
+    
+    # Get form data
+    related_doc_code = request.form.get('related_doc_code')
+    relationship = request.form.get('relationship')
+    
+    # In a real app, we would update the document in the database or JSON file
+    # Mock response for demo purposes
+    flash(f'Related document {related_doc_code} added with relationship "{relationship}"', 'success')
+    
+    return redirect(url_for('document_details', doc_code=document_code))
+
+@app.route('/mark_document_ended/<document_code>', methods=['POST'])
+def mark_document_ended(document_code):
+    """Route for marking documents as ended"""
+    if 'logged_in' not in session:
+        return redirect(url_for('login'))
+    
+    # Get form data
+    confirmation = request.form.get('confirmation') == 'on'
+    reason = request.form.get('reason', '')
+    
+    if not confirmation:
+        flash('You must confirm that you want to mark this document as ended', 'danger')
+        return redirect(url_for('document_details', doc_code=document_code))
+    
+    # In a real app, we would update the document in the database or JSON file
+    # Mock response for demo purposes
+    flash(f'Document {document_code} marked as Ended', 'success')
+    
+    return redirect(url_for('document_details', doc_code=document_code))
+
+@app.route('/export_document_history/<document_code>')
+def export_document_history(document_code):
+    """Route for exporting document history"""
+    if 'logged_in' not in session:
+        return redirect(url_for('login'))
+    
+    export_format = request.args.get('format', 'json')
+    
+    # Mock history data
+    history = [
+        {
+            'timestamp': datetime.now() - timedelta(days=10),
+            'user': 'John Researcher',
+            'action': 'Created',
+            'notes': 'Initial document creation'
+        },
+        {
+            'timestamp': datetime.now() - timedelta(days=9),
+            'user': 'John Researcher',
+            'action': 'Submitted',
+            'notes': 'Submitted for review'
+        },
+        {
+            'timestamp': datetime.now() - timedelta(days=7),
+            'user': 'Sarah Manager',
+            'action': 'Reviewed',
+            'notes': 'First review completed'
+        },
+        {
+            'timestamp': datetime.now() - timedelta(days=5),
+            'user': 'Robert Director',
+            'action': 'Approved',
+            'notes': 'Final approval given'
+        }
+    ]
+    
+    if export_format == 'json':
+        # Convert timestamps to strings for JSON serialization
+        for item in history:
+            item['timestamp'] = item['timestamp'].strftime('%Y-%m-%d %H:%M:%S')
+        
+        response = jsonify({
+            'document_code': document_code,
+            'history': history
+        })
+        response.headers['Content-Disposition'] = f'attachment; filename=document_{document_code}_history.json'
+        return response
+    
+    elif export_format == 'csv':
+        output = StringIO()
+        writer = csv.writer(output)
+        
+        # Write header row
+        writer.writerow(['Timestamp', 'User', 'Action', 'Notes'])
+        
+        # Write data rows
+        for item in history:
+            writer.writerow([
+                item['timestamp'].strftime('%Y-%m-%d %H:%M:%S'),
+                item['user'],
+                item['action'],
+                item['notes']
+            ])
+        
+        response = Response(output.getvalue(), mimetype='text/csv')
+        response.headers['Content-Disposition'] = f'attachment; filename=document_{document_code}_history.csv'
+        return response
+    
+    else:
+        flash('Invalid export format', 'danger')
+        return redirect(url_for('document_details', doc_code=document_code))
+
+@app.route('/view_document_file/<document_code>')
+def view_document_file(document_code):
+    """Route for viewing document files"""
+    if 'logged_in' not in session:
+        return redirect(url_for('login'))
+    
+    # In a real app, we would fetch the file from storage and return it
+    # For demo purposes, we'll just redirect back with a message
+    flash('File viewing is not available in the demo', 'info')
+    return redirect(url_for('document_details', doc_code=document_code))
+
+@app.route('/send_document_notification/<document_code>', methods=['POST'])
+def send_document_notification(document_code):
+    """Route for sending notifications about documents"""
+    if 'logged_in' not in session:
+        return redirect(url_for('login'))
+    
+    # Get form data
+    recipient = request.form.get('recipient')
+    notification_type = request.form.get('notification_type')
+    message = request.form.get('message')
+    send_email = request.form.get('send_email') == 'on'
+    
+    # In a real app, we would send the notification
+    # Mock response for demo purposes
+    flash(f'Notification sent to {recipient}', 'success')
+    
+    if send_email:
+        flash('Email notification also sent', 'info')
+    
+    if document_code != '0':  # If called from a document page
+        return redirect(url_for('document_details', doc_code=document_code))
+    else:
+        # If called from somewhere else (like bulk notification)
+        return redirect(url_for('dashboard'))
+
 if __name__ == '__main__':
-    print("Starting enhanced Flask application with database management...")
-    app.run(host='0.0.0.0', debug=True)
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(description='Flask application for document tracking and user management')
+    parser.add_argument('-p', '--port', type=int, default=5000, help='Port to run the server on')
+    args = parser.parse_args()
+    
+    print(f"Starting enhanced Flask application with database management on port {args.port}...")
+    app.run(host='0.0.0.0', port=args.port, debug=True)
     print("Application stopped.") 

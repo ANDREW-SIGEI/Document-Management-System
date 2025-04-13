@@ -341,104 +341,126 @@
         const dateRangeSelect = document.getElementById('dateRange');
         const customDateRange = document.getElementById('customDateRange');
         
-        dateRangeSelect.addEventListener('change', function() {
-            if (this.value === 'custom') {
-                customDateRange.style.display = 'block';
-            } else {
-                customDateRange.style.display = 'none';
-            }
-        });
+        if (dateRangeSelect) {
+            dateRangeSelect.addEventListener('change', function() {
+                if (this.value === 'custom') {
+                    customDateRange.style.display = 'block';
+                } else {
+                    customDateRange.style.display = 'none';
+                }
+            });
+        }
         
+        // QR code generation functionality
         const qrGeneratorForm = document.getElementById('qrGeneratorForm');
         const qrCodeContainer = document.getElementById('qrCodeContainer');
         const qrCodeInput = document.getElementById('qrDocCode');
-        let qrCode;
+        let qr;
         
-        qrGeneratorForm.addEventListener('submit', function(e) {
-            e.preventDefault();
-            const docCode = qrCodeInput.value.trim();
-            
-            if (docCode) {
-                if (!qrCode) {
-                    qrCode = new QRious({
-                        element: document.createElement('canvas'),
-                        size: 200,
-                        value: window.location.origin + '/track_document?code=' + docCode
-                    });
-                } else {
-                    qrCode.value = window.location.origin + '/track_document?code=' + docCode;
+        if (qrGeneratorForm) {
+            qrGeneratorForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                const docCode = qrCodeInput.value.trim();
+                
+                if (!docCode) {
+                    alert('Please enter a document code');
+                    return;
                 }
                 
-                const qrContainer = document.getElementById('qrcode');
-                qrContainer.innerHTML = '';
-                qrContainer.appendChild(qrCode.element);
+                const qrcodeElement = document.getElementById('qrcode');
+                qrcodeElement.innerHTML = ''; // Clear previous QR code
+                
+                // Create QR code (using QRious library)
+                qr = new QRious({
+                    element: document.createElement('canvas'),
+                    size: 200,
+                    value: window.location.origin + '/track_document?code=' + docCode
+                });
+                
+                qrcodeElement.appendChild(qr.element);
                 qrCodeContainer.style.display = 'block';
-            }
-        });
+            });
+        }
         
-        document.getElementById('downloadQR').addEventListener('click', function() {
-            if (qrCode) {
+        // Download QR code
+        const downloadQRBtn = document.getElementById('downloadQR');
+        if (downloadQRBtn) {
+            downloadQRBtn.addEventListener('click', function() {
+                if (!qr) return;
+                
                 const link = document.createElement('a');
                 link.download = 'document-qr-' + qrCodeInput.value.trim() + '.png';
-                link.href = qrCode.element.toDataURL('image/png');
+                link.href = qr.element.toDataURL('image/png');
                 link.click();
-            }
-        });
+            });
+        }
         
-        document.getElementById('printQR').addEventListener('click', function() {
-            if (qrCode) {
+        // Print QR code
+        const printQRBtn = document.getElementById('printQR');
+        if (printQRBtn) {
+            printQRBtn.addEventListener('click', function() {
+                if (!qr) return;
+                
                 const printWindow = window.open('', '_blank');
                 printWindow.document.write('<html><head><title>Document QR Code</title>');
                 printWindow.document.write('<style>body { text-align: center; } div { margin: 20px; }</style>');
                 printWindow.document.write('</head><body>');
                 printWindow.document.write('<h3>QR Code for Document: ' + qrCodeInput.value.trim() + '</h3>');
                 printWindow.document.write('<div>');
-                printWindow.document.write('<img src="' + qrCode.element.toDataURL('image/png') + '" />');
+                printWindow.document.write('<img src="' + qr.element.toDataURL('image/png') + '" />');
                 printWindow.document.write('</div>');
                 printWindow.document.write('</body></html>');
                 printWindow.document.close();
                 printWindow.focus();
                 printWindow.print();
                 printWindow.close();
-            }
-        });
+            });
+        }
         
-        // Add clipboard copy button
-        const copyQRBtn = document.createElement('button');
-        copyQRBtn.id = 'copyQR';
-        copyQRBtn.className = 'btn btn-sm btn-info ml-2';
-        copyQRBtn.innerHTML = '<i class="fas fa-copy mr-1"></i> Copy';
-        document.querySelector('#qrCodeContainer .mt-2').appendChild(copyQRBtn);
-        
-        document.getElementById('copyQR').addEventListener('click', function() {
-            if (qrCode) {
-                // Create a temporary canvas
-                const canvas = document.createElement('canvas');
-                canvas.width = qrCode.element.width;
-                canvas.height = qrCode.element.height;
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(qrCode.element, 0, 0);
+        // Copy QR code to clipboard
+        const copyQRBtn = document.getElementById('copyQR');
+        if (copyQRBtn) {
+            copyQRBtn.addEventListener('click', function() {
+                if (!qr) return;
                 
-                // Copy to clipboard (works in some browsers)
-                canvas.toBlob(function(blob) {
-                    try {
-                        navigator.clipboard.write([
-                            new ClipboardItem({
-                                'image/png': blob
-                            })
-                        ]).then(() => {
-                            alert('QR code copied to clipboard');
-                        }).catch(err => {
-                            console.error('Error copying QR code: ', err);
-                            alert('Could not copy QR code. Your browser may not support this feature.');
-                        });
-                    } catch (e) {
-                        console.error('Error copying QR code: ', e);
-                        alert('Could not copy QR code. Your browser may not support this feature.');
-                    }
-                }, 'image/png');
-            }
-        });
+                // Use clipboard API if available
+                if (navigator.clipboard && navigator.clipboard.write) {
+                    qr.element.toBlob(function(blob) {
+                        try {
+                            navigator.clipboard.write([
+                                new ClipboardItem({
+                                    'image/png': blob
+                                })
+                            ]).then(() => {
+                                alert('QR code copied to clipboard!');
+                            }).catch(err => {
+                                console.error('Error copying image: ', err);
+                                alert('Could not copy QR code to clipboard.');
+                            });
+                        } catch (e) {
+                            console.error('Error copying image: ', e);
+                            alert('Could not copy QR code to clipboard.');
+                        }
+                    });
+                } else {
+                    alert('Clipboard API not supported in your browser.');
+                }
+            });
+        }
+        
+        // Handle tracking code search form
+        const trackingForm = document.getElementById('trackingForm');
+        if (trackingForm) {
+            trackingForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                const code = document.getElementById('trackingCode').value.trim();
+                if (code) {
+                    window.location.href = '/track_document_details/' + code;
+                } else {
+                    alert('Please enter a tracking code');
+                }
+            });
+        }
         
         let codeReader;
         const scanVideo = document.getElementById('scanner-video');
