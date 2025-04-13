@@ -98,8 +98,7 @@ class DocumentAction(db.Model):
 
 # Initialize the database
 with app.app_context():
-    # Drop all tables and recreate them
-    db.drop_all()
+    # Only create tables if they don't exist
     db.create_all()
     
     # Check if any users exist, if not create a sample user
@@ -109,7 +108,7 @@ with app.app_context():
             email='admin@example.com',
             phone='+1234567890',
             department='IT Department',
-            password='password',  # In a real app, this would be hashed
+            password=generate_password_hash('password'),  # Use password hashing
             created_at=datetime.strptime('2025-01-15', '%Y-%m-%d'),
             role='Administrator'
         )
@@ -232,13 +231,28 @@ def login():
         # Check against database
         user = User.query.filter_by(username=username).first()
         
-        # For debugging
-        print(f"Login attempt - Username: {username}, Password: {password}")
-        if user:
-            print(f"User found - Username: {user.username}, Password in DB: {user.password}")
-        
-        if user and user.password == password:
-            # Successful login - redirect to dashboard
+        if user and check_password_hash(user.password, password):
+            # Successful login - set session data
+            session['logged_in'] = True
+            session['user_id'] = user.id
+            session['username'] = user.username
+            session['user_role'] = user.role
+            
+            # Update last login time
+            user.last_login = datetime.utcnow()
+            
+            # Create login activity record
+            activity = LoginActivity(
+                user_id=user.id,
+                login_date=datetime.utcnow(),
+                ip_address=request.remote_addr,
+                device=request.user_agent.string,
+                location='Unknown'  # In production, use geolocation service
+            )
+            
+            db.session.add(activity)
+            db.session.commit()
+            
             flash('Login successful!', 'success')
             return redirect(url_for('dashboard'))
         else:
@@ -3099,4 +3113,4 @@ def current_user():
     return None
 
 if __name__ == '__main__':
-    app.run(debug=True) 
+    app.run(debug=False, host='0.0.0.0') 

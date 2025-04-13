@@ -376,21 +376,31 @@
             <div class="sidebar" id="sidebar">
                 <h5 class="text-center my-4">Document Management</h5>
                 <div class="nav flex-column">
+                    <!-- Links visible to all users -->
                     <a href="/" class="{% if active_page == 'home' %}active{% endif %}">
                         <i class="fas fa-home"></i> Home
                     </a>
                     <a href="/dashboard" class="{% if active_page == 'dashboard' %}active{% endif %}">
                         <i class="fas fa-tachometer-alt"></i> Dashboard
                     </a>
+                    
+                    <!-- Links for all except read-only users -->
+                    {% if session.get('user_role') != 'Read Only' %}
                     <a href="/compose" class="{% if active_page == 'compose' %}active{% endif %}">
                         <i class="fas fa-pen"></i> Compose
                     </a>
+                    {% endif %}
+                    
+                    <!-- Standard document links for most users -->
                     <a href="/incoming" class="{% if active_page == 'incoming' %}active{% endif %}">
                         <i class="fas fa-inbox"></i> Incoming
                     </a>
                     <a href="/outgoing" class="{% if active_page == 'outgoing' %}active{% endif %}">
                         <i class="fas fa-paper-plane"></i> Outgoing
                     </a>
+                    
+                    <!-- Admin only links -->
+                    {% if session.get('user_role') == 'Administrator' %}
                     <a href="/maintenance" class="{% if active_page == 'maintenance' %}active{% endif %}">
                         <i class="fas fa-cogs"></i> Maintenance
                     </a>
@@ -403,16 +413,18 @@
                     <a href="/database_management" class="{% if active_page == 'database_management' %}active{% endif %}">
                         <i class="fas fa-database"></i> Database
                     </a>
+                    {% endif %}
+
+                    <!-- Links for all users -->
                     <a href="/my_account" class="{% if active_page == 'my_account' %}active{% endif %}">
                         <i class="fas fa-user"></i> My Account
                     </a>
-                    <!-- Nav Item - Track Document -->
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('track_document') }}">
-                            <i class="fas fa-fw fa-search"></i>
-                            <span>Track Document</span>
-                        </a>
-                    </li>
+                    <a href="{{ url_for('track_document') }}" class="{% if active_page == 'track_document' %}active{% endif %}">
+                        <i class="fas fa-search"></i> Track Document
+                    </a>
+                    <a href="{{ url_for('logout') }}" class="{% if active_page == 'logout' %}active{% endif %}">
+                        <i class="fas fa-sign-out-alt"></i> Logout
+                    </a>
                 </div>
             </div>
             

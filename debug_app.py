@@ -7,9 +7,11 @@ import string
 from io import StringIO
 import csv
 import argparse
+import secrets
 
 app = Flask(__name__)
-app.secret_key = 'supersecretkey'  # change this to a more secure key in production
+# Use a more secure secret key for production
+app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(16))
 
 # Custom Jinja2 filters
 @app.template_filter('number_format')
@@ -626,116 +628,72 @@ def compose():
 
 @app.route('/reports')
 def reports():
-    if 'user_id' not in session:
+    """Route for reports page"""
+    if 'logged_in' not in session:
         return redirect(url_for('login'))
-        
-    # Mock user data
-    user = {
-        'id': session.get('user_id'),
-        'username': session.get('username'),
-        'email': f"{session.get('username')}@example.com",
-        'role': session.get('role'),
-        'phone': '+1234567890',
-        'department': 'IT Department',
-        'is_active': True,
-        'last_login': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    }
     
-    # Check if user is admin
-    is_admin = session.get('role') == 'admin'
+    # Check if user has admin permissions
+    if not current_user_has_permission('Administrator'):
+        flash('You do not have permission to access the reports page.', 'danger')
+        return redirect(url_for('dashboard'))
     
-    # Mock report data
-    mock_status_data = {
-        'Incoming': {
-            'total': 45,
-            'normal': 25,
-            'priority': 12,
-            'urgent': 8
+    # Mock data for reports
+    report_list = [
+        {
+            'id': 1,
+            'name': 'Document Activity Report',
+            'description': 'Shows all document activity for a specified time period',
+            'last_run': datetime.now() - timedelta(days=1),
+            'type': 'activity'
         },
-        'Pending': {
-            'total': 32,
-            'normal': 18,
-            'priority': 10,
-            'urgent': 4
+        {
+            'id': 2,
+            'name': 'User Activity Report',
+            'description': 'Shows user login and action history',
+            'last_run': datetime.now() - timedelta(days=2),
+            'type': 'user'
         },
-        'Received': {
-            'total': 78,
-            'normal': 51,
-            'priority': 20,
-            'urgent': 7
-        },
-        'Outgoing': {
-            'total': 37,
-            'normal': 26,
-            'priority': 8,
-            'urgent': 3
-        },
-        'Ended': {
-            'total': 52,
-            'normal': 38,
-            'priority': 11,
-            'urgent': 3
+        {
+            'id': 3,
+            'name': 'System Performance Report',
+            'description': 'Shows system performance metrics',
+            'last_run': datetime.now() - timedelta(days=3),
+            'type': 'system'
         }
-    }
+    ]
     
-    # Mock average processing times
-    mock_avg_times = {
-        'Incoming': '2.5 days',
-        'Pending': '4.3 days',
-        'Received': '3.7 days',
-        'Outgoing': '1.8 days',
-        'Ended': '8.2 days'
-    }
-    
-    # Mock chart data (will be used by JavaScript on the client)
-    mock_chart_data = {
-        'status_labels': ['Incoming', 'Pending', 'Received', 'Outgoing', 'Ended'],
-        'status_counts': [45, 32, 78, 37, 52],
-        'priority_labels': ['Normal', 'Priority', 'Urgent'],
-        'priority_counts': [158, 61, 25]
-    }
-    
-    # Mock activity data for timeline chart
-    mock_activity_data = {
-        'dates': [(datetime.now() - timedelta(days=i)).strftime('%Y-%m-%d') for i in range(30, 0, -1)],
-        'incoming_counts': [random.randint(0, 5) for _ in range(30)],
-        'outgoing_counts': [random.randint(0, 4) for _ in range(30)]
-    }
-    
-    # Mock user activity data
-    mock_user_activity = {
-        'users': ['admin', 'john.doe', 'jane.smith', 'mike.jones', 'sarah.brown'],
-        'processed_counts': [random.randint(10, 50) for _ in range(5)]
-    }
-    
-    # Mock filter settings
-    mock_filters = {
+    # Add default filters
+    filters = {
         'date_range': 'last-7-days',
         'type': 'all',
         'status': 'all',
         'priority': 'all'
     }
     
-    # Mock document statistics summary
-    mock_document_stats = {
-        'total_documents': sum(mock_status_data[status]['total'] for status in mock_status_data),
-        'documents_added_today': random.randint(3, 8),
-        'documents_processed_today': random.randint(5, 12),
-        'average_processing_time': '3.5 days'
+    # Mock status data for report table
+    status_data = {
+        'Incoming': {'total': 12, 'normal': 6, 'priority': 4, 'urgent': 2},
+        'Pending': {'total': 8, 'normal': 4, 'priority': 3, 'urgent': 1},
+        'Received': {'total': 15, 'normal': 10, 'priority': 3, 'urgent': 2},
+        'Outgoing': {'total': 7, 'normal': 5, 'priority': 2, 'urgent': 0},
+        'Ended': {'total': 23, 'normal': 18, 'priority': 4, 'urgent': 1}
     }
     
-    # Return template with mock data
-    return render_template('reports.html',
-                          user=user,
-                          is_admin=is_admin,
-                          status_data=mock_status_data,
-                          avg_times=mock_avg_times,
-                          chart_data=mock_chart_data,
-                          activity_data=mock_activity_data,
-                          user_activity=mock_user_activity,
-                          filters=mock_filters,
-                          stats=mock_document_stats,
-                          active_page='reports')
+    # Mock average processing times
+    avg_times = {
+        'Incoming': '1.2 days',
+        'Pending': '2.5 days',
+        'Received': '0.8 days',
+        'Outgoing': '1.5 days',
+        'Ended': '4.3 days'
+    }
+    
+    # Calculate total documents
+    total_documents = sum(status['total'] for status in status_data.values())
+    
+    return render_template('reports.html', reports=report_list, filters=filters, 
+                           status_data=status_data, avg_times=avg_times, 
+                           total_documents=total_documents, active_page='reports')
 
 @app.route('/api/reports_data', methods=['GET'])
 def reports_data():
@@ -794,64 +752,50 @@ def reports_data():
 
 @app.route('/maintenance')
 def maintenance():
-    # Mock maintenance statistics for the template
-    mock_stats = {
+    """Route for maintenance page"""
+    if 'logged_in' not in session:
+        return redirect(url_for('login'))
+    
+    # Check if user has admin permissions
+    if not current_user_has_permission('Administrator'):
+        flash('You do not have permission to access the maintenance page.', 'danger')
+        return redirect(url_for('dashboard'))
+    
+    scheduled_tasks = get_scheduled_tasks()
+    database_backups = get_database_backups()
+    system_health = get_system_health()
+    
+    # Add missing maintenance_stats
+    maintenance_stats = {
         "cpu_usage": f"{random.randint(5, 30)}%",
         "memory_usage": f"{random.randint(20, 60)}%",
         "disk_usage": f"{random.randint(10, 70)}%",
         "system_uptime": "7 days, 14 hours, 23 minutes",
         "active_users": random.randint(1, 10),
-        "open_files": random.randint(10, 50)
+        "open_files": random.randint(10, 50),
+        "db_size": "324.5 MB",
+        "pending_tasks": random.randint(0, 5)
     }
     
-    # Add new mock data for enhanced maintenance page
-    mock_users = [
-        {"username": "admin", "last_login": "2025-04-12 09:15 AM", "status": "Active"},
-        {"username": "john.doe", "last_login": "2025-04-11 14:30 PM", "status": "Active"},
-        {"username": "jane.smith", "last_login": "2025-04-12 08:45 AM", "status": "Active"},
-        {"username": "guest", "last_login": "2025-04-10 11:20 AM", "status": "Inactive"}
-    ]
-    
-    mock_logs = [
-        {"timestamp": "2025-04-12 10:15:23", "level": "INFO", "message": "System backup completed successfully"},
-        {"timestamp": "2025-04-12 09:30:45", "level": "WARNING", "message": "High memory usage detected (65%)"},
-        {"timestamp": "2025-04-12 08:45:12", "level": "INFO", "message": "User 'admin' logged in"},
-        {"timestamp": "2025-04-12 08:30:56", "level": "ERROR", "message": "Failed to connect to email server"},
-        {"timestamp": "2025-04-12 07:15:30", "level": "INFO", "message": "Daily maintenance tasks started"}
-    ]
-    
-    mock_storage = {
-        "total": "500 GB",
-        "used": "125 GB",
-        "free": "375 GB",
-        "document_storage": "80 GB",
-        "system_storage": "30 GB",
-        "backup_storage": "15 GB"
+    # Add missing performance_data
+    performance_data = {
+        "response_time": f"{random.randint(80, 150)} ms",
+        "queries_per_second": random.randint(10, 50),
+        "slow_queries": random.randint(0, 3),
+        "cache_hit_ratio": f"{random.randint(75, 95)}%"
     }
     
-    mock_performance = {
-        "avg_response_time": "120 ms",
-        "daily_requests": random.randint(5000, 15000),
-        "peak_time": "10:00 AM - 11:00 AM",
-        "slow_queries": random.randint(0, 5)
-    }
+    # Add last_backup info
+    last_backup = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d %H:%M")
     
-    # Get data from our new mock functions
-    scheduled_tasks = get_scheduled_tasks()
-    database_backups = get_database_backups()
-    system_health = get_system_health()
-    
-    # Include active_page for navigation highlighting
     return render_template('maintenance.html', 
-                          active_page='maintenance',
-                          maintenance_stats=mock_stats,
-                          users=mock_users,
-                          system_logs=mock_logs,
-                          storage_info=mock_storage,
-                          performance_data=mock_performance,
                           scheduled_tasks=scheduled_tasks,
                           database_backups=database_backups,
-                          system_health=system_health)
+                          system_health=system_health,
+                          maintenance_stats=maintenance_stats,
+                          performance_data=performance_data,
+                          last_backup=last_backup,
+                          active_page='maintenance')
 
 @app.route('/maintenance_action', methods=['POST'])
 def maintenance_action():
@@ -898,8 +842,10 @@ def user_management():
     if 'logged_in' not in session:
         return redirect(url_for('login'))
     
-    # For demo purposes, set is_admin to True for all users
-    is_admin = True
+    # Check permission for non-admin users
+    if not current_user_has_permission('Administrator'):
+        flash('You do not have permission to access user management.', 'danger')
+        return redirect(url_for('dashboard'))
     
     # Load users from file
     file_users = load_users()
@@ -947,6 +893,19 @@ def user_management():
                     'last_login': (datetime.now() - timedelta(days=30)).replace(tzinfo=None),
                     'login_count': 12,
                     'password': 'password'  # Default password for demo
+                },
+                {
+                    'id': 4,
+                    'name': 'Read Only User',
+                    'email': 'readonly@kemri.org',
+                    'phone': '+254745678901',
+                    'department': 'Audit',
+                    'role': 'Read Only',
+                    'status': 'active',
+                    'created_at': datetime.now().replace(tzinfo=None),
+                    'last_login': (datetime.now() - timedelta(days=5)).replace(tzinfo=None),
+                    'login_count': 8,
+                    'password': 'password'  # Default password for demo
                 }
             ]
             session['users_list'] = mock_users
@@ -964,8 +923,8 @@ def user_management():
     users = session.get('users_list', [])
     
     # Define available departments and roles for dropdowns
-    departments = ['Administration', 'Laboratory', 'Research', 'IT', 'Finance', 'HR']
-    roles = ['Administrator', 'Manager', 'Lab Technician', 'Researcher', 'Data Entry', 'User']
+    departments = ['Administration', 'Laboratory', 'Research', 'IT', 'Finance', 'HR', 'Audit']
+    roles = ['Administrator', 'Manager', 'Lab Technician', 'Researcher', 'Data Entry', 'User', 'Read Only']
     
     # Calculate user statistics
     stats = {
@@ -979,8 +938,8 @@ def user_management():
                            users=users, 
                            departments=departments, 
                            roles=roles, 
-                           is_admin=is_admin,
-                           stats=stats)
+                           stats=stats,
+                           active_page='user_management')
 
 @app.route('/add_user', methods=['POST'])
 def add_user():
@@ -1050,7 +1009,7 @@ def quick_add_user():
         return redirect(url_for('login'))
     
     # Check permission
-    if not current_user_has_permission('admin'):
+    if not current_user_has_permission('Administrator'):
         flash('You do not have permission to add users.', 'danger')
         return redirect(url_for('user_management'))
     
@@ -1195,7 +1154,7 @@ def reset_password(user_id):
         return redirect(url_for('login'))
     
     # Check permission
-    if not current_user_has_permission('admin'):
+    if not current_user_has_permission('Administrator'):
         flash('You do not have permission to reset passwords.', 'danger')
         return redirect(url_for('dashboard'))
     
@@ -1225,7 +1184,7 @@ def toggle_user_status(user_id):
         return redirect(url_for('login'))
     
     # Check permission
-    if not current_user_has_permission('admin'):
+    if not current_user_has_permission('Administrator'):
         flash('You do not have permission to change user status.', 'danger')
         return redirect(url_for('dashboard'))
     
@@ -1347,7 +1306,7 @@ def send_notification(user_id):
         return redirect(url_for('login'))
     
     # Check permission
-    if not current_user_has_permission('admin'):
+    if not current_user_has_permission('Administrator'):
         flash('You do not have permission to send notifications.', 'danger')
         return redirect(url_for('dashboard'))
     
@@ -1408,7 +1367,7 @@ def export_users():
         return redirect(url_for('login'))
     
     # Check permission
-    if not current_user_has_permission('admin'):
+    if not current_user_has_permission('Administrator'):
         flash('You do not have permission to export users.', 'danger')
         return redirect(url_for('dashboard'))
     
@@ -1458,7 +1417,7 @@ def import_users():
         return redirect(url_for('login'))
     
     # Check permission
-    if not current_user_has_permission('admin'):
+    if not current_user_has_permission('Administrator'):
         flash('You do not have permission to import users.', 'danger')
         return redirect(url_for('dashboard'))
     
@@ -1582,9 +1541,9 @@ def current_user_has_permission(required_role=None):
     if 'user_role' not in session:
         return False
     
-    # For admin role checks
-    if required_role == 'admin':
-        return session.get('user_role') == 'Administrator'
+    # Admin role always has all permissions
+    if session.get('user_role') == 'Administrator':
+        return True
     
     # For specific role checks
     if required_role and session.get('user_role') != required_role:
@@ -1641,10 +1600,19 @@ def logout():
 
 @app.context_processor
 def utility_processor():
+    """Add utility functions to the template context."""
     def now():
         # Ensure we always return a timezone-naive datetime
         return datetime.now().replace(tzinfo=None)
-    return dict(now=now)
+    
+    # Add is_admin check to all templates
+    is_admin = session.get('user_role') == 'Administrator' if 'user_role' in session else False
+    
+    return {
+        'now': now,
+        'is_admin': is_admin,
+        'timedelta': timedelta
+    }
 
 @app.route('/incoming_bulk_action', methods=['POST'])
 def incoming_bulk_action():
@@ -1794,25 +1762,50 @@ def get_system_health():
 # Database management routes
 @app.route('/database_management')
 def database_management():
+    """Route for database management page"""
     if 'logged_in' not in session:
         return redirect(url_for('login'))
     
-    # For demo purposes, allow all users
+    # Check permission for non-admin users
+    if not current_user_has_permission('Administrator'):
+        flash('You do not have permission to access database management.', 'danger')
+        return redirect(url_for('dashboard'))
     
-    # Get mock database stats and tables
-    db_stats = get_mock_db_stats()
-    tables = get_mock_tables()
+    # Mock DB stats
+    db_stats = {
+        'size': '2.4 GB',
+        'tables': 42,
+        'rows': 157892,
+        'indexes': 86,
+        'uptime': '18 days, 4 hours',
+        'last_backup': '2023-04-11 04:00:00',
+        'backup_size': '1.8 GB'
+    }
+    
+    # Mock backup history
+    backup_history = [
+        {'date': '2023-04-11 04:00:00', 'size': '1.8 GB', 'status': 'Success', 'duration': '23 min'},
+        {'date': '2023-04-10 04:00:00', 'size': '1.8 GB', 'status': 'Success', 'duration': '22 min'},
+        {'date': '2023-04-09 04:00:00', 'size': '1.7 GB', 'status': 'Success', 'duration': '21 min'},
+        {'date': '2023-04-08 04:00:00', 'size': '1.7 GB', 'status': 'Failed', 'duration': '5 min'},
+        {'date': '2023-04-07 04:00:00', 'size': '1.7 GB', 'status': 'Success', 'duration': '20 min'}
+    ]
     
     return render_template('database_management.html', 
                           db_stats=db_stats, 
-                          tables=tables)
+                          backup_history=backup_history,
+                          active_page='database_management')
 
 @app.route('/database_integrity')
 def database_integrity():
+    """Route for database integrity check page"""
     if 'logged_in' not in session:
         return redirect(url_for('login'))
     
-    # For demo purposes, allow all users
+    # Check permission for non-admin users
+    if not current_user_has_permission('Administrator'):
+        flash('You do not have permission to access database integrity checks.', 'danger')
+        return redirect(url_for('dashboard'))
     
     # Mock integrity data
     integrity_checks = [
@@ -1822,14 +1815,19 @@ def database_integrity():
     ]
     
     return render_template('database_integrity.html', 
-                          integrity_checks=integrity_checks)
+                          integrity_checks=integrity_checks,
+                          active_page='database_management')
 
 @app.route('/database_logs')
 def database_logs():
+    """Route for database logs page"""
     if 'logged_in' not in session:
         return redirect(url_for('login'))
     
-    # For demo purposes, allow all users
+    # Check permission for non-admin users
+    if not current_user_has_permission('Administrator'):
+        flash('You do not have permission to access database logs.', 'danger')
+        return redirect(url_for('dashboard'))
     
     # Mock logs data
     logs = [
@@ -1839,14 +1837,19 @@ def database_logs():
     ]
     
     return render_template('database_logs.html', 
-                          logs=logs)
+                          logs=logs,
+                          active_page='database_management')
 
 @app.route('/backup_database', methods=['POST'])
 def backup_database():
+    """Route for backing up the database"""
     if 'logged_in' not in session:
         return redirect(url_for('login'))
     
-    # For demo purposes, allow all users
+    # Check permission for non-admin users
+    if not current_user_has_permission('Administrator'):
+        flash('You do not have permission to backup the database.', 'danger')
+        return redirect(url_for('dashboard'))
     
     # Mock backup creation
     flash('Database backup created successfully.', 'success')
@@ -1854,10 +1857,14 @@ def backup_database():
 
 @app.route('/restore_database', methods=['POST'])
 def restore_database():
+    """Route for restoring the database from backup"""
     if 'logged_in' not in session:
         return redirect(url_for('login'))
     
-    # For demo purposes, allow all users
+    # Check permission for non-admin users
+    if not current_user_has_permission('Administrator'):
+        flash('You do not have permission to restore the database.', 'danger')
+        return redirect(url_for('dashboard'))
     
     # Mock database restoration
     flash('Database restored successfully from backup.', 'success')
@@ -2234,6 +2241,6 @@ if __name__ == '__main__':
     parser.add_argument('-p', '--port', type=int, default=5000, help='Port to run the server on')
     args = parser.parse_args()
     
-    print(f"Starting enhanced Flask application with database management on port {args.port}...")
-    app.run(host='0.0.0.0', port=args.port, debug=True)
+    print(f"Starting KEMRI Laboratory System on port {args.port}...")
+    app.run(host='0.0.0.0', port=args.port, debug=False)
     print("Application stopped.") 
