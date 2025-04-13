@@ -1,11 +1,11 @@
 {% extends "base.html" %}
 
-{% block title %}Login - KEMRI Laboratory System{% endblock %}
+{% block title %}Login - KEMRI File Management System{% endblock %}
 
 {% block styles %}
-<style>
-    .login-container {
-        max-width: 450px;
+    <style>
+        .login-container {
+            max-width: 450px;
         margin: 80px auto;
         padding: 30px;
         background-color: #fff;
@@ -40,7 +40,7 @@
     .btn-login {
         background-color: #2c7be5;
         border-color: #2c7be5;
-        width: 100%;
+            width: 100%;
         padding: 12px;
         font-weight: 500;
         margin-top: 10px;
@@ -72,8 +72,8 @@
     .forgot-password {
         text-align: right;
         font-size: 0.9rem;
-    }
-</style>
+        }
+    </style>
 {% endblock %}
 
 {% block content %}
@@ -84,22 +84,22 @@
         </div>
         
         <div class="auth-form-header">
-            <h3>Laboratory Information System</h3>
+            <h3>KEMRI File Management System</h3>
             <p class="text-muted">Please sign in to continue</p>
-        </div>
+            </div>
         
         <div class="alerts-container">
-            {% with messages = get_flashed_messages(with_categories=true) %}
-                {% if messages %}
-                    {% for category, message in messages %}
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
                         <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
                             {{ message }}
                             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                         </div>
-                    {% endfor %}
-                {% endif %}
-            {% endwith %}
-            
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+                
             <!-- Demo Credentials Notice -->
             <div class="alert alert-info" role="alert">
                 <strong>Demo Login:</strong> Use username: "admin" or email: "admin@example.com" with password: "password"
@@ -108,15 +108,15 @@
             <!-- New User Login Instructions -->
             <div class="alert alert-warning" role="alert">
                 <strong>New Users:</strong> You can log in with either your full name or email address. Use the same password you entered during registration.
-            </div>
-        </div>
+                        </div>
+                    </div>
         
         <form method="POST" action="{{ url_for('login') }}" id="loginForm" class="needs-validation" novalidate>
             <div class="form-floating mb-3">
                 <input type="text" class="form-control form-control-lg" id="username" name="username" placeholder="Username or Email" required>
                 <label for="username">Username or Email</label>
                 <div class="invalid-feedback">Please enter your username or email</div>
-            </div>
+                        </div>
             
             <div class="form-floating position-relative mb-3">
                 <input type="password" class="form-control form-control-lg" id="password" name="password" placeholder="Password" required>
@@ -125,7 +125,7 @@
                     <i class="fa fa-eye" id="togglePassword"></i>
                 </span>
                 <div class="invalid-feedback">Please enter your password</div>
-            </div>
+                    </div>
             
             <div class="row mb-3">
                 <div class="col-6">
