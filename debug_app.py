@@ -81,7 +81,10 @@ def save_users(users):
 def home():
     if 'user_id' not in session:
         return redirect(url_for('login'))
-    return redirect(url_for('dashboard'))
+    # Add the logged_in session variable if not present
+    if 'logged_in' not in session:
+        session['logged_in'] = True
+    return render_template('index.html', active_page='home')
 
 # Mock database functions
 def get_mock_db_stats():

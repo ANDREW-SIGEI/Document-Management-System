@@ -1,4 +1,4 @@
-{% extends 'layout.html' %}
+{% extends 'base.html' %}
 
 {% block title %}Home - Document Management System{% endblock %}
 
@@ -8,6 +8,6 @@
     <p class="lead">A comprehensive system for managing document workflows, tracking, and collaboration.</p>
     <hr class="my-4">
     <p>Get started by navigating to the dashboard or accessing one of the system features.</p>
-    <a class="btn btn-primary btn-lg" href="/dashboard" role="button">View Dashboard</a>
+    <a class="btn btn-primary btn-lg" href="{{ url_for('dashboard') }}" role="button">View Dashboard</a>
 </div>
 {% endblock %} 
