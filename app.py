@@ -1625,5 +1625,9 @@ def get_table_structure(table_name):
         'columns': columns
     })
 
+@app.route('/logo-test')
+def logo_test():
+    return render_template('logo_test.html')
+
 if __name__ == '__main__':
     app.run(debug=True) 

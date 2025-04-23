@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Logo Test</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        .test-container {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .bg-test {
+            width: 500px;
+            height: 300px;
+            border: 2px solid #000;
+            margin-top: 20px;
+            background: url('/static/images/kemrilogo.png') no-repeat center center;
+            background-size: contain;
+        }
+        .img-test {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>KEMRI Logo Test</h1>
+        <p>Testing direct image tag:</p>
+        <div class="img-test">
+            <img src="/static/images/kemrilogo.png" alt="KEMRI Logo Direct" width="300">
+        </div>
+    </div>
+    
+    <div class="test-container">
+        <p>Testing as CSS background:</p>
+        <div class="bg-test"></div>
+    </div>
+</body>
+</html> 
