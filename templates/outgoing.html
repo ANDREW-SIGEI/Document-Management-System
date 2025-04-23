@@ -1,4 +1,4 @@
-{% extends 'layout.html' %}
+{% extends 'base.html' %}
 
 {% block title %}Outgoing Documents - Document Management System{% endblock %}
 
@@ -147,21 +147,27 @@
     <div class="card-header bg-white d-flex justify-content-between align-items-center">
         <h5 class="mb-0">Outgoing Documents</h5>
         <div class="btn-group btn-group-sm">
-            <button type="button" class="btn btn-outline-secondary sort-btn {% if sort_by == 'date' %}active{% endif %}" data-sort="date" title="Sort by date">
+            <button type="button" class="btn btn-outline-secondary sort-btn" data-sort="date" title="Sort by date">
                 Date 
                 {% if sort_by == 'date' %}
                 <i class="fas fa-sort-{% if sort_order == 'desc' %}down{% else %}up{% endif %}"></i>
                 {% endif %}
             </button>
-            <button type="button" class="btn btn-outline-secondary sort-btn {% if sort_by == 'priority' %}active{% endif %}" data-sort="priority" title="Sort by priority">
+            <button type="button" class="btn btn-outline-secondary sort-btn" data-sort="priority" title="Sort by priority">
                 Priority 
                 {% if sort_by == 'priority' %}
                 <i class="fas fa-sort-{% if sort_order == 'desc' %}down{% else %}up{% endif %}"></i>
                 {% endif %}
             </button>
-            <button type="button" class="btn btn-outline-secondary sort-btn {% if sort_by == 'code' %}active{% endif %}" data-sort="code" title="Sort by code">
+            <button type="button" class="btn btn-outline-secondary sort-btn" data-sort="code" title="Sort by code">
                 Code 
                 {% if sort_by == 'code' %}
+                <i class="fas fa-sort-{% if sort_order == 'desc' %}down{% else %}up{% endif %}"></i>
+                {% endif %}
+            </button>
+            <button type="button" class="btn btn-outline-secondary sort-btn" data-sort="action" title="Sort by action">
+                Action 
+                {% if sort_by == 'action' %}
                 <i class="fas fa-sort-{% if sort_order == 'desc' %}down{% else %}up{% endif %}"></i>
                 {% endif %}
             </button>
@@ -203,7 +209,7 @@
                             <td>{{ doc.sender }}</td>
                             <td>{{ doc.details }}</td>
                             <td>{{ doc.required_action }}</td>
-                            <td>{{ doc.date_of_letter.strftime('%d/%m/%Y') if doc.date_of_letter else "N/A" }}</td>
+                            <td>{{ doc.date_of_letter if doc.date_of_letter is string else doc.date_of_letter.strftime('%d/%m/%Y') if doc.date_of_letter else "N/A" }}</td>
                             <td>
                                 {% if doc.priority == 'Urgent' %}
                                     <span class="badge badge-danger">{{ doc.priority }}</span>
@@ -323,10 +329,15 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
     
-    // Sorting
+    // Sorting - fixed to ensure proper binding and functionality
     const sortButtons = document.querySelectorAll('.sort-btn');
+    console.log('Found ' + sortButtons.length + ' sort buttons');
+    
     sortButtons.forEach(button => {
-        button.addEventListener('click', function() {
+        button.addEventListener('click', function(e) {
+            e.preventDefault();
+            console.log('Sort button clicked: ' + this.getAttribute('data-sort'));
+            
             const sortBy = this.getAttribute('data-sort');
             const currentSortBy = document.getElementById('sortBy').value;
             let sortOrder = document.getElementById('sortOrder').value;
@@ -341,6 +352,14 @@ document.addEventListener('DOMContentLoaded', function() {
             
             document.getElementById('sortBy').value = sortBy;
             document.getElementById('sortOrder').value = sortOrder;
+            
+            // Add active class to current sort button
+            sortButtons.forEach(btn => {
+                btn.classList.remove('active');
+            });
+            this.classList.add('active');
+            
+            // Submit the form to apply sorting
             document.getElementById('searchForm').submit();
         });
     });

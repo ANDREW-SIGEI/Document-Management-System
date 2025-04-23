@@ -431,9 +431,15 @@ def incoming():
     # Check if user is admin
     is_admin = session.get('role') == 'admin'
     
-    # Mock document data
+    # Get documents from session if available
+    session_documents = session.get('documents', [])
+    
+    # Filter documents to show only incoming ones
+    incoming_documents = [doc for doc in session_documents if doc.get('status') == 'Incoming']
+    
+    # Mock document data for initial display
     current_date = datetime.now()
-    documents = [
+    default_documents = [
         {
             'id': 1,
             'tracking_number': 'DOC-2025-001',
@@ -484,6 +490,9 @@ def incoming():
         }
     ]
     
+    # Combine the mock and session documents for display
+    documents = incoming_documents + default_documents
+    
     # Mock filter data
     search_query = request.args.get('search', '')
     status_filter = request.args.get('status', 'All')
@@ -493,22 +502,22 @@ def incoming():
     
     # Mock counts
     priority_counts = {
-        'Urgent': 1,
-        'Priority': 1,
-        'Normal': 1
+        'Urgent': len([doc for doc in documents if doc.get('priority') == 'Urgent']),
+        'Priority': len([doc for doc in documents if doc.get('priority') == 'Priority']),
+        'Normal': len([doc for doc in documents if doc.get('priority') == 'Normal'])
     }
     
     status_counts = {
-        'Incoming': 1,
-        'Pending': 1,
-        'Received': 1
+        'Incoming': len([doc for doc in documents if doc.get('status') == 'Incoming']),
+        'Pending': len([doc for doc in documents if doc.get('status') == 'Pending']),
+        'Received': len([doc for doc in documents if doc.get('status') == 'Received'])
     }
     
     # Mock pagination
     pagination = {
         'page': 1,
         'per_page': 10,
-        'total': 3,
+        'total': len(documents),
         'pages': 1,
         'has_prev': False,
         'has_next': False,
@@ -550,9 +559,15 @@ def outgoing():
     # Check if user is admin
     is_admin = session.get('role') == 'admin'
     
-    # Mock document data
+    # Get documents from session if available
+    session_documents = session.get('documents', [])
+    
+    # Filter documents to show only outgoing ones
+    outgoing_documents = [doc for doc in session_documents if doc.get('status') == 'Outgoing']
+    
+    # Mock document data for initial display
     current_date = datetime.now()
-    documents = [
+    default_documents = [
         {
             'id': 1,
             'tracking_number': 'OUT-2025-001',
@@ -603,24 +618,54 @@ def outgoing():
         }
     ]
     
+    # Combine the mock and session documents for display
+    documents = outgoing_documents + default_documents
+    
     # Mock filter data
     search_query = request.args.get('search', '')
     priority_filter = request.args.get('priority', 'All')
     sort_by = request.args.get('sort_by', 'date')
     sort_order = request.args.get('sort_order', 'desc')
     
+    # Apply filter by priority if needed
+    if priority_filter != 'All':
+        documents = [doc for doc in documents if doc.get('priority') == priority_filter]
+        
+    # Apply search if provided
+    if search_query:
+        search_query_lower = search_query.lower()
+        filtered_docs = []
+        for doc in documents:
+            if (search_query_lower in doc.get('code', '').lower() or
+                search_query_lower in doc.get('sender', '').lower() or
+                search_query_lower in doc.get('details', '').lower() or
+                search_query_lower in doc.get('required_action', '').lower()):
+                filtered_docs.append(doc)
+        documents = filtered_docs
+    
+    # Apply sorting
+    if sort_by == 'date':
+        documents.sort(key=lambda x: x.get('date_of_letter') if not isinstance(x.get('date_of_letter'), str) else datetime.now(), reverse=(sort_order == 'desc'))
+    elif sort_by == 'priority':
+        priority_order = {'Urgent': 0, 'Priority': 1, 'Normal': 2}
+        documents.sort(key=lambda x: priority_order.get(x.get('priority'), 3), reverse=(sort_order == 'desc'))
+    elif sort_by == 'code':
+        documents.sort(key=lambda x: x.get('code', ''), reverse=(sort_order == 'desc'))
+    elif sort_by == 'action':
+        documents.sort(key=lambda x: x.get('required_action', ''), reverse=(sort_order == 'desc'))
+    
     # Mock counts
     priority_counts = {
-        'Urgent': 1,
-        'Priority': 1,
-        'Normal': 1
+        'Urgent': len([doc for doc in documents if doc.get('priority') == 'Urgent']),
+        'Priority': len([doc for doc in documents if doc.get('priority') == 'Priority']),
+        'Normal': len([doc for doc in documents if doc.get('priority') == 'Normal'])
     }
     
     # Mock pagination
     pagination = {
         'page': 1,
         'per_page': 10,
-        'total': 3,
+        'total': len(documents),
         'pages': 1,
         'has_prev': False,
         'has_next': False,
@@ -640,7 +685,7 @@ def outgoing():
                           priority_counts=priority_counts,
                           pagination=pagination)
 
-@app.route('/compose')
+@app.route('/compose', methods=['GET', 'POST'])
 def compose():
     if 'user_id' not in session:
         return redirect(url_for('login'))
@@ -660,7 +705,95 @@ def compose():
     # Check if user is admin
     is_admin = session.get('role') == 'admin'
     
-    return render_template('compose.html', user=user, is_admin=is_admin, users=[])
+    # Mock workflow templates
+    workflow_templates = [
+        {'name': 'Standard Review', 'steps': ['Initial Review', 'Department Review', 'Final Approval']},
+        {'name': 'Fast Track', 'steps': ['Quick Review', 'Approval']},
+        {'name': 'Extended Review', 'steps': ['Initial Check', 'Department Review', 'Management Review', 'Executive Approval', 'Final Filing']}
+    ]
+    
+    # Handle POST submission
+    if request.method == 'POST':
+        try:
+            # In a real application, you would store the document in a database
+            # For this demo, we'll store it in the session
+            
+            # Generate document code if not provided
+            tracking_code = request.form.get('preset_tracking_code')
+            if not tracking_code:
+                timestamp = datetime.now().strftime('%Y%m%d')
+                random_hex = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+                tracking_code = f"DOC-{timestamp}-{random_hex}"
+            
+            # Get form data
+            document_direction = request.form.get('document_direction', 'incoming')
+            document_title = request.form.get('document_title', '')
+            sender = request.form.get('sender', user.get('username', 'Unknown'))
+            recipient = request.form.get('recipient', '')
+            details = request.form.get('details', '')
+            required_action = request.form.get('required_action', 'Review')
+            priority = request.form.get('priority', 'Normal')
+            tags = [tag.strip() for tag in request.form.get('tags', '').split(',') if tag.strip()]
+            is_confidential = request.form.get('is_confidential') == 'on'
+            
+            # Create document record - ensure datetime is converted to string
+            document = {
+                'id': random.randint(1000, 9999),
+                'tracking_number': tracking_code,
+                'title': document_title,
+                'status': 'Incoming' if document_direction == 'incoming' else 'Outgoing',
+                'priority': priority,
+                'sender': sender,
+                'recipient': recipient,
+                'created_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                'last_updated': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                'code': tracking_code,
+                'details': details,
+                'required_action': required_action,
+                'date_received': datetime.now().strftime('%Y-%m-%d'),
+                'date_of_letter': datetime.now().strftime('%Y-%m-%d'),  # Add this for outgoing documents
+                'current_holder': recipient or user.get('username', 'System'),
+                'is_confidential': is_confidential,
+                'tags': tags
+            }
+            
+            # Store in session
+            if 'documents' not in session:
+                session['documents'] = []
+            
+            # Add to session documents list
+            documents = session.get('documents', [])
+            documents.append(document)
+            session['documents'] = documents
+            
+            # Flash success message
+            flash(f'Document uploaded successfully! Tracking code: {tracking_code}', 'success')
+            
+            # Redirect to appropriate list based on document direction
+            if document_direction == 'incoming':
+                return redirect(url_for('incoming'))
+            else:
+                return redirect(url_for('outgoing'))
+                
+        except Exception as e:
+            # If an error occurs, show an error message
+            flash(f'Error uploading document: {str(e)}', 'danger')
+            # Return to compose page
+            return redirect(url_for('compose'))
+    
+    # Get mock users for recipient dropdown
+    users = [
+        {'id': 1, 'name': 'John Admin', 'email': 'admin@example.com', 'department': 'Administration'},
+        {'id': 2, 'name': 'Jane Manager', 'email': 'jane@example.com', 'department': 'Management'},
+        {'id': 3, 'name': 'Bob Researcher', 'email': 'bob@example.com', 'department': 'Research'}
+    ]
+    
+    return render_template('compose.html', 
+                          user=user, 
+                          is_admin=is_admin, 
+                          users=users,
+                          workflow_templates=workflow_templates,
+                          current_user=user)
 
 @app.route('/reports')
 def reports():

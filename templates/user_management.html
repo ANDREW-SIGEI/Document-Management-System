@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 
-{% block title %}User Management - KEMRI Laboratory System{% endblock %}
+{% block title %}User Management - Document Management System{% endblock %}
 
 {% block content %}
 <!-- Header with buttons -->
@@ -218,8 +218,8 @@
                     <tr class="user-row" data-user-id="{{ user.id }}" data-status="{{ user.status }}">
                         <td>
                             <div class="form-check">
-                                <input class="form-check-input user-checkbox" type="checkbox" id="userCheck{{ user.id }}" value="{{ user.id }}" title="Select user {{ user.name }}" aria-label="Select user {{ user.name }}">
-                                <label class="form-check-label" for="userCheck{{ user.id }}"><span class="visually-hidden">Select {{ user.name }}</span></label>
+                                <input class="form-check-input user-checkbox" type="checkbox" id="userCheck{{ user.id }}" value="{{ user.id }}" title="Select user {{ user.username }}" aria-label="Select user {{ user.username }}">
+                                <label class="form-check-label" for="userCheck{{ user.id }}"><span class="visually-hidden">Select {{ user.username }}</span></label>
                             </div>
                         </td>
                         <td>
@@ -228,13 +228,20 @@
                                     <div class="avatar-container">
                                         <img class="avatar-img" src="{{ url_for('static', filename='images/user.png') }}" alt="User Avatar" onerror="this.onerror=null; this.classList.add('error');">
                                         <div class="avatar-circle">
-                                            <span class="initials">{{ user.name[:2].upper() }}</span>
+                                            <span class="initials">{{ user.username[:2].upper() }}</span>
                                         </div>
                                     </div>
                                 </div>
                                 <div class="ms-3">
-                                    <a href="{{ url_for('user_profile', user_id=user.id) }}">{{ user.name }}</a>
-                                    <div class="small text-muted">{{ user.login_count }} logins</div>
+                                    <!-- Commented out user profile link -->
+                                    <a href="#">{{ user.username }}</a>
+                                    <div class="small text-muted">
+                                        {% if user.login_activities %}
+                                            {{ user.login_activities|length }} logins
+                                        {% else %}
+                                            No logins recorded
+                                        {% endif %}
+                                    </div>
                                 </div>
                             </div>
                         </td>
@@ -252,11 +259,8 @@
                             {% endif %}
                         </td>
                         <td>
-                            {% if user.status == 'active' %}
-                                <span class="badge bg-success">Active</span>
-                            {% else %}
-                                <span class="badge bg-warning text-dark">Inactive</span>
-                            {% endif %}
+                            <!-- User status - since it's not in the model, display a default active status -->
+                            <span class="badge bg-success">Active</span>
                         </td>
                         <td data-sort="{{ user.last_login }}">
                             {% if user.last_login %}
@@ -277,21 +281,18 @@
                                     Actions
                                 </button>
                                 <ul class="dropdown-menu dropdown-menu-end">
-                                    <li><a class="dropdown-item" href="{{ url_for('user_profile', user_id=user.id) }}"><i class="fas fa-user me-1 text-primary"></i> View Profile</a></li>
-                                    <li><a class="dropdown-item edit-user" href="#" data-bs-toggle="modal" data-bs-target="#editUserModal" data-user-id="{{ user.id }}" data-user-name="{{ user.name }}"><i class="fas fa-edit me-1 text-info"></i> Edit User</a></li>
+                                    <!-- Commented out user profile link -->
+                                    <li><a class="dropdown-item" href="#"><i class="fas fa-user me-1 text-primary"></i> View Profile</a></li>
+                                    <li><a class="dropdown-item edit-user" href="#" data-bs-toggle="modal" data-bs-target="#editUserModal" data-user-id="{{ user.id }}" data-user-name="{{ user.username }}"><i class="fas fa-edit me-1 text-info"></i> Edit User</a></li>
                                     <li><a class="dropdown-item reset-password" href="#" data-user-id="{{ user.id }}"><i class="fas fa-key me-1 text-warning"></i> Reset Password</a></li>
-                                    <li><a class="dropdown-item send-notification" href="#" data-bs-toggle="modal" data-bs-target="#sendNotificationModal" data-user-id="{{ user.id }}" data-user-name="{{ user.name }}"><i class="fas fa-bell me-1 text-primary"></i> Send Notification</a></li>
+                                    <li><a class="dropdown-item send-notification" href="#" data-bs-toggle="modal" data-bs-target="#sendNotificationModal" data-user-id="{{ user.id }}" data-user-name="{{ user.username }}"><i class="fas fa-bell me-1 text-primary"></i> Send Notification</a></li>
                                     <li><hr class="dropdown-divider"></li>
                                     <li>
-                                        <a class="dropdown-item toggle-status" href="#" data-user-id="{{ user.id }}" data-current-status="{{ user.status }}">
-                                            {% if user.status == 'active' %}
-                                                <i class="fas fa-user-times me-1 text-warning"></i> Deactivate User
-                                            {% else %}
-                                                <i class="fas fa-user-check me-1 text-success"></i> Activate User
-                                            {% endif %}
+                                        <a class="dropdown-item toggle-status" href="#" data-user-id="{{ user.id }}" data-current-status="active">
+                                            <i class="fas fa-user-times me-1 text-warning"></i> Deactivate User
                                         </a>
                                     </li>
-                                    <li><a class="dropdown-item delete-user" href="#" data-bs-toggle="modal" data-bs-target="#deleteUserModal" data-user-id="{{ user.id }}" data-user-name="{{ user.name }}"><i class="fas fa-trash me-1 text-danger"></i> Delete User</a></li>
+                                    <li><a class="dropdown-item delete-user" href="#" data-bs-toggle="modal" data-bs-target="#deleteUserModal" data-user-id="{{ user.id }}" data-user-name="{{ user.username }}"><i class="fas fa-trash me-1 text-danger"></i> Delete User</a></li>
                                 </ul>
                             </div>
                         </td>

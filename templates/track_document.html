@@ -1,590 +1,160 @@
-{% extends 'layout.html' %}
+{% extends 'base.html' %}
 
-{% block title %}Track Document{% endblock %}
+{% block title %}Track Document - Document Management System{% endblock %}
 
 {% block content %}
-<div class="container py-4">
+<div class="container">
     <div class="row justify-content-center">
-        <div class="col-md-8">
-            <div class="card border-0 shadow">
+        <div class="col-lg-8">
+            <div class="card shadow-lg">
                 <div class="card-header bg-primary text-white">
-                    <h1 class="h3 mb-0">Track Document</h1>
+                    <h4 class="mb-0">Track Document</h4>
                 </div>
                 <div class="card-body">
-                    {% with messages = get_flashed_messages(with_categories=true) %}
-                        {% if messages %}
-                            {% for category, message in messages %}
-                                <div class="alert alert-{{ category }}">{{ message }}</div>
-                            {% endfor %}
-                        {% endif %}
-                    {% endwith %}
-                    
-                    <p class="text-muted mb-4">Enter the document tracking code to view its current status and history.</p>
-                    
-                    <form method="POST" action="{{ url_for('track_document') }}">
-                        <div class="form-group">
-                            <label for="document_code">Document Tracking Code</label>
+                    <form id="trackDocumentForm" action="{{ url_for('track_document') }}" method="GET">
+                        <div class="form-group mb-4">
+                            <label for="documentCode">Document Code</label>
                             <div class="input-group">
-                                <div class="input-group-prepend">
-                                    <span class="input-group-text"><i class="fas fa-search"></i></span>
-                                </div>
-                                <input type="text" class="form-control" id="document_code" name="document_code" 
-                                       value="{{ qr_code_value }}"
-                                       placeholder="Enter tracking code (e.g., DOC-2023-001)" required>
+                                <input type="text" class="form-control" id="documentCode" name="code" placeholder="Enter document code (e.g., DOC-2025-001)" value="{{ request.args.get('code', '') }}" required>
                                 <div class="input-group-append">
-                                    <button type="submit" class="btn btn-primary">Track Document</button>
+                                    <button class="btn btn-primary" type="submit">
+                                        <i class="fas fa-search me-2"></i> Track
+                                    </button>
                                 </div>
                             </div>
+                            <small class="form-text text-muted">Enter the unique document code to track its status and history</small>
                         </div>
                     </form>
-                    
-                    <div class="mt-3 text-center">
-                        <button id="scanBarcode" class="btn btn-outline-primary btn-sm">
-                            <i class="fas fa-barcode mr-1"></i> Scan Barcode
-                        </button>
-                        <button id="scanQrCode" class="btn btn-outline-secondary btn-sm ml-2">
-                            <i class="fas fa-qrcode mr-1"></i> Scan QR Code
-                        </button>
-                        <div id="autoRefreshContainer" class="d-inline-block ml-2" style="display: none !important;">
-                            <div class="custom-control custom-switch">
-                                <input type="checkbox" class="custom-control-input" id="autoRefresh">
-                                <label class="custom-control-label" for="autoRefresh">Auto Refresh</label>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div id="scannerInterface" class="mt-3 p-3 border rounded bg-light text-center" style="display: none;">
-                        <div id="scanner-container">
-                            <video id="scanner-video" style="width: 100%; max-height: 300px;"></video>
-                        </div>
-                        <div class="mt-2">
-                            <small class="text-muted">Position the barcode/QR code in front of your camera</small>
-                            <button id="closeScanner" class="btn btn-sm btn-danger ml-2">
-                                <i class="fas fa-times"></i> Close Scanner
-                            </button>
-                        </div>
-                        <div id="scanner-error" class="alert alert-danger mt-2" style="display: none;">
-                            <i class="fas fa-exclamation-triangle mr-1"></i>
-                            <span id="scanner-error-message">Error accessing camera</span>
-                            <br>
-                            <small>Make sure you've granted camera permission to this website</small>
-                        </div>
-                    </div>
-                    
-                    <div class="mt-4">
-                        <a href="#advancedSearch" data-toggle="collapse" class="text-decoration-none">
-                            <i class="fas fa-sliders-h"></i> Advanced Search Options
-                        </a>
-                        
-                        <div id="advancedSearch" class="collapse mt-3">
-                            <div class="card card-body bg-light">
-                                <form action="{{ url_for('track_document') }}" method="GET">
-                                    <div class="row">
-                                        <div class="col-md-6">
-                                            <div class="form-group">
-                                                <label for="sender">Sender</label>
-                                                <input type="text" class="form-control form-control-sm" id="sender" name="sender" placeholder="Sender name or department">
-                                            </div>
-                                        </div>
-                                        <div class="col-md-6">
-                                            <div class="form-group">
-                                                <label for="recipient">Recipient</label>
-                                                <input type="text" class="form-control form-control-sm" id="recipient" name="recipient" placeholder="Recipient name or department">
-                                            </div>
+
+                    {% if search_performed %}
+                        {% if document %}
+                            <!-- Document details -->
+                            <div class="mt-4">
+                                <div class="alert alert-success">
+                                    <div class="d-flex align-items-center">
+                                        <i class="fas fa-check-circle me-3 fa-2x"></i>
+                                        <div>
+                                            <h5 class="mb-1">Document Found</h5>
+                                            <p class="mb-0">Document details are displayed below</p>
                                         </div>
                                     </div>
-                                    <div class="row">
-                                        <div class="col-md-6">
-                                            <div class="form-group">
-                                                <label for="dateRange">Date Range</label>
-                                                <select class="form-control form-control-sm" id="dateRange" name="date_range">
-                                                    <option value="all">All Time</option>
-                                                    <option value="today">Today</option>
-                                                    <option value="yesterday">Yesterday</option>
-                                                    <option value="this_week">This Week</option>
-                                                    <option value="last_week">Last Week</option>
-                                                    <option value="this_month">This Month</option>
-                                                    <option value="custom">Custom Range...</option>
-                                                </select>
-                                            </div>
-                                        </div>
-                                        <div class="col-md-6">
-                                            <div class="form-group">
-                                                <label for="status">Status</label>
-                                                <select class="form-control form-control-sm" id="status" name="status">
-                                                    <option value="all">All Statuses</option>
-                                                    <option value="Incoming">Incoming</option>
-                                                    <option value="Pending">Pending</option>
-                                                    <option value="Received">Received</option>
-                                                    <option value="Outgoing">Outgoing</option>
-                                                    <option value="Sent">Sent</option>
-                                                    <option value="Ended">Ended</option>
-                                                </select>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div id="customDateRange" style="display: none;">
-                                        <div class="row">
-                                            <div class="col-md-6">
-                                                <div class="form-group">
-                                                    <label for="startDate">Start Date</label>
-                                                    <input type="date" class="form-control form-control-sm" id="startDate" name="start_date">
-                                                </div>
-                                            </div>
-                                            <div class="col-md-6">
-                                                <div class="form-group">
-                                                    <label for="endDate">End Date</label>
-                                                    <input type="date" class="form-control form-control-sm" id="endDate" name="end_date">
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <button type="submit" class="btn btn-sm btn-primary">Search Documents</button>
-                                </form>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="mt-4">
-                        <h5>What is a tracking code?</h5>
-                        <p>A tracking code is a unique identifier assigned to each document in the system. You can use this code to:</p>
-                        <ul>
-                            <li>View the current status of your document</li>
-                            <li>See who is currently handling your document</li>
-                            <li>View the document's history and comments</li>
-                            <li>Add actions or comments to the document (if authorized)</li>
-                        </ul>
-                        <p>You can find your document's tracking code in your confirmation email or receipt when you submitted the document.</p>
-                    </div>
-                    
-                    <div class="mt-5 text-center">
-                        <hr>
-                        <p class="text-muted">Don't have a tracking code?</p>
-                        <a href="{{ url_for('compose') }}" class="btn btn-outline-primary">Create New Document</a>
-                        <a href="{{ url_for('incoming') }}" class="btn btn-outline-secondary">View All Incoming Documents</a>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="card border-0 shadow mt-4">
-                <div class="card-header bg-light d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">Recent Documents</h5>
-                    <div class="btn-group btn-group-sm">
-                        <button type="button" class="btn btn-outline-secondary active" data-filter="all">All</button>
-                        <button type="button" class="btn btn-outline-secondary" data-filter="database">Database</button>
-                        <button type="button" class="btn btn-outline-secondary" data-filter="json">JSON</button>
-                    </div>
-                </div>
-                <div class="card-body p-0">
-                    {% if is_search %}
-                        <div class="alert alert-info m-3">
-                            <h6 class="mb-2">Search Results</h6>
-                            <div class="d-flex flex-wrap">
-                                {% if search_params.sender %}
-                                    <span class="badge badge-secondary mr-2 mb-1">Sender: {{ search_params.sender }}</span>
-                                {% endif %}
-                                {% if search_params.recipient %}
-                                    <span class="badge badge-secondary mr-2 mb-1">Recipient: {{ search_params.recipient }}</span>
-                                {% endif %}
-                                {% if search_params.status and search_params.status != 'all' %}
-                                    <span class="badge badge-secondary mr-2 mb-1">Status: {{ search_params.status }}</span>
-                                {% endif %}
-                                {% if search_params.date_range and search_params.date_range != 'all' %}
-                                    <span class="badge badge-secondary mr-2 mb-1">Date: {{ search_params.date_range|replace('_', ' ')|capitalize }}</span>
-                                {% endif %}
-                            </div>
-                            <div class="mt-2">
-                                <a href="{{ url_for('track_document') }}" class="btn btn-sm btn-outline-secondary">
-                                    <i class="fas fa-times mr-1"></i> Clear Search
-                                </a>
-                            </div>
-                        </div>
-                        
-                        <div class="list-group list-group-flush">
-                            {% if search_results %}
-                                {% for doc in search_results %}
-                                    <a href="{{ url_for('track_document_details', document_code=doc.code) if doc.source == 'json' else url_for('document_details', doc_code=doc.code) }}" 
-                                    class="list-group-item list-group-item-action document-item" data-source="{{ doc.source }}">
-                                        <div class="d-flex w-100 justify-content-between">
-                                            <h6 class="mb-1">{{ doc.code }}</h6>
-                                            <small class="text-nowrap">{{ doc.timestamp }}</small>
-                                        </div>
-                                        <p class="mb-1">{{ doc.filename }}</p>
+                                </div>
+                                
+                                <div class="card mb-4 mt-4 border-primary">
+                                    <div class="card-header bg-light">
                                         <div class="d-flex justify-content-between align-items-center">
-                                            <div>
-                                                <span class="badge badge-{% if doc.status == 'Incoming' %}primary{% elif doc.status == 'Pending' %}warning{% elif doc.status == 'Received' %}success{% elif doc.status == 'Outgoing' %}info{% else %}secondary{% endif %}">
-                                                    {{ doc.status }}
-                                                </span>
-                                                <small class="text-muted ml-2">
-                                                    {{ doc.sender }} → {{ doc.recipient }}
-                                                </small>
-                                            </div>
-                                            <small class="text-muted">
-                                                <span class="badge badge-light">
-                                                    <i class="fas fa-{% if doc.source == 'database' %}database{% else %}file-alt{% endif %} mr-1"></i>
-                                                    {{ doc.source|capitalize }}
-                                                </span>
-                                            </small>
-                                        </div>
-                                    </a>
-                                {% endfor %}
-                            {% else %}
-                                <div class="list-group-item py-4">
-                                    <div class="text-center text-muted">
-                                        <i class="fas fa-search fa-2x mb-2"></i>
-                                        <p>No documents match your search criteria.</p>
-                                        <p>Try broadening your search parameters.</p>
-                                    </div>
-                                </div>
-                            {% endif %}
-                        </div>
-                    {% else %}
-                        <div class="list-group list-group-flush">
-                            {% for doc in recent_documents[:10] if recent_documents %}
-                                <a href="{{ url_for('track_document_details', document_code=doc.code) if doc.source == 'json' else url_for('document_details', doc_code=doc.code) }}" 
-                                class="list-group-item list-group-item-action document-item" data-source="{{ doc.source }}">
-                                    <div class="d-flex w-100 justify-content-between">
-                                        <h6 class="mb-1">{{ doc.code }}</h6>
-                                        <small class="text-nowrap">{{ doc.timestamp }}</small>
-                                    </div>
-                                    <p class="mb-1">{{ doc.filename }}</p>
-                                    <div class="d-flex justify-content-between align-items-center">
-                                        <span class="badge badge-{% if doc.status == 'Incoming' %}primary{% elif doc.status == 'Pending' %}warning{% elif doc.status == 'Received' %}success{% elif doc.status == 'Outgoing' %}info{% else %}secondary{% endif %}">
-                                            {{ doc.status }}
-                                        </span>
-                                        <small class="text-muted">
-                                            <span class="badge badge-light">
-                                                <i class="fas fa-{% if doc.source == 'database' %}database{% else %}file-alt{% endif %} mr-1"></i>
-                                                {{ doc.source|capitalize }}
+                                            <h5 class="mb-0">{{ document.code }}</h5>
+                                            <span class="badge bg-{% if document.status == 'Incoming' %}primary{% elif document.status == 'Pending' %}warning{% elif document.status == 'Received' %}success{% elif document.status == 'Outgoing' %}info{% else %}secondary{% endif %}">
+                                                {{ document.status }}
                                             </span>
-                                        </small>
+                                        </div>
                                     </div>
-                                </a>
-                            {% else %}
-                                <div class="list-group-item">
-                                    <p class="text-center mb-0">No recent documents found</p>
+                                    <div class="card-body">
+                                        <h6 class="mb-3">{{ document.title }}</h6>
+                                        
+                                        <div class="row mb-3">
+                                            <div class="col-md-6">
+                                                <p class="mb-1 small text-muted">From (Sender)</p>
+                                                <p class="mb-3">{{ document.sender }}</p>
+                                                
+                                                <p class="mb-1 small text-muted">Date of Letter</p>
+                                                <p class="mb-0">{{ document.date_of_letter.strftime('%d %b %Y') }}</p>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <p class="mb-1 small text-muted">To (Recipient)</p>
+                                                <p class="mb-3">{{ document.recipient }}</p>
+                                                
+                                                <p class="mb-1 small text-muted">Date Received</p>
+                                                <p class="mb-0">{{ document.date_received.strftime('%d %b %Y') }}</p>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <p class="mb-1 small text-muted">Current Holder</p>
+                                            <p class="mb-0">{{ document.current_holder }}</p>
+                                        </div>
+                                        
+                                        <a href="{{ url_for('document_details', doc_code=document.code) }}" class="btn btn-sm btn-outline-primary">
+                                            <i class="fas fa-eye me-1"></i> View Full Details
+                                        </a>
+                                    </div>
                                 </div>
-                            {% endfor %}
+                                
+                                <!-- Document History Timeline -->
+                                <h5 class="mb-3">Document History</h5>
+                                <div class="timeline mb-4">
+                                    {% for entry in history %}
+                                    <div class="timeline-item">
+                                        <div class="timeline-marker bg-{% if entry.action == 'Document Created' %}success{% elif 'Received' in entry.action %}info{% else %}primary{% endif %}"></div>
+                                        <div class="timeline-content">
+                                            <h6 class="mb-1">{{ entry.action }}</h6>
+                                            <p class="mb-0 small text-muted">{{ entry.timestamp.strftime('%d %b %Y, %H:%M') }}</p>
+                                            <p class="mb-0">{{ entry.details }}</p>
+                                            <small class="text-muted">By {{ entry.user }}</small>
+                                        </div>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        {% else %}
+                            <!-- No document found -->
+                            <div class="alert alert-warning mt-4">
+                                <div class="d-flex align-items-center">
+                                    <i class="fas fa-exclamation-triangle me-3 fa-2x"></i>
+                                    <div>
+                                        <h5 class="mb-1">Document Not Found</h5>
+                                        <p class="mb-0">No document found with the code: {{ request.args.get('code') }}</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="text-center my-5">
+                                <p>Please check the document code and try again</p>
+                                <p class="text-muted">If you continue to have issues, please contact support</p>
+                            </div>
+                        {% endif %}
+                    {% else %}
+                        <!-- Initial state -->
+                        <div class="text-center my-5">
+                            <i class="fas fa-search fa-4x text-muted mb-3"></i>
+                            <h5>Enter a document code to track its status</h5>
+                            <p class="text-muted">You can find the document code on the document or in your notification email</p>
                         </div>
                     {% endif %}
-                </div>
-                <div class="card-footer bg-white text-center">
-                    <a href="{{ url_for('dashboard') }}" class="btn btn-sm btn-link">View All Documents</a>
-                </div>
-            </div>
-            
-            <div class="card border-0 shadow mt-4">
-                <div class="card-header bg-light">
-                    <h5 class="mb-0">Generate QR Code for a Document</h5>
-                </div>
-                <div class="card-body">
-                    <form id="qrGeneratorForm" class="mb-3">
-                        <div class="form-group">
-                            <label for="qrDocCode">Document Code</label>
-                            <div class="input-group">
-                                <input type="text" class="form-control" id="qrDocCode" name="qrDocCode" 
-                                       placeholder="Enter document code for QR generation">
-                                <div class="input-group-append">
-                                    <button type="submit" class="btn btn-secondary">Generate QR</button>
-                                </div>
-                            </div>
-                            <small class="form-text text-muted">
-                                QR codes make document tracking easier via mobile devices.
-                            </small>
-                        </div>
-                    </form>
-                    
-                    <div id="qrCodeContainer" class="text-center p-3" style="display: none;">
-                        <div id="qrcode" class="d-inline-block border p-2 bg-white"></div>
-                        <div class="mt-2">
-                            <button id="downloadQR" class="btn btn-sm btn-primary">
-                                <i class="fas fa-download mr-1"></i> Download
-                            </button>
-                            <button id="printQR" class="btn btn-sm btn-secondary">
-                                <i class="fas fa-print mr-1"></i> Print
-                            </button>
-                        </div>
-                    </div>
                 </div>
             </div>
         </div>
     </div>
 </div>
 
-{% block extra_scripts %}
-<script src="https://cdn.jsdelivr.net/npm/qrious@4.0.2/dist/qrious.min.js"></script>
-<script src="https://unpkg.com/@zxing/library@0.19.1/umd/index.min.js"></script>
-
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const filterButtons = document.querySelectorAll('[data-filter]');
-        const documentItems = document.querySelectorAll('.document-item');
-        
-        filterButtons.forEach(button => {
-            button.addEventListener('click', function() {
-                filterButtons.forEach(btn => btn.classList.remove('active'));
-                
-                this.classList.add('active');
-                
-                const filter = this.getAttribute('data-filter');
-                
-                documentItems.forEach(item => {
-                    if (filter === 'all' || item.getAttribute('data-source') === filter) {
-                        item.style.display = '';
-                    } else {
-                        item.style.display = 'none';
-                    }
-                });
-            });
-        });
-        
-        const dateRangeSelect = document.getElementById('dateRange');
-        const customDateRange = document.getElementById('customDateRange');
-        
-        if (dateRangeSelect) {
-            dateRangeSelect.addEventListener('change', function() {
-                if (this.value === 'custom') {
-                    customDateRange.style.display = 'block';
-                } else {
-                    customDateRange.style.display = 'none';
-                }
-            });
-        }
-        
-        // QR code generation functionality
-        const qrGeneratorForm = document.getElementById('qrGeneratorForm');
-        const qrCodeContainer = document.getElementById('qrCodeContainer');
-        const qrCodeInput = document.getElementById('qrDocCode');
-        let qr;
-        
-        if (qrGeneratorForm) {
-            qrGeneratorForm.addEventListener('submit', function(e) {
-                e.preventDefault();
-                const docCode = qrCodeInput.value.trim();
-                
-                if (!docCode) {
-                    alert('Please enter a document code');
-                    return;
-                }
-                
-                const qrcodeElement = document.getElementById('qrcode');
-                qrcodeElement.innerHTML = ''; // Clear previous QR code
-                
-                // Create QR code (using QRious library)
-                qr = new QRious({
-                    element: document.createElement('canvas'),
-                    size: 200,
-                    value: window.location.origin + '/track_document?code=' + docCode
-                });
-                
-                qrcodeElement.appendChild(qr.element);
-                qrCodeContainer.style.display = 'block';
-            });
-        }
-        
-        // Download QR code
-        const downloadQRBtn = document.getElementById('downloadQR');
-        if (downloadQRBtn) {
-            downloadQRBtn.addEventListener('click', function() {
-                if (!qr) return;
-                
-                const link = document.createElement('a');
-                link.download = 'document-qr-' + qrCodeInput.value.trim() + '.png';
-                link.href = qr.element.toDataURL('image/png');
-                link.click();
-            });
-        }
-        
-        // Print QR code
-        const printQRBtn = document.getElementById('printQR');
-        if (printQRBtn) {
-            printQRBtn.addEventListener('click', function() {
-                if (!qr) return;
-                
-                const printWindow = window.open('', '_blank');
-                printWindow.document.write('<html><head><title>Document QR Code</title>');
-                printWindow.document.write('<style>body { text-align: center; } div { margin: 20px; }</style>');
-                printWindow.document.write('</head><body>');
-                printWindow.document.write('<h3>QR Code for Document: ' + qrCodeInput.value.trim() + '</h3>');
-                printWindow.document.write('<div>');
-                printWindow.document.write('<img src="' + qr.element.toDataURL('image/png') + '" />');
-                printWindow.document.write('</div>');
-                printWindow.document.write('</body></html>');
-                printWindow.document.close();
-                printWindow.focus();
-                printWindow.print();
-                printWindow.close();
-            });
-        }
-        
-        // Copy QR code to clipboard
-        const copyQRBtn = document.getElementById('copyQR');
-        if (copyQRBtn) {
-            copyQRBtn.addEventListener('click', function() {
-                if (!qr) return;
-                
-                // Use clipboard API if available
-                if (navigator.clipboard && navigator.clipboard.write) {
-                    qr.element.toBlob(function(blob) {
-                        try {
-                            navigator.clipboard.write([
-                                new ClipboardItem({
-                                    'image/png': blob
-                                })
-                            ]).then(() => {
-                                alert('QR code copied to clipboard!');
-                            }).catch(err => {
-                                console.error('Error copying image: ', err);
-                                alert('Could not copy QR code to clipboard.');
-                            });
-                        } catch (e) {
-                            console.error('Error copying image: ', e);
-                            alert('Could not copy QR code to clipboard.');
-                        }
-                    });
-                } else {
-                    alert('Clipboard API not supported in your browser.');
-                }
-            });
-        }
-        
-        // Handle tracking code search form
-        const trackingForm = document.getElementById('trackingForm');
-        if (trackingForm) {
-            trackingForm.addEventListener('submit', function(e) {
-                e.preventDefault();
-                const code = document.getElementById('trackingCode').value.trim();
-                if (code) {
-                    window.location.href = '/track_document_details/' + code;
-                } else {
-                    alert('Please enter a tracking code');
-                }
-            });
-        }
-        
-        let codeReader;
-        const scanVideo = document.getElementById('scanner-video');
-        const scannerInterface = document.getElementById('scannerInterface');
-        const scannerError = document.getElementById('scanner-error');
-        const scannerErrorMessage = document.getElementById('scanner-error-message');
-        
-        document.getElementById('scanBarcode').addEventListener('click', function() {
-            initializeScanner('barcode');
-        });
-        
-        document.getElementById('scanQrCode').addEventListener('click', function() {
-            initializeScanner('qrcode');
-        });
-        
-        document.getElementById('closeScanner').addEventListener('click', function() {
-            if (codeReader) {
-                codeReader.reset();
-                scannerInterface.style.display = 'none';
-                scannerError.style.display = 'none';
-            }
-        });
-        
-        function initializeScanner(type) {
-            scannerInterface.style.display = 'block';
-            scannerError.style.display = 'none';
-            
-            if (!codeReader) {
-                codeReader = new ZXing.BrowserMultiFormatReader();
-            }
-            
-            codeReader.listVideoInputDevices()
-                .then((videoInputDevices) => {
-                    if (videoInputDevices.length > 0) {
-                        let selectedDeviceId = videoInputDevices[0].deviceId;
-                        
-                        codeReader.decodeFromVideoDevice(
-                            selectedDeviceId, 
-                            'scanner-video',
-                            (result, err) => {
-                                if (result) {
-                                    // Check if result is a URL with code parameter
-                                    let code = result.text;
-                                    if (code.includes('code=')) {
-                                        code = code.split('code=')[1].split('&')[0];
-                                    }
-                                    
-                                    document.getElementById('document_code').value = code;
-                                    codeReader.reset();
-                                    scannerInterface.style.display = 'none';
-                                    
-                                    // Auto-submit the form
-                                    document.querySelector('form').submit();
-                                }
-                                
-                                if (err && !(err instanceof ZXing.NotFoundException)) {
-                                    console.error(err);
-                                }
-                            }
-                        );
-                    } else {
-                        scannerError.style.display = 'block';
-                        scannerErrorMessage.textContent = 'No video input devices found';
-                    }
-                })
-                .catch(err => {
-                    console.error(err);
-                    scannerError.style.display = 'block';
-                    scannerErrorMessage.textContent = 'Error accessing camera: ' + err;
-                    scannerInterface.style.display = 'block';
-                });
-        }
-        
-        // Auto refresh functionality for tracking
-        const urlParams = new URLSearchParams(window.location.search);
-        const codeParam = urlParams.get('code');
-        
-        if (codeParam) {
-            // If there's a code in the URL, populate the input
-            document.getElementById('document_code').value = codeParam;
-            
-            // Show auto-refresh control
-            document.getElementById('autoRefreshContainer').style.display = 'inline-block !important';
-            
-            // Check if auto-refresh was previously enabled
-            const autoRefresh = document.getElementById('autoRefresh');
-            const wasEnabled = localStorage.getItem('documentTrackAutoRefresh') === 'true';
-            
-            autoRefresh.checked = wasEnabled;
-            
-            if (wasEnabled) {
-                startAutoRefresh();
-            }
-            
-            // Toggle auto-refresh
-            autoRefresh.addEventListener('change', function() {
-                if (this.checked) {
-                    localStorage.setItem('documentTrackAutoRefresh', 'true');
-                    startAutoRefresh();
-                } else {
-                    localStorage.setItem('documentTrackAutoRefresh', 'false');
-                    stopAutoRefresh();
-                }
-            });
-        }
-        
-        let refreshInterval;
-        
-        function startAutoRefresh() {
-            if (!refreshInterval) {
-                refreshInterval = setInterval(function() {
-                    // Submit the form to refresh data
-                    document.querySelector('form').submit();
-                }, 60000); // Refresh every minute
-            }
-        }
-        
-        function stopAutoRefresh() {
-            if (refreshInterval) {
-                clearInterval(refreshInterval);
-                refreshInterval = null;
-            }
-        }
-    });
-</script>
-{% endblock %}
+<style>
+/* Timeline styling */
+.timeline {
+    position: relative;
+    padding-left: 1.5rem;
+    list-style: none;
+}
+.timeline::before {
+    content: '';
+    position: absolute;
+    left: 0.5rem;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background-color: #e0e0e0;
+}
+.timeline-item {
+    position: relative;
+    padding-bottom: 1.5rem;
+}
+.timeline-marker {
+    position: absolute;
+    left: -1.5rem;
+    width: 1rem;
+    height: 1rem;
+    border-radius: 50%;
+}
+.timeline-content {
+    padding-left: 0.5rem;
+}
+</style>
 {% endblock %} 

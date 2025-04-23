@@ -1,13 +1,14 @@
 {% extends 'base.html' %}
 
-{% block title %}Home - Document Management System{% endblock %}
+{% block title %}Document Management System - Home{% endblock %}
 
 {% block content %}
-<div class="jumbotron">
-    <h1 class="display-4">Welcome to the Document Management System</h1>
-    <p class="lead">A comprehensive system for managing document workflows, tracking, and collaboration.</p>
-    <hr class="my-4">
-    <p>Get started by navigating to the dashboard or accessing one of the system features.</p>
-    <a class="btn btn-primary btn-lg" href="{{ url_for('dashboard') }}" role="button">View Dashboard</a>
+<div class="container mt-5">
+    <div class="jumbotron text-center">
+        <h1 class="display-4">Welcome to KEMRI Document Management System</h1>
+        <p class="lead">Efficiently track, manage, and process all your documents</p>
+        <hr class="my-4">
+        <a href="{{ url_for('dashboard') }}" class="btn btn-primary btn-lg">Go to Dashboard</a>
+    </div>
 </div>
 {% endblock %} 

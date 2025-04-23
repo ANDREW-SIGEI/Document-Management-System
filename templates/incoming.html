@@ -1,4 +1,4 @@
-{% extends 'layout.html' %}
+{% extends 'base.html' %}
 
 {% block title %}Incoming Documents - Document Management System{% endblock %}
 
@@ -6,8 +6,11 @@
 <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap">
     <h1 class="h2 mb-2 mb-md-0">Incoming Documents</h1>
     <div class="d-flex gap-2">
-        <a href="/compose" class="btn btn-primary">
-            <i class="fas fa-plus"></i> New Document
+        <a href="{{ url_for('track_document') }}" class="btn btn-info mr-2">
+            <i class="fas fa-search"></i> Track Document
+        </a>
+        <a href="/compose?type=incoming" class="btn btn-primary">
+            <i class="fas fa-plus"></i> New Incoming Document
         </a>
         <button type="button" class="btn btn-outline-primary" id="bulkActionsBtn" disabled data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
             <i class="fas fa-tasks"></i> Bulk Actions
@@ -25,6 +28,9 @@
                 <div class="dropdown-divider"></div>
                 <button type="button" class="dropdown-item bulk-action-btn" data-action="print">
                     <i class="fas fa-print text-secondary"></i> Print Selected
+                </button>
+                <button type="button" class="dropdown-item bulk-action-btn" data-action="export">
+                    <i class="fas fa-file-export text-primary"></i> Export Selected
                 </button>
             </form>
         </div>
@@ -44,130 +50,17 @@
   {% endif %}
 {% endwith %}
 
-<!-- Stats Cards -->
-<div class="row mb-4">
-    <div class="col-md-3 col-sm-6 mb-3 mb-md-0">
-        <div class="card border-left-primary shadow h-100 py-2">
-            <div class="card-body">
-                <div class="row no-gutters align-items-center">
-                    <div class="col mr-2">
-                        <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">All Documents</div>
-                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ priority_counts.Urgent + priority_counts.Priority + priority_counts.Normal }}</div>
-                    </div>
-                    <div class="col-auto">
-                        <i class="fas fa-file-alt fa-2x text-gray-300"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3 col-sm-6 mb-3 mb-md-0">
-        <div class="card border-left-danger shadow h-100 py-2">
-            <div class="card-body">
-                <div class="row no-gutters align-items-center">
-                    <div class="col mr-2">
-                        <div class="text-xs font-weight-bold text-danger text-uppercase mb-1">Urgent</div>
-                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ priority_counts.Urgent }}</div>
-                    </div>
-                    <div class="col-auto">
-                        <i class="fas fa-exclamation-circle fa-2x text-gray-300"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3 col-sm-6 mb-3 mb-md-0">
-        <div class="card border-left-warning shadow h-100 py-2">
-            <div class="card-body">
-                <div class="row no-gutters align-items-center">
-                    <div class="col mr-2">
-                        <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">Priority</div>
-                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ priority_counts.Priority }}</div>
-                    </div>
-                    <div class="col-auto">
-                        <i class="fas fa-exclamation fa-2x text-gray-300"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3 col-sm-6">
-        <div class="card border-left-secondary shadow h-100 py-2">
-            <div class="card-body">
-                <div class="row no-gutters align-items-center">
-                    <div class="col mr-2">
-                        <div class="text-xs font-weight-bold text-secondary text-uppercase mb-1">Normal</div>
-                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ priority_counts.Normal }}</div>
-                    </div>
-                    <div class="col-auto">
-                        <i class="fas fa-file fa-2x text-gray-300"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Status Cards -->
-<div class="row mb-4">
-    <div class="col-md-4 col-sm-6 mb-3 mb-md-0">
-        <div class="card border-left-info shadow h-100 py-2">
-            <div class="card-body">
-                <div class="row no-gutters align-items-center">
-                    <div class="col mr-2">
-                        <div class="text-xs font-weight-bold text-info text-uppercase mb-1">Incoming</div>
-                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ status_counts.Incoming }}</div>
-                    </div>
-                    <div class="col-auto">
-                        <i class="fas fa-inbox fa-2x text-gray-300"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-4 col-sm-6 mb-3 mb-md-0">
-        <div class="card border-left-warning shadow h-100 py-2">
-            <div class="card-body">
-                <div class="row no-gutters align-items-center">
-                    <div class="col mr-2">
-                        <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">Pending</div>
-                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ status_counts.Pending }}</div>
-                    </div>
-                    <div class="col-auto">
-                        <i class="fas fa-clock fa-2x text-gray-300"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-4 col-sm-6">
-        <div class="card border-left-success shadow h-100 py-2">
-            <div class="card-body">
-                <div class="row no-gutters align-items-center">
-                    <div class="col mr-2">
-                        <div class="text-xs font-weight-bold text-success text-uppercase mb-1">Received</div>
-                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ status_counts.Received }}</div>
-                    </div>
-                    <div class="col-auto">
-                        <i class="fas fa-check-circle fa-2x text-gray-300"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Search and Filters -->
+<!-- Quick Search and Filters -->
 <div class="card mb-4">
     <div class="card-body">
         <form id="searchForm" action="{{ url_for('incoming') }}" method="GET">
             <div class="row">
                 <div class="col-lg-8 col-md-12 mb-3 mb-lg-0">
                     <div class="input-group">
-                        <input type="text" class="form-control" name="search" value="{{ search_query }}" placeholder="Search incoming documents...">
+                        <input type="text" class="form-control" name="search" value="{{ search_query }}" placeholder="Search by code, sender, title or content...">
                         <div class="input-group-append">
                             <button class="btn btn-primary" type="submit" aria-label="Search">
-                                <i class="fas fa-search"></i>
+                                <i class="fas fa-search"></i> Search
                             </button>
                         </div>
                     </div>
@@ -185,12 +78,6 @@
                                 <option value="Received" {% if status_filter == 'Received' %}selected{% endif %}>Received</option>
                             </select>
                         </div>
-                        <div class="btn-group btn-group-sm flex-fill" role="group">
-                            <button type="button" class="btn btn-outline-primary priority-filter {% if priority_filter == 'All' %}active{% endif %}" data-priority="All">All</button>
-                            <button type="button" class="btn btn-outline-warning priority-filter {% if priority_filter == 'Priority' %}active{% endif %}" data-priority="Priority">Priority</button>
-                            <button type="button" class="btn btn-outline-danger priority-filter {% if priority_filter == 'Urgent' %}active{% endif %}" data-priority="Urgent">Urgent</button>
-                            <button type="button" class="btn btn-outline-secondary priority-filter {% if priority_filter == 'Normal' %}active{% endif %}" data-priority="Normal">Normal</button>
-                        </div>
                     </div>
                     <input type="hidden" name="priority" id="priorityFilter" value="{{ priority_filter }}">
                     <input type="hidden" name="sort_by" id="sortBy" value="{{ sort_by }}">
@@ -202,10 +89,99 @@
     </div>
 </div>
 
+<!-- Stats Cards -->
+<div class="row mb-4">
+    <div class="col-md-4 col-sm-6 mb-3 mb-md-0">
+        <div class="card border-left-info shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-info text-uppercase mb-1">Incoming</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ status_counts.Incoming }}</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-inbox fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+                <div class="mt-2">
+                    <a href="{{ url_for('incoming', status='Incoming') }}" class="btn btn-sm btn-outline-info btn-block">View Only Incoming</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 col-sm-6 mb-3 mb-md-0">
+        <div class="card border-left-warning shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">Pending</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ status_counts.Pending }}</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-clock fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+                <div class="mt-2">
+                    <a href="{{ url_for('incoming', status='Pending') }}" class="btn btn-sm btn-outline-warning btn-block">View Only Pending</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 col-sm-6">
+        <div class="card border-left-success shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-success text-uppercase mb-1">Received</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ status_counts.Received }}</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-check-circle fa-2x text-gray-300"></i>
+                    </div>
+                </div>
+                <div class="mt-2">
+                    <a href="{{ url_for('incoming', status='Received') }}" class="btn btn-sm btn-outline-success btn-block">View Only Received</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Priority Filter Tabs -->
+<div class="card mb-4">
+    <div class="card-body p-0">
+        <ul class="nav nav-pills nav-fill">
+            <li class="nav-item">
+                <a class="nav-link {% if priority_filter == 'All' %}active{% endif %} priority-filter" href="#" data-priority="All">
+                    <i class="fas fa-list-ul mr-1"></i> All Priorities
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {% if priority_filter == 'Urgent' %}active{% endif %} priority-filter" href="#" data-priority="Urgent">
+                    <i class="fas fa-exclamation-circle text-danger mr-1"></i> Urgent
+                    <span class="badge badge-pill badge-danger ml-1">{{ priority_counts.Urgent }}</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {% if priority_filter == 'Priority' %}active{% endif %} priority-filter" href="#" data-priority="Priority">
+                    <i class="fas fa-exclamation text-warning mr-1"></i> Priority
+                    <span class="badge badge-pill badge-warning ml-1">{{ priority_counts.Priority }}</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {% if priority_filter == 'Normal' %}active{% endif %} priority-filter" href="#" data-priority="Normal">
+                    <i class="fas fa-file text-secondary mr-1"></i> Normal
+                    <span class="badge badge-pill badge-secondary ml-1">{{ priority_counts.Normal }}</span>
+                </a>
+            </li>
+        </ul>
+    </div>
+</div>
+
 <!-- Documents Table -->
-<div class="card">
-    <div class="card-header bg-white d-flex justify-content-between align-items-center">
-        <h5 class="mb-0">Incoming Documents</h5>
+<div class="card shadow">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
+        <h5 class="mb-0 font-weight-bold text-primary">Document List</h5>
         <div class="btn-group btn-group-sm">
             <button type="button" class="btn btn-outline-secondary sort-btn {% if sort_by == 'date' %}active{% endif %}" data-sort="date" title="Sort by date">
                 Date 
@@ -225,17 +201,23 @@
                 <i class="fas fa-sort-{% if sort_order == 'desc' %}down{% else %}up{% endif %}"></i>
                 {% endif %}
             </button>
+            <button type="button" class="btn btn-outline-secondary sort-btn {% if sort_by == 'action' %}active{% endif %}" data-sort="action" title="Sort by action">
+                Action 
+                {% if sort_by == 'action' %}
+                <i class="fas fa-sort-{% if sort_order == 'desc' %}down{% else %}up{% endif %}"></i>
+                {% endif %}
+            </button>
         </div>
     </div>
-    <div class="card-body p-0 p-md-3">
+    <div class="card-body p-0">
         <div class="table-responsive">
-            <table class="table table-striped">
-                <thead>
+            <table class="table table-hover mb-0">
+                <thead class="bg-light">
                     <tr>
                         <th style="width: 40px;">
                             <div class="custom-control custom-checkbox">
                                 <input type="checkbox" class="custom-control-input" id="selectAll" title="Select all documents">
-                                <label class="custom-control-label" for="selectAll">Select All</label>
+                                <label class="custom-control-label" for="selectAll"><span class="sr-only">Select All</span></label>
                             </div>
                         </th>
                         <th>Doc. Code</th>
@@ -246,24 +228,24 @@
                         <th>Priority</th>
                         <th>Status</th>
                         <th>Holder</th>
-                        <th>Action</th>
+                        <th style="width: 120px;">Action</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% if documents %}
                         {% for doc in documents %}
-                        <tr>
+                        <tr class="{% if doc.priority == 'Urgent' %}table-danger{% elif doc.priority == 'Priority' %}table-warning{% endif %}">
                             <td>
                                 <div class="custom-control custom-checkbox">
                                     <input type="checkbox" class="custom-control-input doc-checkbox" id="doc-{{ doc.code }}" value="{{ doc.code }}" title="Select document {{ doc.code }}">
-                                    <label class="custom-control-label" for="doc-{{ doc.code }}">Select</label>
+                                    <label class="custom-control-label" for="doc-{{ doc.code }}"><span class="sr-only">Select</span></label>
                                 </div>
                             </td>
-                            <td><a href="/document/{{ doc.code }}" class="text-primary">{{ doc.code }}</a></td>
+                            <td><a href="/document/{{ doc.code }}" class="font-weight-bold text-primary">{{ doc.code }}</a></td>
                             <td>{{ doc.sender }}</td>
                             <td>{{ doc.details }}</td>
                             <td>{{ doc.required_action }}</td>
-                            <td>{{ doc.date_received.strftime('%d/%m/%Y') if doc.date_received else "N/A" }}</td>
+                            <td>{{ doc.date_received if doc.date_received is string else doc.date_received.strftime('%d/%m/%Y') if doc.date_received else "N/A" }}</td>
                             <td>
                                 {% if doc.priority == 'Urgent' %}
                                     <span class="badge badge-danger">{{ doc.priority }}</span>
@@ -274,33 +256,32 @@
                                 {% endif %}
                             </td>
                             <td>
-                                <span class="badge {% if doc.status == 'Incoming' %}badge-info{% elif doc.status == 'Pending' %}badge-warning{% elif doc.status == 'Received' %}badge-success{% else %}badge-secondary{% endif %}">
+                                <span class="badge badge-pill {% if doc.status == 'Incoming' %}badge-info{% elif doc.status == 'Pending' %}badge-warning{% elif doc.status == 'Received' %}badge-success{% else %}badge-secondary{% endif %}">
                                     {{ doc.status }}
                                 </span>
                             </td>
                             <td>{{ doc.current_holder }}</td>
                             <td>
-                                <div class="dropdown">
-                                    <button class="btn btn-sm btn-primary dropdown-toggle" type="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false" title="Document actions">
-                                        <i class="fas fa-cog"></i> <span class="sr-only">Actions</span>
+                                <div class="btn-group btn-group-sm">
+                                    <a href="/document/{{ doc.code }}" class="btn btn-outline-primary" data-toggle="tooltip" title="View Details">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    <button type="button" class="btn btn-outline-info dropdown-toggle dropdown-toggle-split" data-toggle="dropdown" aria-expanded="false">
+                                        <span class="sr-only">Actions</span>
                                     </button>
                                     <div class="dropdown-menu dropdown-menu-right">
-                                        <a href="/document/{{ doc.code }}" class="dropdown-item">
-                                            <i class="fas fa-eye text-primary"></i> View
-                                        </a>
-                                        <div class="dropdown-divider"></div>
-                                        <h6 class="dropdown-header">Update Status</h6>
-                                        <form action="{{ url_for('update_incoming_status', doc_code=doc.code) }}" method="post" aria-label="Update document status form">
-                                            <button type="submit" name="status" value="Pending" class="dropdown-item {% if doc.status == 'Pending' %}disabled{% endif %}" title="Mark document as pending">
+                                        <form action="{{ url_for('update_incoming_status', doc_code=doc.code) }}" method="post">
+                                            <button type="submit" name="status" value="Pending" class="dropdown-item {% if doc.status == 'Pending' %}disabled{% endif %}">
                                                 <i class="fas fa-clock text-warning"></i> Mark as Pending
                                             </button>
-                                            <button type="submit" name="status" value="Received" class="dropdown-item {% if doc.status == 'Received' %}disabled{% endif %}" title="Mark document as received">
+                                            <button type="submit" name="status" value="Received" class="dropdown-item {% if doc.status == 'Received' %}disabled{% endif %}">
                                                 <i class="fas fa-check-circle text-success"></i> Mark as Received
                                             </button>
-                                            <button type="submit" name="status" value="Outgoing" class="dropdown-item {% if doc.status == 'Outgoing' %}disabled{% endif %}" title="Move to outgoing">
+                                            <button type="submit" name="status" value="Outgoing" class="dropdown-item {% if doc.status == 'Outgoing' %}disabled{% endif %}">
                                                 <i class="fas fa-paper-plane text-info"></i> Move to Outgoing
                                             </button>
-                                            <button type="submit" name="status" value="Ended" class="dropdown-item {% if doc.status == 'Ended' %}disabled{% endif %}" title="Mark document as ended">
+                                            <div class="dropdown-divider"></div>
+                                            <button type="submit" name="status" value="Ended" class="dropdown-item {% if doc.status == 'Ended' %}disabled{% endif %}">
                                                 <i class="fas fa-archive text-secondary"></i> Mark as Ended
                                             </button>
                                         </form>
@@ -311,7 +292,13 @@
                         {% endfor %}
                     {% else %}
                         <tr>
-                            <td colspan="10" class="text-center">No incoming documents found. <a href="/compose">Upload a new document</a>.</td>
+                            <td colspan="10" class="text-center py-4">
+                                <div class="py-5">
+                                    <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                                    <h5>No incoming documents found</h5>
+                                    <p class="text-muted">Start by <a href="/compose" class="text-primary">uploading a new document</a></p>
+                                </div>
+                            </td>
                         </tr>
                     {% endif %}
                 </tbody>
@@ -370,6 +357,7 @@
     {% endif %}
 </div>
 
+{% block scripts %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     // Status filter change
@@ -385,7 +373,8 @@ document.addEventListener('DOMContentLoaded', function() {
     // Priority filter buttons
     const priorityButtons = document.querySelectorAll('.priority-filter');
     priorityButtons.forEach(button => {
-        button.addEventListener('click', function() {
+        button.addEventListener('click', function(e) {
+            e.preventDefault();
             const priority = this.getAttribute('data-priority');
             document.getElementById('priorityFilter').value = priority;
             
@@ -496,6 +485,12 @@ document.addEventListener('DOMContentLoaded', function() {
             bulkActionsBtn.innerHTML = '<i class="fas fa-tasks"></i> Bulk Actions';
         }
     }
+    
+    // Initialize tooltips
+    if (typeof $ !== 'undefined' && typeof $.fn.tooltip !== 'undefined') {
+        $('[data-toggle="tooltip"]').tooltip();
+    }
 });
 </script>
+{% endblock %}
 {% endblock %} 

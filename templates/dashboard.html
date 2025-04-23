@@ -5,18 +5,57 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h1>Dashboard</h1>
-    <div class="btn-group">
+    <div>
+        <a href="/track_document" class="btn btn-info mr-2">
+            <i class="fas fa-search mr-1"></i> Track Document
+        </a>
         <a href="/compose" class="btn btn-primary">
             <i class="fas fa-plus-circle mr-1"></i> New Document
         </a>
-        <button type="button" class="btn btn-outline-primary dropdown-toggle dropdown-toggle-split" data-toggle="dropdown" aria-expanded="false">
-            <span class="sr-only">Toggle Dropdown</span>
-        </button>
-        <div class="dropdown-menu dropdown-menu-right">
-            <a class="dropdown-item" href="/compose?type=incoming"><i class="fas fa-inbox mr-2"></i>New Incoming</a>
-            <a class="dropdown-item" href="/compose?type=outgoing"><i class="fas fa-paper-plane mr-2"></i>New Outgoing</a>
-            <div class="dropdown-divider"></div>
-            <a class="dropdown-item" href="/track_document"><i class="fas fa-search mr-2"></i>Track Document</a>
+    </div>
+</div>
+
+<!-- Main Action Cards -->
+<div class="row mb-4">
+    <div class="col-md-6 mb-4">
+        <div class="card border-left-primary shadow h-100 py-3">
+            <div class="card-body text-center">
+                <div class="mb-3">
+                    <i class="fas fa-file-alt fa-4x text-primary mb-3"></i>
+                    <h4 class="font-weight-bold text-primary">Compose New Document</h4>
+                    <p class="mb-4">Create and upload a new document into the system with tracking details</p>
+                </div>
+                <div class="d-flex justify-content-center">
+                    <a href="/compose?type=incoming" class="btn btn-outline-primary mr-2">
+                        <i class="fas fa-inbox mr-1"></i> New Incoming
+                    </a>
+                    <a href="/compose?type=outgoing" class="btn btn-outline-primary">
+                        <i class="fas fa-paper-plane mr-1"></i> New Outgoing
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6 mb-4">
+        <div class="card border-left-info shadow h-100 py-3">
+            <div class="card-body text-center">
+                <div class="mb-3">
+                    <i class="fas fa-search fa-4x text-info mb-3"></i>
+                    <h4 class="font-weight-bold text-info">Track Document</h4>
+                    <p class="mb-4">Track the status and location of any document in the system</p>
+                </div>
+                <form action="/track_document" method="get" class="d-flex justify-content-center">
+                    <div class="input-group w-75">
+                        <input type="text" class="form-control" placeholder="Enter document code..." name="code">
+                        <div class="input-group-append">
+                            <button class="btn btn-info" type="submit">
+                                <i class="fas fa-search"></i> Track
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
 </div>

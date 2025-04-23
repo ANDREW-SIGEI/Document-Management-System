@@ -1,612 +1,355 @@
-{% extends 'layout.html' %}
+{% extends 'base.html' %}
 
-{% block title %}Document Details - {{ document.code }}{% endblock %}
+{% block title %}Document {{ document.code }} - Document Management System{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h1 class="mb-0">Document Details</h1>
-    <div>
-        <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary mr-2">
-            <i class="fas fa-tachometer-alt"></i> Dashboard
-        </a>
-        {% if document.status == 'Incoming' %}
-        <a href="{{ url_for('incoming') }}" class="btn btn-outline-secondary">
-            <i class="fas fa-inbox"></i> Incoming Documents
-        </a>
-        {% else %}
-        <a href="{{ url_for('outgoing') }}" class="btn btn-outline-secondary">
-            <i class="fas fa-paper-plane"></i> Outgoing Documents
-        </a>
-        {% endif %}
-    </div>
-</div>
-
-{% with messages = get_flashed_messages(with_categories=true) %}
-  {% if messages %}
-    {% for category, message in messages %}
-      <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-        {{ message }}
-        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-          <span aria-hidden="true">&times;</span>
-        </button>
-      </div>
-    {% endfor %}
-  {% endif %}
-{% endwith %}
-
-<!-- Document Tracking Header -->
-<div class="card mb-4">
-    <div class="card-header bg-white d-flex justify-content-between align-items-center">
-        <h5 class="mb-0">
-            <i class="fas fa-file-alt mr-2"></i> Document Tracking
-        </h5>
+<div class="container-fluid">
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
-            <span class="badge badge-{% if document.priority == 'Urgent' %}danger{% elif document.priority == 'Priority' %}warning{% else %}secondary{% endif %} mr-2">
-                {{ document.priority }}
-            </span>
-            <span class="badge badge-{% if document.status == 'Incoming' %}primary{% elif document.status == 'Pending' %}warning{% elif document.status == 'Received' %}success{% elif document.status == 'Outgoing' %}info{% else %}secondary{% endif %}">
-                {{ document.status }}
-            </span>
+            <h2 class="h2 mb-0">
+                <span class="badge bg-{% if document.status == 'Incoming' %}primary{% elif document.status == 'Pending' %}warning{% elif document.status == 'Received' %}success{% elif document.status == 'Outgoing' %}info{% else %}secondary{% endif %} me-2">
+                    {{ document.status }}
+                </span>
+                Document {{ document.code }}
+            </h2>
+            <p class="text-muted">{{ document.title }}</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="#" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#printModal">
+                <i class="fas fa-print me-2"></i> Print
+            </a>
+            <div class="btn-group">
+                <button type="button" class="btn btn-primary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                    <i class="fas fa-ellipsis-v"></i> Actions
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    <li>
+                        <form action="{{ url_for('update_incoming_status', doc_code=document.code) if document.status in ['Incoming', 'Pending', 'Received'] else url_for('update_outgoing_status', doc_code=document.code) }}" method="post">
+                            {% if document.status != 'Pending' %}
+                            <button type="submit" name="status" value="Pending" class="dropdown-item">
+                                <i class="fas fa-clock text-warning me-2"></i> Mark as Pending
+                            </button>
+                            {% endif %}
+                            
+                            {% if document.status != 'Received' %}
+                            <button type="submit" name="status" value="Received" class="dropdown-item">
+                                <i class="fas fa-check-circle text-success me-2"></i> Mark as Received
+                            </button>
+                            {% endif %}
+                            
+                            {% if document.status != 'Outgoing' and document.status in ['Incoming', 'Pending', 'Received'] %}
+                            <button type="submit" name="status" value="Outgoing" class="dropdown-item">
+                                <i class="fas fa-paper-plane text-info me-2"></i> Move to Outgoing
+                            </button>
+                            {% endif %}
+                            
+                            {% if document.status != 'Ended' %}
+                            <li><hr class="dropdown-divider"></li>
+                            <button type="submit" name="status" value="Ended" class="dropdown-item">
+                                <i class="fas fa-archive text-secondary me-2"></i> Mark as Ended
+                            </button>
+                            {% endif %}
+                        </form>
+                    </li>
+                </ul>
+            </div>
         </div>
     </div>
-    <div class="card-body">
-        <div class="row">
-            <div class="col-md-6">
-                <div class="form-group">
-                    <label class="font-weight-bold">Tracking Code:</label>
-                    <div class="input-group">
-                        <input type="text" class="form-control" value="{{ document.code }}" id="trackingCode" readonly aria-label="Document tracking code">
-                        <div class="input-group-append">
-                            <button class="btn btn-outline-secondary" type="button" onclick="copyToClipboard('trackingCode')" aria-label="Copy tracking code" title="Copy to clipboard">
-                                <i class="fas fa-copy"></i>
-                            </button>
+    
+    <!-- Document Information -->
+    <div class="row">
+        <div class="col-lg-8">
+            <!-- Document Details -->
+            <div class="card mb-4">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Document Information</h5>
+                    <span class="badge bg-{% if document.priority == 'Urgent' %}danger{% elif document.priority == 'Priority' %}warning{% else %}secondary{% endif %}">
+                        {{ document.priority }}
+                    </span>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <p class="mb-1 small text-muted">Document Code</p>
+                            <p class="mb-3 fw-bold">{{ document.code }}</p>
+                            
+                            <p class="mb-1 small text-muted">Date of Letter</p>
+                            <p class="mb-3">{{ document.date_of_letter.strftime('%d %b %Y') }}</p>
+                            
+                            <p class="mb-1 small text-muted">Date Received</p>
+                            <p class="mb-0">{{ document.date_received.strftime('%d %b %Y') }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p class="mb-1 small text-muted">Sender</p>
+                            <p class="mb-3">{{ document.sender }}</p>
+                            
+                            <p class="mb-1 small text-muted">Recipient</p>
+                            <p class="mb-3">{{ document.recipient }}</p>
+                            
+                            <p class="mb-1 small text-muted">Current Holder</p>
+                            <p class="mb-0">{{ document.current_holder }}</p>
                         </div>
                     </div>
-                    <small class="text-muted">Use this code to track this document</small>
-                </div>
-                
-                <div class="form-group">
-                    <label class="font-weight-bold">Document Title:</label>
-                    <p>{{ document.filename }}</p>
-                </div>
-                
-                <div class="form-group">
-                    <label class="font-weight-bold">Current Status:</label>
-                    <p>{{ document.status }}</p>
-                </div>
-                
-                <div class="form-group">
-                    <label class="font-weight-bold">Current Holder:</label>
-                    <p>{{ document.current_holder }}</p>
+                    
+                    <hr class="my-4">
+                    
+                    <div class="mb-4">
+                        <p class="mb-1 small text-muted">Document Details</p>
+                        <p class="mb-0">{{ document.details }}</p>
+                    </div>
+                    
+                    <div>
+                        <p class="mb-1 small text-muted">Required Action</p>
+                        <p class="mb-0">{{ document.required_action }}</p>
+                    </div>
                 </div>
             </div>
             
-            <div class="col-md-6">
-                <div class="form-group">
-                    <label class="font-weight-bold">Required Action:</label>
-                    <p>{{ document.required_action }}</p>
+            <!-- Document History -->
+            <div class="card">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0">History</h5>
                 </div>
-                
-                <div class="form-group">
-                    <label class="font-weight-bold">Deadline:</label>
-                    <p>{{ document.deadline }}</p>
-                </div>
-                
-                <div class="form-group">
-                    <label class="font-weight-bold">Workflow Stage:</label>
-                    <p>{{ document.workflow_stage }}</p>
-                </div>
-                
-                <div class="form-group">
-                    <label class="font-weight-bold">Tags:</label>
-                    <p>
-                        {% for tag in document.tags %}
-                            <span class="badge badge-info">{{ tag }}</span>
-                        {% else %}
-                            <span class="text-muted">No tags</span>
+                <div class="card-body p-0">
+                    <div class="list-group list-group-flush">
+                        {% for entry in history %}
+                        <div class="list-group-item">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <h6 class="mb-1">{{ entry.action }}</h6>
+                                <small class="text-muted">{{ entry.timestamp.strftime('%d %b %Y, %H:%M') }}</small>
+                            </div>
+                            <p class="mb-1">{{ entry.details }}</p>
+                            <small class="text-muted">By {{ entry.user }}</small>
+                        </div>
                         {% endfor %}
-                    </p>
+                    </div>
                 </div>
             </div>
         </div>
         
-        <hr>
-        
-        <div class="row">
-            <div class="col-md-6">
-                <h6 class="mb-3"><i class="fas fa-user-edit mr-2"></i>Sender Information</h6>
-                <table class="table table-sm">
-                    <tr>
-                        <td width="40%" class="font-weight-bold">Name:</td>
-                        <td>{{ document.sender }}</td>
-                    </tr>
-                    <tr>
-                        <td class="font-weight-bold">Email:</td>
-                        <td>{{ document.sender_email }}</td>
-                    </tr>
-                    <tr>
-                        <td class="font-weight-bold">Department:</td>
-                        <td>{{ document.sender_department }}</td>
-                    </tr>
-                </table>
+        <div class="col-lg-4">
+            <!-- Document Timeline -->
+            <div class="card mb-4">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0">Document Timeline</h5>
+                </div>
+                <div class="card-body">
+                    <ul class="timeline">
+                        <li class="timeline-item">
+                            <div class="timeline-marker bg-success"></div>
+                            <div class="timeline-content">
+                                <h6 class="mb-1">Document Created</h6>
+                                <p class="mb-0 small text-muted">{{ document.created_at.strftime('%d %b %Y, %H:%M') }}</p>
+                            </div>
+                        </li>
+                        
+                        {% if document.status != 'Incoming' %}
+                        <li class="timeline-item">
+                            <div class="timeline-marker bg-warning"></div>
+                            <div class="timeline-content">
+                                <h6 class="mb-1">Marked as {{ document.status }}</h6>
+                                <p class="mb-0 small text-muted">{{ document.updated_at.strftime('%d %b %Y, %H:%M') }}</p>
+                            </div>
+                        </li>
+                        {% endif %}
+                        
+                        {% if document.status == 'Ended' %}
+                        <li class="timeline-item">
+                            <div class="timeline-marker bg-danger"></div>
+                            <div class="timeline-content">
+                                <h6 class="mb-1">Document Ended</h6>
+                                <p class="mb-0 small text-muted">{{ document.updated_at.strftime('%d %b %Y, %H:%M') }}</p>
+                            </div>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </div>
             </div>
             
-            <div class="col-md-6">
-                <h6 class="mb-3"><i class="fas fa-user-check mr-2"></i>Recipient Information</h6>
-                <table class="table table-sm">
-                    <tr>
-                        <td width="40%" class="font-weight-bold">Name:</td>
-                        <td>{{ document.recipient }}</td>
-                    </tr>
-                    <tr>
-                        <td class="font-weight-bold">Email:</td>
-                        <td>{{ document.recipient_email }}</td>
-                    </tr>
-                    <tr>
-                        <td class="font-weight-bold">Department:</td>
-                        <td>{{ document.recipient_department }}</td>
-                    </tr>
-                </table>
-            </div>
-        </div>
-        
-        <hr>
-        
-        <div class="row">
-            <div class="col-12">
-                <h6 class="mb-3"><i class="fas fa-info-circle mr-2"></i>Document Details</h6>
-                <p>{{ document.details }}</p>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Action Buttons -->
-<div class="card mb-4">
-    <div class="card-header bg-white">
-        <h5 class="mb-0"><i class="fas fa-tasks mr-2"></i>Actions</h5>
-    </div>
-    <div class="card-body">
-        <div class="btn-group-wrap d-flex flex-wrap">
-            <button class="btn btn-primary m-1" data-toggle="modal" data-target="#addActionModal">
-                <i class="fas fa-plus-circle mr-1"></i> Add Action
-            </button>
-            <button class="btn btn-success m-1" data-toggle="modal" data-target="#addCommentModal">
-                <i class="fas fa-comment mr-1"></i> Add Comment
-            </button>
-            <button class="btn btn-warning m-1" data-toggle="modal" data-target="#changePriorityModal">
-                <i class="fas fa-exclamation-circle mr-1"></i> Change Priority
-            </button>
-            <button class="btn btn-info m-1" data-toggle="modal" data-target="#reassignDocumentModal">
-                <i class="fas fa-exchange-alt mr-1"></i> Reassign Document
-            </button>
-            <button class="btn btn-secondary m-1" data-toggle="modal" data-target="#relatedDocumentModal">
-                <i class="fas fa-link mr-1"></i> Add Related Document
-            </button>
-            <div class="dropdown m-1">
-                <button class="btn btn-outline-primary dropdown-toggle" type="button" id="exportDropdown" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                    <i class="fas fa-file-export mr-1"></i> Export History
-                </button>
-                <div class="dropdown-menu" aria-labelledby="exportDropdown">
-                    <a class="dropdown-item" href="{{ url_for('export_document_history', document_code=document.code, format='json') }}" target="_blank">
-                        <i class="fas fa-file-code mr-2"></i> JSON Format
-                    </a>
-                    <a class="dropdown-item" href="{{ url_for('export_document_history', document_code=document.code, format='csv') }}" target="_blank">
-                        <i class="fas fa-file-csv mr-2"></i> CSV Format
-                    </a>
+            <!-- Document Attachments (placeholder) -->
+            <div class="card">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Attachments</h5>
+                    <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addAttachmentModal">
+                        <i class="fas fa-plus me-1"></i> Add
+                    </button>
                 </div>
-            </div>
-            <button class="btn btn-info m-1" data-toggle="modal" data-target="#viewFileModal">
-                <i class="fas fa-file mr-1"></i> View File
-            </button>
-            <button class="btn btn-outline-secondary m-1" onclick="window.print();">
-                <i class="fas fa-print mr-1"></i> Print Details
-            </button>
-            {% if document.status != 'Ended' %}
-            <button class="btn btn-danger m-1" data-toggle="modal" data-target="#markEndedModal">
-                <i class="fas fa-check-circle mr-1"></i> Mark as Ended
-            </button>
-            {% endif %}
-        </div>
-    </div>
-</div>
-
-<!-- Action History -->
-<div class="card mb-4">
-    <div class="card-header bg-white">
-        <h5 class="mb-0"><i class="fas fa-history mr-2"></i>Action History</h5>
-    </div>
-    <div class="card-body">
-        <div class="table-responsive">
-            <table class="table table-striped">
-                <thead>
-                    <tr>
-                        <th>Timestamp</th>
-                        <th>User</th>
-                        <th>Action</th>
-                        <th>Notes</th>
-                        <th>Status Change</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for action in actions|sort(attribute='timestamp', reverse=true) %}
-                    <tr>
-                        <td>{{ action.timestamp }}</td>
-                        <td>{{ action.user }}</td>
-                        <td>{{ action.action }}</td>
-                        <td>{{ action.notes }}</td>
-                        <td>
-                            {% if action.previous_status != action.new_status and action.previous_status %}
-                                <span class="badge badge-secondary">{{ action.previous_status }}</span> 
-                                <i class="fas fa-arrow-right text-muted mx-1"></i> 
-                                <span class="badge badge-primary">{{ action.new_status }}</span>
-                            {% elif action.previous_status == None and action.new_status %}
-                                <span class="badge badge-primary">{{ action.new_status }}</span>
-                            {% else %}
-                                <span class="text-muted">No status change</span>
-                            {% endif %}
-                        </td>
-                    </tr>
+                <div class="card-body">
+                    {% if document.attachments %}
+                        <div class="list-group list-group-flush">
+                            {% for attachment in document.attachments %}
+                            <div class="list-group-item d-flex justify-content-between align-items-center">
+                                <div>
+                                    <i class="fas fa-{% if attachment.file_type == 'pdf' %}file-pdf{% elif attachment.file_type in ['doc', 'docx'] %}file-word{% elif attachment.file_type in ['xls', 'xlsx'] %}file-excel{% elif attachment.file_type in ['jpg', 'jpeg', 'png'] %}file-image{% else %}file{% endif %} me-2 text-muted"></i>
+                                    <span>{{ attachment.original_filename }}</span>
+                                    <small class="text-muted ms-2">
+                                        ({{ attachment.file_size|filesizeformat }})
+                                    </small>
+                                </div>
+                                <div>
+                                    <a href="{{ url_for('static', filename='uploads/' + attachment.filename) }}" class="btn btn-sm btn-outline-primary" target="_blank">
+                                        <i class="fas fa-download me-1"></i> Download
+                                    </a>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
                     {% else %}
-                    <tr>
-                        <td colspan="5" class="text-center">No actions recorded yet</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>
-</div>
-
-<!-- Related Documents Section -->
-<div class="card mb-4">
-    <div class="card-header bg-white">
-        <h5 class="mb-0"><i class="fas fa-link mr-2"></i>Related Documents</h5>
-    </div>
-    <div class="card-body">
-        {% if document.related_documents and document.related_documents|length > 0 %}
-            <div class="table-responsive">
-                <table class="table table-striped">
-                    <thead>
-                        <tr>
-                            <th>Document Code</th>
-                            <th>Document Title</th>
-                            <th>Relationship</th>
-                            <th>Added On</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for related_doc in document.related_documents %}
-                        <tr>
-                            <td>
-                                <a href="{{ url_for('track_document_details', document_code=related_doc.code) if 'DOC-' in related_doc.code else url_for('document_details', doc_code=related_doc.code) }}">
-                                    {{ related_doc.code }}
-                                </a>
-                            </td>
-                            <td>{{ related_doc.title }}</td>
-                            <td>
-                                <span class="badge badge-info">{{ related_doc.relationship }}</span>
-                            </td>
-                            <td>{{ related_doc.added_on }}</td>
-                            <td>
-                                <a href="{{ url_for('track_document_details', document_code=related_doc.code) if 'DOC-' in related_doc.code else url_for('document_details', doc_code=related_doc.code) }}" class="btn btn-sm btn-outline-primary">
-                                    <i class="fas fa-eye"></i> View
-                                </a>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        {% else %}
-            <div class="text-center text-muted py-3">
-                <i class="fas fa-link fa-2x mb-2"></i>
-                <p>No related documents have been linked to this document.</p>
-                <button class="btn btn-sm btn-outline-primary" data-toggle="modal" data-target="#relatedDocumentModal">
-                    <i class="fas fa-plus"></i> Add Related Document
-                </button>
-            </div>
-        {% endif %}
-    </div>
-</div>
-
-<!-- Comments Section -->
-<div class="card mb-4">
-    <div class="card-header bg-white">
-        <h5 class="mb-0"><i class="fas fa-comments mr-2"></i>Comments</h5>
-    </div>
-    <div class="card-body">
-        {% for comment in comments|sort(attribute='timestamp', reverse=true) %}
-        <div class="media mb-4">
-            <div class="mr-3">
-                <div class="avatar bg-primary text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
-                    {{ comment.username[:1] }}
-                </div>
-            </div>
-            <div class="media-body">
-                <h6 class="mt-0">
-                    {{ comment.username }}
-                    {% if comment.is_private %}
-                    <span class="badge badge-warning ml-2">Private</span>
+                        <div class="text-center py-4">
+                            <i class="fas fa-file-pdf fa-3x text-muted mb-3"></i>
+                            <p class="mb-0">No attachments yet</p>
+                        </div>
                     {% endif %}
-                </h6>
-                <p class="comment-text">{{ comment.comment }}</p>
-                <div class="text-muted small">{{ comment.timestamp }}</div>
+                </div>
+            </div>
+            
+            <!-- Add Document Comments Section -->
+            <div class="card mt-4">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0">Comments</h5>
+                </div>
+                <div class="card-body">
+                    {% if document.comments %}
+                        <div class="comments-list mb-4">
+                            {% for comment in document.comments|sort(attribute='created_at', reverse=true) %}
+                            <div class="comment-item mb-3">
+                                <div class="d-flex">
+                                    <div class="comment-avatar me-3">
+                                        <div class="avatar-circle">
+                                            {{ comment.user.username[:1] }}
+                                        </div>
+                                    </div>
+                                    <div class="comment-content">
+                                        <div class="d-flex justify-content-between">
+                                            <h6 class="mb-1">{{ comment.user.username }}</h6>
+                                            <small class="text-muted">{{ comment.created_at.strftime('%d %b %Y, %H:%M') }}</small>
+                                        </div>
+                                        <p class="mb-0">{{ comment.comment }}</p>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="text-muted text-center mb-4">No comments yet</p>
+                    {% endif %}
+                    
+                    <form action="{{ url_for('add_comment', doc_code=document.code) }}" method="post">
+                        <div class="mb-3">
+                            <label for="comment" class="form-label">Add a comment</label>
+                            <textarea class="form-control" id="comment" name="comment" rows="3" placeholder="Type your comment here..."></textarea>
+                        </div>
+                        <div class="text-end">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-comment me-1"></i> Post Comment
+                            </button>
+                        </div>
+                    </form>
+                </div>
             </div>
         </div>
-        {% else %}
-        <div class="text-center text-muted py-3">
-            <i class="fas fa-comment-slash fa-2x mb-2"></i>
-            <p>No comments yet</p>
-        </div>
-        {% endfor %}
     </div>
 </div>
 
-<!-- Add Action Modal -->
-<div class="modal fade" id="addActionModal" tabindex="-1" role="dialog" aria-labelledby="addActionModalLabel" aria-hidden="true">
-    <div class="modal-dialog" role="document">
+<!-- Add Attachment Modal -->
+<div class="modal fade" id="addAttachmentModal" tabindex="-1" aria-labelledby="addAttachmentModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
         <div class="modal-content">
-            <form action="{{ url_for('add_document_action', document_code=document.code) }}" method="POST">
+            <form action="{{ url_for('add_attachment', doc_code=document.code) }}" method="post" enctype="multipart/form-data">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="addActionModalLabel">Add Document Action</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                        <span aria-hidden="true">&times;</span>
-                    </button>
+                    <h5 class="modal-title" id="addAttachmentModalLabel">Add Attachment</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    <div class="form-group">
-                        <label for="action_type">Action Type <span class="text-danger">*</span></label>
-                        <select class="form-control" id="action_type" name="action_type" required>
-                            <option value="Reviewed">Reviewed</option>
-                            <option value="Approved">Approved</option>
-                            <option value="Rejected">Rejected</option>
-                            <option value="Forwarded">Forwarded</option>
-                            <option value="Updated">Updated</option>
-                            <option value="Completed">Completed</option>
-                            <option value="Filed">Filed</option>
-                            <option value="Archived">Archived</option>
-                            <option value="Escalated">Escalated</option>
-                        </select>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="notes">Notes</label>
-                        <textarea class="form-control" id="notes" name="notes" rows="3" placeholder="Enter action notes"></textarea>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="new_status">Change Status (Optional)</label>
-                        <select class="form-control" id="new_status" name="new_status">
-                            <option value="">No Change</option>
-                            <option value="Incoming">Incoming</option>
-                            <option value="Pending">Pending</option>
-                            <option value="Received">Received</option>
-                            <option value="Outgoing">Outgoing</option>
-                            <option value="Ended">Ended</option>
-                        </select>
+                    <div class="mb-3">
+                        <label for="attachment_file" class="form-label">Choose file</label>
+                        <input type="file" class="form-control" id="attachment_file" name="attachment_file" required accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.jpg,.jpeg,.png">
+                        <div class="form-text">Max file size: 16MB</div>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Add Action</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Upload Attachment</button>
                 </div>
             </form>
         </div>
     </div>
 </div>
 
-<!-- Change Priority Modal -->
-<div class="modal fade" id="changePriorityModal" tabindex="-1" role="dialog" aria-labelledby="changePriorityModalLabel" aria-hidden="true">
-    <div class="modal-dialog" role="document">
-        <div class="modal-content">
-            <form action="{{ url_for('set_document_priority', document_code=document.code) }}" method="POST">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="changePriorityModalLabel">Change Document Priority</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                        <span aria-hidden="true">&times;</span>
-                    </button>
-                </div>
-                <div class="modal-body">
-                    <div class="form-group">
-                        <label for="priority">New Priority Level <span class="text-danger">*</span></label>
-                        <select class="form-control" id="priority" name="priority" required>
-                            <option value="Normal" {% if document.priority == 'Normal' %}selected{% endif %}>Normal</option>
-                            <option value="Priority" {% if document.priority == 'Priority' %}selected{% endif %}>Priority</option>
-                            <option value="Urgent" {% if document.priority == 'Urgent' %}selected{% endif %}>Urgent</option>
-                        </select>
-                    </div>
-                    <p class="text-muted small">
-                        <i class="fas fa-info-circle"></i> Changing the priority may affect processing times and notifications.
-                    </p>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-warning">Update Priority</button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-
-<!-- Reassign Document Modal -->
-<div class="modal fade" id="reassignDocumentModal" tabindex="-1" role="dialog" aria-labelledby="reassignDocumentModalLabel" aria-hidden="true">
-    <div class="modal-dialog" role="document">
-        <div class="modal-content">
-            <form action="{{ url_for('reassign_document', document_code=document.code) }}" method="POST">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="reassignDocumentModalLabel">Reassign Document</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                        <span aria-hidden="true">&times;</span>
-                    </button>
-                </div>
-                <div class="modal-body">
-                    <div class="form-group">
-                        <label for="current_holder">Current Holder</label>
-                        <input type="text" class="form-control" value="{{ document.current_holder }}" readonly>
-                    </div>
-                    <div class="form-group">
-                        <label for="new_holder">New Holder/Department <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" id="new_holder" name="new_holder" required placeholder="Enter name or department">
-                    </div>
-                    <p class="text-muted small">
-                        <i class="fas fa-info-circle"></i> The document will be assigned to the new holder and an action record will be created.
-                    </p>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-info">Reassign Document</button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-
-<!-- Add Related Document Modal -->
-<div class="modal fade" id="relatedDocumentModal" tabindex="-1" role="dialog" aria-labelledby="relatedDocumentModalLabel" aria-hidden="true">
-    <div class="modal-dialog" role="document">
-        <div class="modal-content">
-            <form action="{{ url_for('attach_related_document', document_code=document.code) }}" method="POST">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="relatedDocumentModalLabel">Add Related Document</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                        <span aria-hidden="true">&times;</span>
-                    </button>
-                </div>
-                <div class="modal-body">
-                    <div class="form-group">
-                        <label for="related_doc_code">Related Document Code <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" id="related_doc_code" name="related_doc_code" required placeholder="Enter document code (e.g., DOC-20250405-12345)">
-                    </div>
-                    <div class="form-group">
-                        <label for="relationship">Relationship Type</label>
-                        <select class="form-control" id="relationship" name="relationship">
-                            <option value="Related to">Related to</option>
-                            <option value="Parent of">Parent of</option>
-                            <option value="Child of">Child of</option>
-                            <option value="Supersedes">Supersedes</option>
-                            <option value="Superseded by">Superseded by</option>
-                            <option value="Referenced by">Referenced by</option>
-                            <option value="References">References</option>
-                        </select>
-                    </div>
-                    <p class="text-muted small">
-                        <i class="fas fa-info-circle"></i> This will create a reference between this document and the specified related document.
-                    </p>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Add Relationship</button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-
-<!-- Mark as Ended Modal -->
-<div class="modal fade" id="markEndedModal" tabindex="-1" role="dialog" aria-labelledby="markEndedModalLabel" aria-hidden="true">
-    <div class="modal-dialog" role="document">
-        <div class="modal-content">
-            <form action="{{ url_for('add_document_action', document_code=document.code) }}" method="POST">
-                <input type="hidden" name="action_type" value="Ended">
-                <input type="hidden" name="new_status" value="Ended">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="markEndedModalLabel">Mark Document as Ended</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                        <span aria-hidden="true">&times;</span>
-                    </button>
-                </div>
-                <div class="modal-body">
-                    <div class="alert alert-warning">
-                        <i class="fas fa-exclamation-triangle"></i> Are you sure you want to mark this document as ended?
-                        <br>This indicates that all processing is complete and the document is archived.
-                    </div>
-                    <div class="form-group">
-                        <label for="notes">Closing Notes</label>
-                        <textarea class="form-control" id="notes" name="notes" rows="3" placeholder="Enter any final notes about this document"></textarea>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-danger">Mark as Ended</button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-
-<!-- Add Comment Modal -->
-<div class="modal fade" id="addCommentModal" tabindex="-1" role="dialog" aria-labelledby="addCommentModalLabel" aria-hidden="true">
-    <div class="modal-dialog" role="document">
-        <div class="modal-content">
-            <form action="{{ url_for('add_document_comment', document_code=document.code) }}" method="POST">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="addCommentModalLabel">Add Comment</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                        <span aria-hidden="true">&times;</span>
-                    </button>
-                </div>
-                <div class="modal-body">
-                    <div class="form-group">
-                        <label for="comment">Comment <span class="text-danger">*</span></label>
-                        <textarea class="form-control" id="comment" name="comment" rows="4" placeholder="Enter your comment" required></textarea>
-                    </div>
-                    
-                    <div class="custom-control custom-switch">
-                        <input type="checkbox" class="custom-control-input" id="is_private" name="is_private">
-                        <label class="custom-control-label" for="is_private">Mark as Private Comment</label>
-                        <small class="form-text text-muted">Private comments are only visible to administrators</small>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Add Comment</button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-
-<!-- View File Modal -->
-<div class="modal fade" id="viewFileModal" tabindex="-1" role="dialog" aria-labelledby="viewFileModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg" role="document">
+<!-- Print Modal -->
+<div class="modal fade" id="printModal" tabindex="-1" aria-labelledby="printModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="viewFileModalLabel">View Document: {{ document.filename }}</h5>
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
-                </button>
+                <h5 class="modal-title" id="printModalLabel">Print Document</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body text-center">
-                <p class="text-muted mb-4">File preview would be displayed here in a real application</p>
-                
-                <div class="border p-4 mb-4">
-                    <i class="far fa-file-{{ document.document_type|lower }} fa-5x text-primary mb-3"></i>
-                    <h5>{{ document.filename }}</h5>
-                    <p class="text-muted">
-                        {{ document.document_type }} Document • {{ document.file_size }} bytes
-                    </p>
+            <div class="modal-body">
+                <p>Are you sure you want to print document {{ document.code }}?</p>
+                <div class="form-check mb-3">
+                    <input class="form-check-input" type="checkbox" id="includeHistory">
+                    <label class="form-check-label" for="includeHistory">
+                        Include document history
+                    </label>
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
-                <button type="button" class="btn btn-primary">
-                    <i class="fas fa-download"></i> Download File
-                </button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="window.print();">Print Document</button>
             </div>
         </div>
     </div>
 </div>
 
-<script>
-    function copyToClipboard(elementId) {
-        const element = document.getElementById(elementId);
-        element.select();
-        document.execCommand('copy');
-        
-        // Show tooltip or notification
-        alert('Tracking code copied to clipboard: ' + element.value);
-    }
-</script>
+<style>
+/* Timeline styling */
+.timeline {
+    position: relative;
+    padding-left: 1.5rem;
+    list-style: none;
+}
+.timeline::before {
+    content: '';
+    position: absolute;
+    left: 0.5rem;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background-color: #e0e0e0;
+}
+.timeline-item {
+    position: relative;
+    padding-bottom: 1.5rem;
+}
+.timeline-marker {
+    position: absolute;
+    left: -1.5rem;
+    width: 1rem;
+    height: 1rem;
+    border-radius: 50%;
+}
+.timeline-content {
+    padding-left: 0.5rem;
+}
+
+/* Comment styling */
+.avatar-circle {
+    width: 40px;
+    height: 40px;
+    background-color: #6c757d;
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+}
+.comment-content {
+    flex: 1;
+    background-color: #f8f9fa;
+    padding: 12px 15px;
+    border-radius: 8px;
+}
+</style>
 {% endblock %} 

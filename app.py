@@ -6,11 +6,36 @@ import json
 import random
 from sqlalchemy import case
 from sqlalchemy.sql import expression
+import os
+from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
 app.config.from_object(Config)
 app.secret_key = 'kemri_secret_key'  # Required for flash messages
 db = SQLAlchemy(app)
+
+# Configure file uploads
+UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static/uploads')
+if not os.path.exists(UPLOAD_FOLDER):
+    os.makedirs(UPLOAD_FOLDER)
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max upload
+
+# Make current datetime available to templates
+@app.context_processor
+def inject_now():
+    return {'now': lambda: datetime.utcnow()}
+
+# Add route/endpoint helper for templates to avoid BuildError
+@app.context_processor
+def utility_processor():
+    def has_endpoint(endpoint):
+        try:
+            url_for(endpoint)
+            return True
+        except:
+            return False
+    return dict(has_endpoint=has_endpoint)
 
 # Example model
 class User(db.Model):
@@ -72,6 +97,35 @@ class SystemLog(db.Model):
     
     def __repr__(self):
         return f'<SystemLog {self.action}>'
+
+# Document Attachment Model
+class DocumentAttachment(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    document_id = db.Column(db.Integer, db.ForeignKey('document.id'), nullable=False)
+    filename = db.Column(db.String(255), nullable=False)
+    original_filename = db.Column(db.String(255), nullable=False)
+    file_type = db.Column(db.String(50), nullable=False)  # pdf, doc, jpg, etc.
+    file_size = db.Column(db.Integer, nullable=False)  # Size in bytes
+    uploaded_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    document = db.relationship('Document', backref=db.backref('attachments', lazy=True, cascade='all, delete-orphan'))
+    
+    def __repr__(self):
+        return f'<DocumentAttachment {self.original_filename}>'
+
+# Document Comment Model
+class DocumentComment(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    document_id = db.Column(db.Integer, db.ForeignKey('document.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    comment = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    document = db.relationship('Document', backref=db.backref('comments', lazy=True, cascade='all, delete-orphan'))
+    user = db.relationship('User', backref=db.backref('comments', lazy=True))
+    
+    def __repr__(self):
+        return f'<DocumentComment {self.id}>'
 
 # Initialize the database
 with app.app_context():
@@ -193,15 +247,302 @@ def home():
 @app.route('/dashboard')
 def dashboard():
     users = User.query.all()
-    return render_template('dashboard_new.html', users=users)
+    
+    # Count documents by status for stats
+    status_counts = {
+        'Incoming': Document.query.filter_by(status='Incoming').count(),
+        'Pending': Document.query.filter_by(status='Pending').count(),
+        'Received': Document.query.filter_by(status='Received').count(),
+        'Outgoing': Document.query.filter_by(status='Outgoing').count(),
+        'Ended': Document.query.filter_by(status='Ended').count()
+    }
+    
+    # Get recent activity
+    recent_logs = SystemLog.query.order_by(SystemLog.timestamp.desc()).limit(10).all()
+    
+    # Get urgent documents
+    urgent_docs = Document.query.filter_by(priority='Urgent').order_by(Document.created_at.desc()).limit(5).all()
+    
+    # Get total counts
+    total_documents = Document.query.count()
+    total_users = User.query.count()
+    
+    return render_template(
+        'dashboard_new.html', 
+        users=users,
+        status_counts=status_counts,
+        recent_logs=recent_logs,
+        urgent_docs=urgent_docs,
+        total_documents=total_documents,
+        total_users=total_users
+    )
 
-@app.route('/compose')
+@app.route('/compose', methods=['GET', 'POST'])
 def compose():
-    return render_template('compose.html')
+    if request.method == 'POST':
+        # Get form data
+        doc_type = request.form.get('doc_type', 'Incoming')
+        title = request.form.get('title')
+        sender = request.form.get('sender')
+        recipient = request.form.get('recipient')
+        details = request.form.get('details')
+        required_action = request.form.get('required_action')
+        date_of_letter = request.form.get('date_of_letter')
+        priority = request.form.get('priority', 'Normal')
+        
+        # Basic validation
+        if not title or not sender or not recipient:
+            flash('Please fill in all required fields', 'danger')
+            return render_template('compose.html', form_data=request.form)
+        
+        # Generate document code
+        current_year = datetime.utcnow().year
+        last_doc = Document.query.filter(Document.code.like(f'DOC-{current_year}-%')).order_by(Document.code.desc()).first()
+        
+        if last_doc:
+            # Extract the sequence number from the last document code
+            try:
+                last_seq = int(last_doc.code.split('-')[-1])
+                new_seq = last_seq + 1
+            except ValueError:
+                new_seq = 1
+        else:
+            new_seq = 1
+            
+        # Create document code with format DOC-YYYY-NNN
+        doc_code = f'DOC-{current_year}-{new_seq:03d}'
+        
+        # Create new document
+        new_document = Document(
+            code=doc_code,
+            title=title,
+            sender=sender,
+            recipient=recipient,
+            details=details,
+            required_action=required_action,
+            date_of_letter=datetime.strptime(date_of_letter, '%Y-%m-%d') if date_of_letter else datetime.utcnow(),
+            date_received=datetime.utcnow(),
+            priority=priority,
+            status='Incoming' if doc_type == 'Incoming' else 'Outgoing',
+            current_holder='Admin'  # In a real app, this would be the current user
+        )
+        
+        db.session.add(new_document)
+        db.session.commit()  # Commit to generate the document ID
+        
+        # Handle file upload if provided
+        if 'document_file' in request.files:
+            document_file = request.files['document_file']
+            
+            if document_file and document_file.filename:
+                original_filename = document_file.filename
+                # Secure filename to prevent security issues
+                filename = secure_filename(original_filename)
+                # Add document code to filename to ensure uniqueness
+                file_parts = os.path.splitext(filename)
+                unique_filename = f"{file_parts[0]}_{doc_code}{file_parts[1]}"
+                
+                # Save the file to the upload folder
+                file_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
+                document_file.save(file_path)
+                
+                # Get file size and type
+                file_size = os.path.getsize(file_path)
+                file_type = os.path.splitext(filename)[1][1:].lower()  # Remove the dot from extension
+                
+                # Create document attachment record
+                attachment = DocumentAttachment(
+                    document_id=new_document.id,
+                    filename=unique_filename,
+                    original_filename=original_filename,
+                    file_type=file_type,
+                    file_size=file_size
+                )
+                db.session.add(attachment)
+        
+        # Log the document creation
+        new_log = SystemLog(
+            log_type='Success',
+            user='Admin',  # In a real app, this would be the current user
+            action='Document Created',
+            details=f'New {doc_type} document created with code {doc_code}'
+        )
+        db.session.add(new_log)
+        db.session.commit()
+        
+        flash(f'Document {doc_code} has been created successfully', 'success')
+        
+        # Redirect to the appropriate page based on document type
+        if doc_type == 'Incoming':
+            return redirect(url_for('incoming'))
+        else:
+            return redirect(url_for('outgoing'))
+    
+    # For GET request, render the compose form
+    doc_type = request.args.get('type', 'Incoming')
+    return render_template('compose.html', doc_type=doc_type)
 
 @app.route('/incoming')
 def incoming():
-    return render_template('incoming.html')
+    # Get query parameters
+    search_query = request.args.get('search', '')
+    status_filter = request.args.get('status', 'All')
+    priority_filter = request.args.get('priority', 'All')
+    sort_by = request.args.get('sort_by', 'date')
+    sort_order = request.args.get('sort_order', 'desc')
+    page = request.args.get('page', 1, type=int)
+    per_page = 10  # Number of documents per page
+    
+    # Start with all documents that are incoming
+    query = Document.query.filter(Document.status.in_(['Incoming', 'Pending', 'Received']))
+    
+    # Apply search filter if provided
+    if search_query:
+        search_terms = f"%{search_query}%"
+        query = query.filter(
+            db.or_(
+                Document.code.like(search_terms),
+                Document.sender.like(search_terms),
+                Document.recipient.like(search_terms),
+                Document.details.like(search_terms),
+                Document.required_action.like(search_terms)
+            )
+        )
+    
+    # Apply status filter if not 'All'
+    if status_filter != 'All':
+        query = query.filter(Document.status == status_filter)
+    
+    # Apply priority filter if not 'All'
+    if priority_filter != 'All':
+        query = query.filter(Document.priority == priority_filter)
+    
+    # Apply sorting
+    if sort_by == 'code':
+        if sort_order == 'asc':
+            query = query.order_by(Document.code.asc())
+        else:
+            query = query.order_by(Document.code.desc())
+    elif sort_by == 'date':
+        if sort_order == 'asc':
+            query = query.order_by(Document.date_received.asc())
+        else:
+            query = query.order_by(Document.date_received.desc())
+    elif sort_by == 'priority':
+        # Custom ordering for priority (Urgent > Priority > Normal)
+        if sort_order == 'asc':
+            # Normal (3) -> Priority (2) -> Urgent (1)
+            priority_case = case([
+                (Document.priority == 'Urgent', 1),
+                (Document.priority == 'Priority', 2),
+                (Document.priority == 'Normal', 3)
+            ], else_=4)
+            query = query.order_by(priority_case.asc())
+        else:
+            # Urgent (1) -> Priority (2) -> Normal (3)
+            priority_case = case([
+                (Document.priority == 'Urgent', 1),
+                (Document.priority == 'Priority', 2),
+                (Document.priority == 'Normal', 3)
+            ], else_=4)
+            query = query.order_by(priority_case.desc())
+    
+    # Pagination
+    pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+    documents = pagination.items
+    
+    # Count documents by status for stats
+    status_counts = {
+        'Incoming': Document.query.filter_by(status='Incoming').count(),
+        'Pending': Document.query.filter_by(status='Pending').count(),
+        'Received': Document.query.filter_by(status='Received').count()
+    }
+    
+    # Count documents by priority for stats
+    priority_counts = {
+        'Urgent': Document.query.filter(
+            Document.status.in_(['Incoming', 'Pending', 'Received']), 
+            Document.priority == 'Urgent'
+        ).count(),
+        'Priority': Document.query.filter(
+            Document.status.in_(['Incoming', 'Pending', 'Received']), 
+            Document.priority == 'Priority'
+        ).count(),
+        'Normal': Document.query.filter(
+            Document.status.in_(['Incoming', 'Pending', 'Received']), 
+            Document.priority == 'Normal'
+        ).count()
+    }
+    
+    return render_template(
+        'incoming.html', 
+        documents=documents,
+        pagination=pagination,
+        search_query=search_query,
+        status_filter=status_filter,
+        priority_filter=priority_filter,
+        sort_by=sort_by,
+        sort_order=sort_order,
+        status_counts=status_counts,
+        priority_counts=priority_counts
+    )
+
+@app.route('/track_document')
+def track_document():
+    # Get the document code from the query parameters
+    doc_code = request.args.get('code')
+    document = None
+    history = []
+    
+    if doc_code:
+        # Try to find the document
+        document = Document.query.filter_by(code=doc_code).first()
+        
+        if document:
+            # Simulate document history
+            # In a real app, this would come from a document_history table
+            current_time = datetime.utcnow()
+            history = [
+                {
+                    'timestamp': document.created_at,
+                    'action': 'Document Created',
+                    'user': 'Admin',
+                    'details': f'Document {doc_code} was created'
+                }
+            ]
+            
+            # Add history entries based on document status
+            if document.status != 'Incoming':
+                history.append({
+                    'timestamp': document.updated_at,
+                    'action': f'Status Changed to {document.status}',
+                    'user': 'Admin',
+                    'details': f'Document status updated to {document.status}'
+                })
+            
+            if document.status == 'Received':
+                history.append({
+                    'timestamp': document.updated_at - timedelta(hours=1),
+                    'action': 'Document Received',
+                    'user': document.current_holder or 'System',
+                    'details': f'Document was received by {document.current_holder}'
+                })
+                
+            # Sort history by timestamp (newest first)
+            history.sort(key=lambda x: x['timestamp'], reverse=True)
+    
+    return render_template(
+        'track_document.html',
+        document=document,
+        history=history,
+        search_performed=(doc_code is not None)
+    )
+
+@app.route('/logout')
+def logout():
+    # In a real app, this would log the user out
+    flash('You have been logged out.', 'success')
+    return redirect(url_for('home'))
 
 @app.route('/outgoing', methods=['GET'])
 def outgoing():
@@ -249,28 +590,20 @@ def outgoing():
         # Convert the priority to a numeric value for sorting
         if sort_order == 'asc':
             # Normal (3) -> Priority (2) -> Urgent (1)
-            query = query.order_by(
-                case(
-                    whens={
-                        'Urgent': 1,
-                        'Priority': 2,
-                        'Normal': 3
-                    },
-                    value=Document.priority
-                ).asc()
-            )
+            priority_case = case([
+                (Document.priority == 'Urgent', 1),
+                (Document.priority == 'Priority', 2),
+                (Document.priority == 'Normal', 3)
+            ], else_=4)
+            query = query.order_by(priority_case.asc())
         else:
             # Urgent (1) -> Priority (2) -> Normal (3)
-            query = query.order_by(
-                case(
-                    whens={
-                        'Urgent': 1,
-                        'Priority': 2,
-                        'Normal': 3
-                    },
-                    value=Document.priority
-                ).desc()
-            )
+            priority_case = case([
+                (Document.priority == 'Urgent', 1),
+                (Document.priority == 'Priority', 2),
+                (Document.priority == 'Normal', 3)
+            ], else_=4)
+            query = query.order_by(priority_case.desc())
     
     # Pagination
     pagination = query.paginate(page=page, per_page=per_page, error_out=False)
@@ -363,33 +696,101 @@ def outgoing_bulk_action():
     
     return redirect(url_for('outgoing'))
 
+@app.route('/incoming/bulk-action', methods=['POST'])
+def incoming_bulk_action():
+    """Perform bulk actions on selected incoming documents"""
+    selected_docs = request.form.getlist('selected_docs')
+    action = request.form.get('bulk_action')
+    
+    if not selected_docs:
+        flash('No documents selected', 'warning')
+        return redirect(url_for('incoming'))
+    
+    if action == 'mark_pending':
+        for doc_code in selected_docs:
+            document = Document.query.filter_by(code=doc_code).first()
+            if document:
+                document.status = 'Pending'
+        
+        db.session.commit()
+        flash(f'{len(selected_docs)} documents marked as pending', 'success')
+    
+    elif action == 'mark_received':
+        for doc_code in selected_docs:
+            document = Document.query.filter_by(code=doc_code).first()
+            if document:
+                document.status = 'Received'
+        
+        db.session.commit()
+        flash(f'{len(selected_docs)} documents marked as received', 'success')
+    
+    elif action == 'print':
+        # We'll just redirect to a print view with the selected document IDs
+        doc_codes = ','.join(selected_docs)
+        return redirect(url_for('print_documents', doc_codes=doc_codes))
+    
+    elif action == 'export':
+        # Handle export action
+        flash(f'{len(selected_docs)} documents exported', 'success')
+    
+    return redirect(url_for('incoming'))
+
 @app.route('/print-documents')
 def print_documents():
     """View for printing multiple documents"""
     doc_codes = request.args.get('doc_codes', '').split(',')
     documents = Document.query.filter(Document.code.in_(doc_codes)).all()
     
-    return render_template('print_documents.html', documents=documents)
+    # Pass the show_history parameter to control whether document history is included
+    show_history = request.args.get('show_history', 'false').lower() == 'true'
+    
+    return render_template('print_documents.html', documents=documents, show_history=show_history)
+
+@app.route('/document/<string:doc_code>')
+def document_details(doc_code):
+    """View a single document's details"""
+    document = Document.query.filter_by(code=doc_code).first_or_404()
+    
+    # Get document history (in a real app, this would be from a history table)
+    # Here we'll simulate some history entries
+    current_time = datetime.utcnow()
+    history = [
+        {
+            'timestamp': current_time - timedelta(days=random.randint(0, 5), hours=random.randint(0, 12)),
+            'action': 'Document Created',
+            'user': 'Admin',
+            'details': f'Document {doc_code} was created'
+        },
+        {
+            'timestamp': current_time - timedelta(days=random.randint(0, 3), hours=random.randint(0, 8)),
+            'action': 'Status Changed',
+            'user': 'Admin',
+            'details': f'Document status changed to {document.status}'
+        }
+    ]
+    
+    # Sort history by timestamp (newest first)
+    history.sort(key=lambda x: x['timestamp'], reverse=True)
+    
+    return render_template(
+        'document_details.html',
+        document=document,
+        history=history
+    )
 
 @app.route('/maintenance')
 def maintenance():
     # Get real system statistics
     total_documents = Document.query.count()
     
-    # Calculate storage used (simulated)
-    avg_doc_size_kb = 250  # Assume average document is 250KB
-    storage_used_kb = total_documents * avg_doc_size_kb
+    # Calculate storage used (in a real app, this would be the actual size)
+    document_attachments = DocumentAttachment.query.all()
+    storage_used = sum(attachment.file_size for attachment in document_attachments) / (1024 * 1024)  # Convert to MB
+    storage_used = f"{storage_used:.2f} MB"
     
-    if storage_used_kb < 1024:
-        storage_used = f"{storage_used_kb} KB"
-    elif storage_used_kb < 1024 * 1024:
-        storage_used = f"{storage_used_kb / 1024:.1f} MB"
-    else:
-        storage_used = f"{storage_used_kb / (1024 * 1024):.2f} GB"
-    
-    # Get last backup time (simulated)
-    last_backup = None
-    system_logs = db.session.query(SystemLog).order_by(SystemLog.timestamp.desc()).filter(
+    # Get last backup time
+    last_backup = "Never"
+    system_logs = db.session.query(SystemLog).filter(
         SystemLog.action == 'Backup Completed'
     ).first()
     
@@ -400,20 +801,41 @@ def maintenance():
     logs = db.session.query(SystemLog).order_by(SystemLog.timestamp.desc()).limit(10).all()
     
     # Calculate timestamps for admin activity logs
-    now = datetime.utcnow()
-    timestamp_2hr_ago = (now - timedelta(hours=2)).strftime('%Y-%m-%d %H:%M:%S')
-    timestamp_1day_ago = (now - timedelta(days=1)).strftime('%Y-%m-%d %H:%M:%S')
-    timestamp_2day_ago = (now - timedelta(days=2)).strftime('%Y-%m-%d %H:%M:%S')
+    current_time = datetime.utcnow()
+    timestamp_2hr_ago = (current_time - timedelta(hours=2)).strftime('%Y-%m-%d %H:%M:%S')
+    timestamp_1day_ago = (current_time - timedelta(days=1)).strftime('%Y-%m-%d %H:%M:%S')
+    timestamp_2day_ago = (current_time - timedelta(days=2)).strftime('%Y-%m-%d %H:%M:%S')
+    
+    # Create maintenance stats data
+    maintenance_stats = {
+        'system_uptime': '3 days, 7 hours, 22 minutes',
+        'cpu_usage': '32%',
+        'memory_usage': '45%',
+        'disk_usage': '27%',
+        'db_size': '156 MB',
+        'active_users': User.query.count(),
+        'pending_tasks': Document.query.filter(Document.status == 'Pending').count()
+    }
+    
+    # Create performance data
+    performance_data = {
+        'response_time': '120ms',
+        'queries_per_second': '12.5',
+        'slow_queries': '0',
+        'cache_hit_ratio': '94%'
+    }
     
     return render_template('maintenance.html', 
                           total_documents=total_documents,
                           storage_used=storage_used,
                           last_backup=last_backup,
                           logs=logs,
-                          now=now,
+                          current_time=current_time,
                           timestamp_2hr_ago=timestamp_2hr_ago,
                           timestamp_1day_ago=timestamp_1day_ago,
-                          timestamp_2day_ago=timestamp_2day_ago)
+                          timestamp_2day_ago=timestamp_2day_ago,
+                          maintenance_stats=maintenance_stats,
+                          performance_data=performance_data)
 
 @app.route('/reports')
 def reports():
@@ -562,6 +984,27 @@ def user_management():
     users = User.query.all()
     return render_template('user_management.html', users=users)
 
+@app.route('/database-management')
+def database_management():
+    """Provides an interface for database management operations"""
+    # Get basic database statistics
+    total_documents = Document.query.count()
+    total_users = User.query.count()
+    total_system_logs = SystemLog.query.count()
+    
+    # Get recent database activity
+    recent_logs = SystemLog.query.filter(
+        SystemLog.action.in_(['Database Optimized', 'Backup Completed'])
+    ).order_by(SystemLog.timestamp.desc()).limit(5).all()
+    
+    return render_template('database_management.html', 
+                          stats={
+                              'total_documents': total_documents,
+                              'total_users': total_users,
+                              'total_logs': total_system_logs
+                          },
+                          recent_logs=recent_logs)
+
 @app.route('/add-user', methods=['POST'])
 def add_user():
     username = request.form.get('username')
@@ -624,12 +1067,16 @@ def delete_user(user_id):
     flash('User deleted successfully!', 'success')
     return redirect(url_for('user_management'))
 
-@app.route('/my-account')
+@app.route('/my_account')
 def my_account():
     # Get the current user (in a real app, this would be the logged-in user)
     user = User.query.first()
     login_activities = LoginActivity.query.filter_by(user_id=user.id).order_by(LoginActivity.login_date.desc()).limit(3).all()
     return render_template('my_account.html', user=user, login_activities=login_activities)
+
+@app.route('/my-account')
+def my_account_alt():
+    return redirect(url_for('my_account'))
 
 @app.route('/update-profile', methods=['POST'])
 def update_profile():
@@ -818,6 +1265,133 @@ def update_indexing_settings():
     db.session.commit()
     
     return jsonify({'success': True})
+
+@app.route('/update_incoming_status/<string:doc_code>', methods=['POST'])
+def update_incoming_status(doc_code):
+    """Update the status of an incoming document"""
+    document = Document.query.filter_by(code=doc_code).first_or_404()
+    
+    new_status = request.form.get('status')
+    if new_status in ['Incoming', 'Pending', 'Received', 'Outgoing', 'Ended']:
+        document.status = new_status
+        
+        # Log the status change
+        new_log = SystemLog(
+            log_type='Info',
+            user='Admin',
+            action='Document Status Update',
+            details=f'Document {doc_code} status changed to {new_status}'
+        )
+        db.session.add(new_log)
+        db.session.commit()
+        
+        flash(f'Document {doc_code} has been updated to {new_status}', 'success')
+    else:
+        flash('Invalid status selected', 'danger')
+    
+    return redirect(url_for('incoming'))
+
+@app.route('/add_comment/<string:doc_code>', methods=['POST'])
+def add_comment(doc_code):
+    """Add a comment to a document"""
+    document = Document.query.filter_by(code=doc_code).first_or_404()
+    
+    comment_text = request.form.get('comment')
+    if not comment_text:
+        flash('Comment cannot be empty', 'warning')
+        return redirect(url_for('document_details', doc_code=doc_code))
+    
+    # In a real app, get the current user ID from session
+    user = User.query.first()  # Just get the first user for now
+    
+    # Create the comment
+    new_comment = DocumentComment(
+        document_id=document.id,
+        user_id=user.id,
+        comment=comment_text
+    )
+    
+    # Log the activity
+    new_log = SystemLog(
+        log_type='Info',
+        user=user.username,
+        action='Comment Added',
+        details=f'Comment added to document {doc_code}'
+    )
+    
+    db.session.add(new_comment)
+    db.session.add(new_log)
+    db.session.commit()
+    
+    flash('Comment added successfully', 'success')
+    return redirect(url_for('document_details', doc_code=doc_code))
+
+@app.route('/add_attachment/<string:doc_code>', methods=['POST'])
+def add_attachment(doc_code):
+    """Add an attachment to a document"""
+    document = Document.query.filter_by(code=doc_code).first_or_404()
+    
+    if 'attachment_file' not in request.files:
+        flash('No file selected', 'warning')
+        return redirect(url_for('document_details', doc_code=doc_code))
+    
+    attachment_file = request.files['attachment_file']
+    
+    if attachment_file.filename == '':
+        flash('No file selected', 'warning')
+        return redirect(url_for('document_details', doc_code=doc_code))
+    
+    if attachment_file:
+        # Process the file similar to the compose endpoint
+        original_filename = attachment_file.filename
+        # Secure filename to prevent security issues
+        filename = secure_filename(original_filename)
+        # Add document code to filename to ensure uniqueness
+        file_parts = os.path.splitext(filename)
+        unique_filename = f"{file_parts[0]}_{doc_code}_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}{file_parts[1]}"
+        
+        # Save the file to the upload folder
+        file_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
+        attachment_file.save(file_path)
+        
+        # Get file size and type
+        file_size = os.path.getsize(file_path)
+        file_type = os.path.splitext(filename)[1][1:].lower()  # Remove the dot from extension
+        
+        # Create document attachment record
+        attachment = DocumentAttachment(
+            document_id=document.id,
+            filename=unique_filename,
+            original_filename=original_filename,
+            file_type=file_type,
+            file_size=file_size
+        )
+        
+        # Log the activity
+        user = User.query.first()  # Just get the first user for now
+        new_log = SystemLog(
+            log_type='Info',
+            user=user.username,
+            action='Attachment Added',
+            details=f'File "{original_filename}" added to document {doc_code}'
+        )
+        
+        db.session.add(attachment)
+        db.session.add(new_log)
+        db.session.commit()
+        
+        flash('Attachment added successfully', 'success')
+    
+    return redirect(url_for('document_details', doc_code=doc_code))
+
+@app.route('/download_attachment/<int:attachment_id>')
+def download_attachment(attachment_id):
+    """Download a document attachment"""
+    attachment = DocumentAttachment.query.get_or_404(attachment_id)
+    
+    # The file is already in the static/uploads folder
+    # Redirect to the static URL for the file
+    return redirect(url_for('static', filename=f'uploads/{attachment.filename}'))
 
 if __name__ == '__main__':
     app.run(debug=True) 

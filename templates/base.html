@@ -190,7 +190,7 @@
                     <i class="fas fa-tachometer-alt"></i> Dashboard
                 </a>
                 <a href="{{ url_for('compose') }}" class="sidebar-menu-item {% if request.endpoint == 'compose' %}active{% endif %}">
-                    <i class="fas fa-pen"></i> Compose
+                    <i class="fas fa-edit"></i> Compose
                 </a>
                 <a href="{{ url_for('incoming') }}" class="sidebar-menu-item {% if request.endpoint == 'incoming' %}active{% endif %}">
                     <i class="fas fa-inbox"></i> Incoming
@@ -198,24 +198,36 @@
                 <a href="{{ url_for('outgoing') }}" class="sidebar-menu-item {% if request.endpoint == 'outgoing' %}active{% endif %}">
                     <i class="fas fa-paper-plane"></i> Outgoing
                 </a>
+                {% if has_endpoint('maintenance') %}
                 <a href="{{ url_for('maintenance') }}" class="sidebar-menu-item {% if request.endpoint == 'maintenance' %}active{% endif %}">
                     <i class="fas fa-cogs"></i> Maintenance
                 </a>
+                {% endif %}
+                {% if has_endpoint('reports') %}
                 <a href="{{ url_for('reports') }}" class="sidebar-menu-item {% if request.endpoint == 'reports' %}active{% endif %}">
                     <i class="fas fa-chart-bar"></i> Reports
                 </a>
+                {% endif %}
+                {% if has_endpoint('user_management') %}
                 <a href="{{ url_for('user_management') }}" class="sidebar-menu-item {% if request.endpoint == 'user_management' %}active{% endif %}">
                     <i class="fas fa-users"></i> User Management
                 </a>
+                {% endif %}
+                {% if has_endpoint('database_management') %}
                 <a href="{{ url_for('database_management') }}" class="sidebar-menu-item {% if request.endpoint == 'database_management' %}active{% endif %}">
                     <i class="fas fa-database"></i> Database
                 </a>
+                {% endif %}
+                {% if has_endpoint('my_account') %}
                 <a href="{{ url_for('my_account') }}" class="sidebar-menu-item {% if request.endpoint == 'my_account' %}active{% endif %}">
                     <i class="fas fa-user"></i> My Account
                 </a>
+                {% endif %}
+                {% if has_endpoint('track_document') %}
                 <a href="{{ url_for('track_document') }}" class="sidebar-menu-item {% if request.endpoint == 'track_document' %}active{% endif %}">
                     <i class="fas fa-search"></i> Track Document
                 </a>
+                {% endif %}
                 
                 <!-- Separator before logout -->
                 <div class="border-top my-3"></div>

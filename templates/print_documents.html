@@ -1,1 +1,132 @@
- 
+{% extends 'base.html' %}
+
+{% block title %}Print Documents - Document Management System{% endblock %}
+
+{% block content %}
+<div class="container-fluid print-container">
+    <!-- Print Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4 print-header">
+        <div>
+            <h2 class="h3 mb-0">Document Print View</h2>
+            <p class="text-muted">Printed on {{ now().strftime('%d %b %Y, %H:%M') }}</p>
+        </div>
+        <div class="d-print-none">
+            <button class="btn btn-primary" onclick="window.print();">
+                <i class="fas fa-print me-2"></i> Print Now
+            </button>
+            <a href="javascript:history.back()" class="btn btn-outline-secondary ms-2">
+                <i class="fas fa-arrow-left me-2"></i> Back
+            </a>
+        </div>
+    </div>
+    
+    <!-- Documents -->
+    {% for document in documents %}
+    <div class="card mb-5 document-print-item">
+        <div class="card-header bg-light">
+            <div class="d-flex justify-content-between">
+                <h4 class="mb-0">{{ document.code }}</h4>
+                <span class="badge bg-{% if document.status == 'Incoming' %}primary{% elif document.status == 'Pending' %}warning{% elif document.status == 'Received' %}success{% elif document.status == 'Outgoing' %}info{% else %}secondary{% endif %}">
+                    {{ document.status }}
+                </span>
+            </div>
+        </div>
+        
+        <div class="card-body">
+            <h5 class="mb-3">{{ document.title }}</h5>
+            
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <p class="mb-1 small text-muted">From (Sender)</p>
+                    <p class="mb-3">{{ document.sender }}</p>
+                    
+                    <p class="mb-1 small text-muted">Date of Letter</p>
+                    <p class="mb-0">{{ document.date_of_letter.strftime('%d %b %Y') }}</p>
+                </div>
+                <div class="col-md-6">
+                    <p class="mb-1 small text-muted">To (Recipient)</p>
+                    <p class="mb-3">{{ document.recipient }}</p>
+                    
+                    <p class="mb-1 small text-muted">Date Received</p>
+                    <p class="mb-0">{{ document.date_received.strftime('%d %b %Y') }}</p>
+                </div>
+            </div>
+            
+            <hr>
+            
+            <div class="mb-4">
+                <p class="mb-1 small text-muted">Document Details</p>
+                <p class="mb-0">{{ document.details }}</p>
+            </div>
+            
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <p class="mb-1 small text-muted">Required Action</p>
+                    <p class="mb-0">{{ document.required_action }}</p>
+                </div>
+                <div class="col-md-6">
+                    <p class="mb-1 small text-muted">Priority</p>
+                    <p class="mb-0">
+                        <span class="badge bg-{% if document.priority == 'Urgent' %}danger{% elif document.priority == 'Priority' %}warning{% else %}secondary{% endif %}">
+                            {{ document.priority }}
+                        </span>
+                    </p>
+                </div>
+            </div>
+            
+            <div class="mb-3">
+                <p class="mb-1 small text-muted">Current Holder</p>
+                <p class="mb-0">{{ document.current_holder }}</p>
+            </div>
+            
+            {% if show_history %}
+            <hr class="mb-4">
+            
+            <h6 class="mb-3">Document History</h6>
+            <ul class="list-unstyled">
+                <li class="mb-2">
+                    <span class="text-muted small">{{ document.created_at.strftime('%d %b %Y, %H:%M') }}</span>
+                    <br>Document created by System
+                </li>
+                <li class="mb-2">
+                    <span class="text-muted small">{{ document.updated_at.strftime('%d %b %Y, %H:%M') }}</span>
+                    <br>Status updated to {{ document.status }}
+                </li>
+            </ul>
+            {% endif %}
+        </div>
+        
+        <div class="card-footer">
+            <p class="mb-0 small text-muted">Printed from KEMRI Document Management System</p>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<style>
+@media print {
+    body {
+        padding: 0;
+        margin: 0;
+    }
+    
+    .print-container {
+        width: 100%;
+        max-width: 100%;
+        padding: 0;
+    }
+    
+    .document-print-item {
+        page-break-after: always;
+    }
+    
+    .d-print-none {
+        display: none !important;
+    }
+    
+    .card {
+        border: 1px solid #ddd;
+    }
+}
+</style>
+{% endblock %} 
