@@ -6,9 +6,9 @@
 {{ super() }}
 <style>
     :root {
-        --kemri-primary: #00a0d2;     /* Bright Blue from logo */
+        --kemri-primary: #00a0d2;     /* Bright Blue */
         --kemri-secondary: #FFD700;   /* Gold */
-        --kemri-accent: #d91e18;      /* Red from caduceus in logo */
+        --kemri-accent: #d91e18;      /* Red */
         --kemri-light: #e6f7ff;       /* Light Blue */
         --kemri-dark: #0076a3;        /* Darker Blue */
     }
@@ -94,16 +94,24 @@
     }
     
     .kemri-logo {
-        max-height: 140px;
-        filter: drop-shadow(0 0 8px rgba(0,0,0,0.2));
+        max-height: 400px;
+        filter: drop-shadow(0 0 10px rgba(0,0,0,0.3));
+    }
+    
+    .kemri-logo-container {
+        width: 320px;
+        height: 320px;
+        overflow: hidden;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto;
     }
     
     .kemri-logo-img {
-        border-radius: 50%;
-        border: 3px solid white;
-        background-color: var(--kemri-primary);
-        max-height: 140px;
-        box-shadow: 0 0 10px rgba(0,0,0,0.2);
+        width: 100%;
+        height: auto;
+        object-fit: contain;
     }
     
     .welcome-icon {
@@ -136,65 +144,15 @@
 <!-- KEMRI Banner -->
 <div class="card mb-4 bg-gradient-kemri text-white">
     <div class="card-body py-4">
-        <div class="d-flex align-items-center justify-content-between flex-wrap">
-            <div>
-                <h1 class="display-5 mb-0">KEMRI</h1>
-                <h4 class="mb-3">Document Management System</h4>
-                <p class="lead mb-0">A comprehensive system for managing document workflows, tracking, and collaboration.</p>
+        <div class="d-flex flex-column align-items-center text-center">
+            <!-- KEMRI Logo -->
+            <div class="kemri-logo-container mb-3">
+                <img src="{{ url_for('static', filename='images/kemrilogo.png') }}" alt="KEMRI Logo" class="kemri-logo-img">
             </div>
-            <div class="text-center d-none d-md-block">
-                <!-- KEMRI Logo - SVG version with fallback to image -->
-                <div class="position-relative">
-                    <!-- Fallback colored circle with KEMRI text if SVG doesn't render -->
-                    <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; z-index: 1;">
-                        <div style="width: 140px; height: 140px; background-color: #00a0d2; border-radius: 50%; border: 3px solid white; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 24px;">
-                            KEMRI
-                        </div>
-                    </div>
-                    
-                    <!-- SVG Logo (will appear on top of fallback) -->
-                    <svg width="180" height="180" viewBox="0 0 200 200" class="kemri-logo" style="position: relative; z-index: 2;">
-                        <!-- Outer circle -->
-                        <circle cx="100" cy="100" r="95" fill="#00a0d2" />
-                        <!-- Inner white ring -->
-                        <circle cx="100" cy="100" r="90" fill="#00a0d2" stroke="white" stroke-width="3" />
-                        
-                        <!-- Top text -->
-                        <path d="M 30,45 A 80,80 0 0,1 170,45" fill="none" stroke="white" id="topTextPath" />
-                        <text>
-                            <textPath href="#topTextPath" startOffset="50%" text-anchor="middle" fill="white" font-weight="bold" font-size="12">
-                                KENYA MEDICAL RESEARCH INSTITUTE
-                            </textPath>
-                        </text>
-                        
-                        <!-- Medical Symbol - Caduceus -->
-                        <g transform="translate(100, 100) scale(1.2)">
-                            <!-- Staff/Rod -->
-                            <rect x="-4" y="-30" width="8" height="60" fill="white" />
-                            
-                            <!-- Wings at top -->
-                            <path d="M 0,-30 L -20,-20 L -18,-15 L -3,-22 Z" fill="white" />
-                            <path d="M 0,-30 L 20,-20 L 18,-15 L 3,-22 Z" fill="white" />
-                            
-                            <!-- Snakes -->
-                            <path d="M -5,-15 C -15,-10 -25,-20 -15,-25 C -5,-30 -5,-15 -5,-10 
-                                   C -15,-5 -25,5 -15,10 C -5,15 -5,0 -5,5" 
-                                  fill="none" stroke="#d91e18" stroke-width="4" />
-                            
-                            <path d="M 5,-15 C 15,-10 25,-20 15,-25 C 5,-30 5,-15 5,-10 
-                                   C 15,-5 25,5 15,10 C 5,15 5,0 5,5" 
-                                  fill="none" stroke="#d91e18" stroke-width="4" />
-                        </g>
-                        
-                        <!-- Bottom text -->
-                        <path d="M 30,155 A 80,80 0 0,0 170,155" fill="none" stroke="white" id="bottomTextPath" />
-                        <text>
-                            <textPath href="#bottomTextPath" startOffset="50%" text-anchor="middle" fill="white" font-weight="bold" font-size="16">
-                                KEMRI
-                            </textPath>
-                        </text>
-                    </svg>
-                </div>
+            <div class="mt-3">
+                <h1 class="display-5 mb-1">KEMRI</h1>
+                <h4 class="mb-2">Document Management System</h4>
+                <p class="lead mb-0">A comprehensive system for managing document workflows, tracking, and collaboration.</p>
             </div>
         </div>
     </div>
