@@ -995,19 +995,89 @@ def database_management():
     total_documents = Document.query.count()
     total_users = User.query.count()
     total_system_logs = SystemLog.query.count()
+    total_attachments = DocumentAttachment.query.count()
+    
+    # Get database size (simulated for demo)
+    db_size = "15.7 MB"
+    health_percentage = 95
     
     # Get recent database activity
     recent_logs = SystemLog.query.filter(
-        SystemLog.action.in_(['Database Optimized', 'Backup Completed'])
-    ).order_by(SystemLog.timestamp.desc()).limit(5).all()
+        SystemLog.action.in_(['Database Optimized', 'Backup Completed', 'Cleanup Completed', 'Database Integrity Check'])
+    ).order_by(SystemLog.timestamp.desc()).limit(8).all()
+    
+    # Get sample backups
+    backups = [
+        {
+            'filename': 'backup_2025-04-23.db',
+            'date': '2025-04-23 08:30 AM',
+            'size': '14.2 MB'
+        },
+        {
+            'filename': 'backup_2025-04-21.db',
+            'date': '2025-04-21 09:15 AM',
+            'size': '14.0 MB'
+        },
+        {
+            'filename': 'backup_2025-04-19.db',
+            'date': '2025-04-19 07:45 AM',
+            'size': '13.8 MB'
+        }
+    ]
+    
+    # Get database tables
+    tables = [
+        {
+            'name': 'user',
+            'records': total_users,
+            'size': '0.2 MB',
+            'last_updated': datetime.utcnow().strftime('%Y-%m-%d'),
+            'status': 'Good'
+        },
+        {
+            'name': 'document',
+            'records': total_documents,
+            'size': '2.1 MB',
+            'last_updated': datetime.utcnow().strftime('%Y-%m-%d'),
+            'status': 'Good'
+        },
+        {
+            'name': 'system_log',
+            'records': total_system_logs,
+            'size': '1.5 MB',
+            'last_updated': datetime.utcnow().strftime('%Y-%m-%d'),
+            'status': 'Good'
+        },
+        {
+            'name': 'document_attachment',
+            'records': total_attachments,
+            'size': '11.9 MB',
+            'last_updated': datetime.utcnow().strftime('%Y-%m-%d'),
+            'status': 'Good'
+        }
+    ]
+    
+    # Performance metrics
+    performance = {
+        'response_time': '120',
+        'queries_per_second': '12.5',
+        'slow_queries': '0',
+        'cache_hit_ratio': '94'
+    }
     
     return render_template('database_management.html', 
                           stats={
                               'total_documents': total_documents,
                               'total_users': total_users,
-                              'total_logs': total_system_logs
+                              'total_logs': total_system_logs,
+                              'total_attachments': total_attachments,
+                              'db_size': db_size,
+                              'health_percentage': health_percentage
                           },
-                          recent_logs=recent_logs)
+                          recent_logs=recent_logs,
+                          backups=backups,
+                          tables=tables,
+                          performance=performance)
 
 @app.route('/add-user', methods=['POST'])
 def add_user():
@@ -1172,6 +1242,95 @@ def maintenance_action():
         db.session.commit()
         flash('Database optimization completed!', 'success')
     
+    elif action == 'integrity_check':
+        # Simulate database integrity check
+        new_log = SystemLog(
+            log_type='Success',
+            user='Admin',
+            action='Database Integrity Check',
+            details='Database integrity check completed successfully. All tables are intact.'
+        )
+        db.session.add(new_log)
+        db.session.commit()
+        flash('Database integrity check completed. No issues found!', 'success')
+    
+    elif action == 'vacuum':
+        # Simulate database vacuum
+        new_log = SystemLog(
+            log_type='Success',
+            user='Admin',
+            action='Database Vacuum',
+            details='Database vacuum operation completed successfully. Database size reduced.'
+        )
+        db.session.add(new_log)
+        db.session.commit()
+        flash('Database vacuum completed successfully!', 'success')
+    
+    elif action == 'optimize_table':
+        # Get table name from form
+        table_name = request.form.get('table_name')
+        # Simulate table optimization
+        new_log = SystemLog(
+            log_type='Success',
+            user='Admin',
+            action='Table Optimized',
+            details=f'Table "{table_name}" optimized successfully.'
+        )
+        db.session.add(new_log)
+        db.session.commit()
+        flash(f'Table "{table_name}" optimized successfully!', 'success')
+    
+    elif action == 'truncate_table':
+        # Get table name from form
+        table_name = request.form.get('table_name')
+        # Simulate table truncation
+        new_log = SystemLog(
+            log_type='Warning',
+            user='Admin',
+            action='Table Truncated',
+            details=f'Table "{table_name}" truncated, all records removed.'
+        )
+        db.session.add(new_log)
+        db.session.commit()
+        flash(f'Table "{table_name}" truncated successfully. All records removed.', 'warning')
+    
+    elif action == 'restore_backup':
+        # Get backup name from form
+        backup_name = request.form.get('backup_name')
+        # Simulate backup restoration
+        new_log = SystemLog(
+            log_type='Success',
+            user='Admin',
+            action='Backup Restored',
+            details=f'Database restored from backup "{backup_name}" successfully.'
+        )
+        db.session.add(new_log)
+        db.session.commit()
+        flash(f'Database restored from backup "{backup_name}" successfully!', 'success')
+    
+    elif action == 'download_backup':
+        # Get backup name from form
+        backup_name = request.form.get('backup_name')
+        # In a real app, you would generate a download response
+        # For this demo, just provide a success message
+        flash(f'Backup "{backup_name}" download started.', 'success')
+        # Redirect to database management to avoid the POST-redirect issue
+        return redirect(url_for('database_management'))
+    
+    elif action == 'delete_backup':
+        # Get backup name from form
+        backup_name = request.form.get('backup_name')
+        # Simulate backup deletion
+        new_log = SystemLog(
+            log_type='Warning',
+            user='Admin',
+            action='Backup Deleted',
+            details=f'Backup "{backup_name}" deleted from the system.'
+        )
+        db.session.add(new_log)
+        db.session.commit()
+        flash(f'Backup "{backup_name}" deleted successfully.', 'warning')
+    
     elif action == 'update':
         # Simulate checking for updates
         new_log = SystemLog(
@@ -1208,7 +1367,7 @@ def maintenance_action():
         db.session.commit()
         flash(f'Successfully reindexed {Document.query.count()} documents!', 'success')
     
-    return redirect(url_for('maintenance'))
+    return redirect(url_for('database_management'))
 
 @app.route('/maintenance/disk-info')
 def disk_info():
@@ -1401,6 +1560,70 @@ def download_attachment(attachment_id):
     # The file is already in the static/uploads folder
     # Redirect to the static URL for the file
     return redirect(url_for('static', filename=f'uploads/{attachment.filename}'))
+
+@app.route('/api/table-structure/<table_name>')
+def get_table_structure(table_name):
+    """API endpoint to get the structure of a database table"""
+    # In a real app, this would query the database information schema
+    # For this demo, we'll provide mock data based on the table name
+    
+    if table_name == 'user':
+        columns = [
+            {'name': 'id', 'type': 'INTEGER', 'nullable': 'NO', 'default': None, 'key': 'PK'},
+            {'name': 'username', 'type': 'VARCHAR(80)', 'nullable': 'NO', 'default': None, 'key': 'UNI'},
+            {'name': 'email', 'type': 'VARCHAR(120)', 'nullable': 'NO', 'default': None, 'key': 'UNI'},
+            {'name': 'phone', 'type': 'VARCHAR(20)', 'nullable': 'YES', 'default': None, 'key': ''},
+            {'name': 'department', 'type': 'VARCHAR(50)', 'nullable': 'YES', 'default': None, 'key': ''},
+            {'name': 'password', 'type': 'VARCHAR(100)', 'nullable': 'YES', 'default': None, 'key': ''},
+            {'name': 'last_login', 'type': 'DATETIME', 'nullable': 'YES', 'default': 'CURRENT_TIMESTAMP', 'key': ''},
+            {'name': 'created_at', 'type': 'DATETIME', 'nullable': 'YES', 'default': 'CURRENT_TIMESTAMP', 'key': ''},
+            {'name': 'role', 'type': 'VARCHAR(50)', 'nullable': 'YES', 'default': None, 'key': ''}
+        ]
+    elif table_name == 'document':
+        columns = [
+            {'name': 'id', 'type': 'INTEGER', 'nullable': 'NO', 'default': None, 'key': 'PK'},
+            {'name': 'code', 'type': 'VARCHAR(20)', 'nullable': 'NO', 'default': None, 'key': 'UNI'},
+            {'name': 'title', 'type': 'VARCHAR(200)', 'nullable': 'NO', 'default': None, 'key': ''},
+            {'name': 'sender', 'type': 'VARCHAR(100)', 'nullable': 'NO', 'default': None, 'key': ''},
+            {'name': 'recipient', 'type': 'VARCHAR(100)', 'nullable': 'NO', 'default': None, 'key': ''},
+            {'name': 'details', 'type': 'TEXT', 'nullable': 'YES', 'default': None, 'key': ''},
+            {'name': 'required_action', 'type': 'VARCHAR(200)', 'nullable': 'YES', 'default': None, 'key': ''},
+            {'name': 'date_of_letter', 'type': 'DATETIME', 'nullable': 'YES', 'default': 'CURRENT_TIMESTAMP', 'key': ''},
+            {'name': 'date_received', 'type': 'DATETIME', 'nullable': 'YES', 'default': 'CURRENT_TIMESTAMP', 'key': ''},
+            {'name': 'priority', 'type': 'VARCHAR(20)', 'nullable': 'YES', 'default': "'Normal'", 'key': ''},
+            {'name': 'status', 'type': 'VARCHAR(20)', 'nullable': 'YES', 'default': "'Incoming'", 'key': ''},
+            {'name': 'current_holder', 'type': 'VARCHAR(100)', 'nullable': 'YES', 'default': None, 'key': ''},
+            {'name': 'created_at', 'type': 'DATETIME', 'nullable': 'YES', 'default': 'CURRENT_TIMESTAMP', 'key': ''},
+            {'name': 'updated_at', 'type': 'DATETIME', 'nullable': 'YES', 'default': 'CURRENT_TIMESTAMP', 'key': ''},
+            {'name': 'processed_by', 'type': 'INTEGER', 'nullable': 'YES', 'default': None, 'key': 'FK'}
+        ]
+    elif table_name == 'system_log':
+        columns = [
+            {'name': 'id', 'type': 'INTEGER', 'nullable': 'NO', 'default': None, 'key': 'PK'},
+            {'name': 'timestamp', 'type': 'DATETIME', 'nullable': 'YES', 'default': 'CURRENT_TIMESTAMP', 'key': ''},
+            {'name': 'log_type', 'type': 'VARCHAR(20)', 'nullable': 'YES', 'default': None, 'key': ''},
+            {'name': 'user', 'type': 'VARCHAR(100)', 'nullable': 'YES', 'default': None, 'key': ''},
+            {'name': 'action', 'type': 'VARCHAR(100)', 'nullable': 'YES', 'default': None, 'key': ''},
+            {'name': 'details', 'type': 'TEXT', 'nullable': 'YES', 'default': None, 'key': ''}
+        ]
+    elif table_name == 'document_attachment':
+        columns = [
+            {'name': 'id', 'type': 'INTEGER', 'nullable': 'NO', 'default': None, 'key': 'PK'},
+            {'name': 'document_id', 'type': 'INTEGER', 'nullable': 'NO', 'default': None, 'key': 'FK'},
+            {'name': 'filename', 'type': 'VARCHAR(255)', 'nullable': 'NO', 'default': None, 'key': ''},
+            {'name': 'original_filename', 'type': 'VARCHAR(255)', 'nullable': 'NO', 'default': None, 'key': ''},
+            {'name': 'file_type', 'type': 'VARCHAR(50)', 'nullable': 'NO', 'default': None, 'key': ''},
+            {'name': 'file_size', 'type': 'INTEGER', 'nullable': 'NO', 'default': None, 'key': ''},
+            {'name': 'uploaded_at', 'type': 'DATETIME', 'nullable': 'YES', 'default': 'CURRENT_TIMESTAMP', 'key': ''}
+        ]
+    else:
+        # Default empty table for unknown tables
+        columns = []
+    
+    return jsonify({
+        'table_name': table_name,
+        'columns': columns
+    })
 
 if __name__ == '__main__':
     app.run(debug=True) 
