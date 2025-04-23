@@ -981,8 +981,12 @@ def report_data():
 
 @app.route('/user-management')
 def user_management():
+    # Define available departments and roles for dropdowns
+    departments = ['Administration', 'Laboratory', 'Research', 'IT', 'Finance', 'HR', 'Audit']
+    roles = ['Administrator', 'Manager', 'Lab Technician', 'Researcher', 'Data Entry', 'User', 'Read Only']
+    
     users = User.query.all()
-    return render_template('user_management.html', users=users)
+    return render_template('user_management.html', users=users, departments=departments, roles=roles)
 
 @app.route('/database-management')
 def database_management():
@@ -1007,11 +1011,14 @@ def database_management():
 
 @app.route('/add-user', methods=['POST'])
 def add_user():
-    username = request.form.get('username')
+    # Get form fields matching the names in the HTML form
+    username = request.form.get('fullName')
     email = request.form.get('email')
+    phone = request.form.get('phone', '')
     department = request.form.get('department')
     role = request.form.get('role')
     password = request.form.get('password')
+    status = 'active' if request.form.get('status') == 'on' else 'inactive'
     
     # Basic validation
     if not username or not email or not password:
@@ -1027,6 +1034,7 @@ def add_user():
     new_user = User(
         username=username,
         email=email,
+        phone=phone,
         department=department,
         password=password,  # In a real app, this would be hashed
         role=role
@@ -1042,8 +1050,9 @@ def add_user():
 def edit_user(user_id):
     user = User.query.get_or_404(user_id)
     
-    user.username = request.form.get('username')
+    user.username = request.form.get('fullName')
     user.email = request.form.get('email')
+    user.phone = request.form.get('phone', '')
     user.department = request.form.get('department')
     user.role = request.form.get('role')
     

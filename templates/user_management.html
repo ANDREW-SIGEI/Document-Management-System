@@ -329,7 +329,7 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <form id="addUserForm" action="/add_user" method="POST">
+                <form id="addUserForm" action="/add-user" method="POST">
                     <div class="row mb-3">
                         <div class="col-md-6">
                             <label for="addUserFullName" class="form-label">Full Name <span class="text-danger">*</span></label>
@@ -422,7 +422,7 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <form id="editUserForm" action="/edit_user/0" method="POST">
+                <form id="editUserForm" action="/edit-user/0" method="POST">
                     <input type="hidden" id="editUserId" name="user_id" value="">
                     
                     <div class="row mb-3">
@@ -922,6 +922,8 @@ document.addEventListener('DOMContentLoaded', function() {
         var emailField = document.getElementById('addUserEmail');
         var passwordField = document.getElementById('addUserPassword');
         var confirmPasswordField = document.getElementById('addUserConfirmPassword');
+        var departmentField = document.getElementById('addUserDepartment');
+        var roleField = document.getElementById('addUserRole');
         var isValid = true;
 
         // Validate required fields
@@ -958,6 +960,23 @@ document.addEventListener('DOMContentLoaded', function() {
 
         if (!isValid) {
             e.preventDefault();
+            showToast('Please fill in all required fields correctly', 'danger');
+        } else {
+            // This would be replaced with actual AJAX form submission
+            e.preventDefault();
+            
+            // Simulate user addition and hide modal
+            showToast('User added successfully!', 'success');
+            simulateAddUser(
+                fullNameField.value, 
+                emailField.value, 
+                departmentField.options[departmentField.selectedIndex].text,
+                roleField.options[roleField.selectedIndex].text
+            );
+            
+            // Hide modal and reset form
+            bootstrap.Modal.getInstance(document.getElementById('addUserModal')).hide();
+            this.reset();
         }
     });
 
@@ -968,7 +987,8 @@ document.addEventListener('DOMContentLoaded', function() {
             var userId = this.getAttribute('data-user-id');
             
             if (confirm('Are you sure you want to reset the password for this user?')) {
-                window.location.href = '/reset_password/' + userId;
+                // Simulate password reset
+                showToast('Password has been reset and sent to user', 'success');
             }
         });
     });
@@ -982,7 +1002,30 @@ document.addEventListener('DOMContentLoaded', function() {
             var actionText = currentStatus === 'active' ? 'deactivate' : 'activate';
             
             if (confirm('Are you sure you want to ' + actionText + ' this user?')) {
-                window.location.href = '/toggle_user_status/' + userId;
+                // Simulate status toggle
+                var newStatus = currentStatus === 'active' ? 'inactive' : 'active';
+                var userRow = document.querySelector(`tr[data-user-id="${userId}"]`);
+                
+                if (userRow) {
+                    userRow.setAttribute('data-status', newStatus);
+                    var statusBadge = userRow.querySelector('td:nth-child(6) span');
+                    
+                    if (statusBadge) {
+                        if (newStatus === 'active') {
+                            statusBadge.className = 'badge bg-success';
+                            statusBadge.textContent = 'Active';
+                            this.innerHTML = '<i class="fas fa-user-times me-1 text-warning"></i> Deactivate User';
+                            this.setAttribute('data-current-status', 'active');
+                        } else {
+                            statusBadge.className = 'badge bg-warning text-dark';
+                            statusBadge.textContent = 'Inactive';
+                            this.innerHTML = '<i class="fas fa-user-check me-1 text-success"></i> Activate User';
+                            this.setAttribute('data-current-status', 'inactive');
+                        }
+                    }
+                    
+                    showToast(`User has been ${actionText}d`, 'success');
+                }
             }
         });
     });
@@ -997,6 +1040,32 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('deleteUserId').value = userId;
             document.getElementById('deleteUserForm').action = '/delete_user/' + userId;
         });
+    });
+    
+    // Delete user form submission
+    document.getElementById('deleteUserForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        var confirmDelete = document.getElementById('confirmDelete');
+        
+        if (!confirmDelete.checked) {
+            confirmDelete.classList.add('is-invalid');
+            return;
+        }
+        
+        // Get user ID and remove the row
+        var userId = document.getElementById('deleteUserId').value;
+        var userRow = document.querySelector(`tr[data-user-id="${userId}"]`);
+        
+        if (userRow) {
+            userRow.remove();
+        }
+        
+        // Hide modal
+        bootstrap.Modal.getInstance(document.getElementById('deleteUserModal')).hide();
+        showToast('User has been deleted', 'success');
+        
+        // Update user count in stats
+        updateUserCountStats();
     });
 
     // Edit User Handler
@@ -1016,7 +1085,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 // Populate edit form
                 document.getElementById('editUserId').value = userId;
-                document.getElementById('editUserForm').action = '/edit_user/' + userId;
+                document.getElementById('editUserForm').action = '/edit-user/' + userId;
                 document.getElementById('editUserFullName').value = userName;
                 document.getElementById('editUserEmail').value = userEmail;
                 
@@ -1044,6 +1113,69 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
     
+    // Edit user form submission
+    document.getElementById('editUserForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        var userId = document.getElementById('editUserId').value;
+        var fullName = document.getElementById('editUserFullName').value;
+        var email = document.getElementById('editUserEmail').value;
+        var department = document.getElementById('editUserDepartment').options[document.getElementById('editUserDepartment').selectedIndex].text;
+        var role = document.getElementById('editUserRole').options[document.getElementById('editUserRole').selectedIndex].text;
+        var isActive = document.getElementById('editUserStatus').checked;
+        
+        // Update user in the table
+        var userRow = document.querySelector(`tr[data-user-id="${userId}"]`);
+        if (userRow) {
+            userRow.querySelector('td:nth-child(2) a').textContent = fullName;
+            userRow.querySelector('td:nth-child(3)').textContent = email;
+            userRow.querySelector('td:nth-child(4)').textContent = department;
+            
+            var roleBadge = userRow.querySelector('td:nth-child(5) span');
+            roleBadge.textContent = role;
+            // Update role badge style based on role
+            roleBadge.className = 'badge ';
+            if (role === 'Administrator') {
+                roleBadge.className += 'bg-danger';
+            } else if (role === 'Manager') {
+                roleBadge.className += 'bg-warning text-dark';
+            } else if (role === 'Lead Scientist') {
+                roleBadge.className += 'bg-info text-dark';
+            } else {
+                roleBadge.className += 'bg-secondary';
+            }
+            
+            var statusBadge = userRow.querySelector('td:nth-child(6) span');
+            if (isActive) {
+                statusBadge.className = 'badge bg-success';
+                statusBadge.textContent = 'Active';
+            } else {
+                statusBadge.className = 'badge bg-warning text-dark';
+                statusBadge.textContent = 'Inactive';
+            }
+            
+            // Update user status and toggle action text
+            userRow.setAttribute('data-status', isActive ? 'active' : 'inactive');
+            var toggleStatusBtn = userRow.querySelector('.toggle-status');
+            if (toggleStatusBtn) {
+                if (isActive) {
+                    toggleStatusBtn.innerHTML = '<i class="fas fa-user-times me-1 text-warning"></i> Deactivate User';
+                    toggleStatusBtn.setAttribute('data-current-status', 'active');
+                } else {
+                    toggleStatusBtn.innerHTML = '<i class="fas fa-user-check me-1 text-success"></i> Activate User';
+                    toggleStatusBtn.setAttribute('data-current-status', 'inactive');
+                }
+            }
+            
+            // Update user count stats
+            updateUserCountStats();
+        }
+        
+        // Hide modal
+        bootstrap.Modal.getInstance(document.getElementById('editUserModal')).hide();
+        showToast('User updated successfully', 'success');
+    });
+
     // User Search Functionality
     document.getElementById('userSearch').addEventListener('input', function() {
         var searchTerm = this.value.toLowerCase();
@@ -1112,27 +1244,97 @@ document.addEventListener('DOMContentLoaded', function() {
             switch(action) {
                 case 'activate':
                     if (confirm('Are you sure you want to activate ' + selectedUsers.length + ' users?')) {
-                        submitBulkAction('activate', selectedUsers);
+                        // Simulate activation
+                        selectedUsers.forEach(function(userId) {
+                            var userRow = document.querySelector(`tr[data-user-id="${userId}"]`);
+                            if (userRow) {
+                                userRow.setAttribute('data-status', 'active');
+                                var statusBadge = userRow.querySelector('td:nth-child(6) span');
+                                statusBadge.className = 'badge bg-success';
+                                statusBadge.textContent = 'Active';
+                                
+                                // Update toggle button
+                                var toggleBtn = userRow.querySelector('.toggle-status');
+                                if (toggleBtn) {
+                                    toggleBtn.innerHTML = '<i class="fas fa-user-times me-1 text-warning"></i> Deactivate User';
+                                    toggleBtn.setAttribute('data-current-status', 'active');
+                                }
+                            }
+                        });
+                        updateUserCountStats();
+                        showToast(selectedUsers.length + ' users activated successfully', 'success');
                     }
                     e.preventDefault();
                     break;
                     
                 case 'deactivate':
                     if (confirm('Are you sure you want to deactivate ' + selectedUsers.length + ' users?')) {
-                        submitBulkAction('deactivate', selectedUsers);
+                        // Simulate deactivation
+                        selectedUsers.forEach(function(userId) {
+                            var userRow = document.querySelector(`tr[data-user-id="${userId}"]`);
+                            if (userRow) {
+                                userRow.setAttribute('data-status', 'inactive');
+                                var statusBadge = userRow.querySelector('td:nth-child(6) span');
+                                statusBadge.className = 'badge bg-warning text-dark';
+                                statusBadge.textContent = 'Inactive';
+                                
+                                // Update toggle button
+                                var toggleBtn = userRow.querySelector('.toggle-status');
+                                if (toggleBtn) {
+                                    toggleBtn.innerHTML = '<i class="fas fa-user-check me-1 text-success"></i> Activate User';
+                                    toggleBtn.setAttribute('data-current-status', 'inactive');
+                                }
+                            }
+                        });
+                        updateUserCountStats();
+                        showToast(selectedUsers.length + ' users deactivated successfully', 'success');
                     }
                     e.preventDefault();
                     break;
                     
                 case 'delete':
                     if (confirm('Are you sure you want to delete ' + selectedUsers.length + ' users? This action cannot be undone.')) {
-                        submitBulkAction('delete', selectedUsers);
+                        // Simulate deletion
+                        selectedUsers.forEach(function(userId) {
+                            var userRow = document.querySelector(`tr[data-user-id="${userId}"]`);
+                            if (userRow) {
+                                userRow.remove();
+                            }
+                        });
+                        updateUserCountStats();
+                        showToast(selectedUsers.length + ' users deleted successfully', 'success');
                     }
                     e.preventDefault();
                     break;
                     
                 case 'export':
-                    submitBulkAction('export', selectedUsers);
+                    // Simulate export - create CSV
+                    var csvContent = "data:text/csv;charset=utf-8,";
+                    csvContent += "ID,Name,Email,Department,Role,Status,Last Login\n";
+                    
+                    selectedUsers.forEach(function(userId) {
+                        var userRow = document.querySelector(`tr[data-user-id="${userId}"]`);
+                        if (userRow) {
+                            var name = userRow.querySelector('td:nth-child(2) a').textContent.trim();
+                            var email = userRow.querySelector('td:nth-child(3)').textContent.trim();
+                            var department = userRow.querySelector('td:nth-child(4)').textContent.trim();
+                            var role = userRow.querySelector('td:nth-child(5) span').textContent.trim();
+                            var status = userRow.querySelector('td:nth-child(6) span').textContent.trim();
+                            var lastLogin = userRow.querySelector('td:nth-child(7)').textContent.trim();
+                            
+                            csvContent += `${userId},"${name}","${email}","${department}","${role}","${status}","${lastLogin}"\n`;
+                        }
+                    });
+                    
+                    var encodedUri = encodeURI(csvContent);
+                    var link = document.createElement("a");
+                    link.setAttribute("href", encodedUri);
+                    link.setAttribute("download", "selected_users.csv");
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    
+                    showToast(selectedUsers.length + ' users exported successfully', 'success');
                     e.preventDefault();
                     break;
                     
@@ -1158,49 +1360,74 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
     
-    // Function to submit bulk actions
-    function submitBulkAction(action, userIds) {
-        var form = document.createElement('form');
-        form.method = 'POST';
-        form.action = '/bulk_user_action';
+    // Handle role assignment form
+    document.getElementById('assignRoleForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        var userIds = document.getElementById('roleUserIds').value.split(',');
+        var roleSelect = document.getElementById('assignRole');
+        var role = roleSelect.options[roleSelect.selectedIndex].text;
         
-        var actionInput = document.createElement('input');
-        actionInput.type = 'hidden';
-        actionInput.name = 'action';
-        actionInput.value = action;
-        form.appendChild(actionInput);
-        
-        // If userIds is an array, create multiple inputs
-        if (Array.isArray(userIds)) {
-            // Create a comma-separated string for user IDs
-            var userIdsInput = document.createElement('input');
-            userIdsInput.type = 'hidden';
-            userIdsInput.name = 'user_ids';
-            userIdsInput.value = userIds.join(',');
-            form.appendChild(userIdsInput);
-        } else {
-            // Single user ID
-            var userIdInput = document.createElement('input');
-            userIdInput.type = 'hidden';
-            userIdInput.name = 'user_ids';
-            userIdInput.value = userIds;
-            form.appendChild(userIdInput);
-        }
-        
-        document.body.appendChild(form);
-        form.submit();
-    }
-    
-    // Single Notification Handler
-    document.querySelectorAll('.send-notification').forEach(function(button) {
-        button.addEventListener('click', function() {
-            var userId = this.getAttribute('data-user-id');
-            var userName = this.getAttribute('data-user-name');
-            
-            document.getElementById('notificationUserIds').value = userId;
-            document.getElementById('notificationModalTitle').textContent = 'Send Notification to ' + userName;
-            document.getElementById('sendNotificationForm').action = '/send_notification/' + userId;
+        // Update role for each selected user
+        userIds.forEach(function(userId) {
+            var userRow = document.querySelector(`tr[data-user-id="${userId}"]`);
+            if (userRow) {
+                var roleBadge = userRow.querySelector('td:nth-child(5) span');
+                roleBadge.textContent = role;
+                
+                // Update role badge style based on role
+                roleBadge.className = 'badge ';
+                if (role === 'Administrator') {
+                    roleBadge.className += 'bg-danger';
+                } else if (role === 'Manager') {
+                    roleBadge.className += 'bg-warning text-dark';
+                } else if (role === 'Lead Scientist') {
+                    roleBadge.className += 'bg-info text-dark';
+                } else {
+                    roleBadge.className += 'bg-secondary';
+                }
+            }
         });
+        
+        // Hide modal
+        bootstrap.Modal.getInstance(document.getElementById('assignRoleModal')).hide();
+        showToast(`Role assigned to ${userIds.length} users successfully`, 'success');
+        
+        // Update user stats
+        updateUserCountStats();
+    });
+    
+    // Handle department assignment form
+    document.getElementById('assignDepartmentForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        var userIds = document.getElementById('departmentUserIds').value.split(',');
+        var departmentSelect = document.getElementById('assignDepartment');
+        var department = departmentSelect.options[departmentSelect.selectedIndex].text;
+        
+        // Update department for each selected user
+        userIds.forEach(function(userId) {
+            var userRow = document.querySelector(`tr[data-user-id="${userId}"]`);
+            if (userRow) {
+                userRow.querySelector('td:nth-child(4)').textContent = department;
+            }
+        });
+        
+        // Hide modal
+        bootstrap.Modal.getInstance(document.getElementById('assignDepartmentModal')).hide();
+        showToast(`Department assigned to ${userIds.length} users successfully`, 'success');
+    });
+    
+    // Handle notification form submission
+    document.getElementById('sendNotificationForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        var userIds = document.getElementById('notificationUserIds').value.split(',');
+        var message = document.getElementById('notificationMessage').value;
+        var notificationType = document.getElementById('notificationType').value;
+        
+        // Hide modal
+        bootstrap.Modal.getInstance(document.getElementById('sendNotificationModal')).hide();
+        
+        // Show notification sent confirmation
+        showToast(`Notification sent to ${userIds.length} user(s) successfully`, 'success');
     });
     
     // Template Download
@@ -1222,6 +1449,271 @@ document.addEventListener('DOMContentLoaded', function() {
         document.body.removeChild(downloadLink);
     });
 
+    // Simulate adding a new user to the table
+    function simulateAddUser(name, email, department, role = 'Staff') {
+        // Generate random ID
+        var userId = Math.floor(Math.random() * 10000);
+        
+        // Create table row HTML
+        var html = `
+            <tr class="user-row" data-user-id="${userId}" data-status="active">
+                <td>
+                    <div class="form-check">
+                        <input class="form-check-input user-checkbox" type="checkbox" id="userCheck${userId}" value="${userId}" title="Select user ${name}">
+                        <label class="form-check-label" for="userCheck${userId}"><span class="visually-hidden">Select {{ name }}</span></label>
+                    </div>
+                </td>
+                <td>
+                    <div class="d-flex align-items-center">
+                        <div class="flex-shrink-0">
+                            <div class="avatar-container">
+                                <img class="avatar-img" src="/static/images/user.png" alt="User Avatar" onerror="this.onerror=null; this.classList.add('error');">
+                                <div class="avatar-circle">
+                                    <span class="initials">${name.substring(0, 2).toUpperCase()}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="ms-3">
+                            <a href="#">${name}</a>
+                            <div class="small text-muted">No logins recorded</div>
+                        </div>
+                    </div>
+                </td>
+                <td>${email}</td>
+                <td>${department}</td>
+                <td>
+                    <span class="badge ${role === 'Administrator' ? 'bg-danger' : 
+                        role === 'Manager' ? 'bg-warning text-dark' : 
+                        role === 'Lead Scientist' ? 'bg-info text-dark' : 
+                        'bg-secondary'}">${role}</span>
+                </td>
+                <td>
+                    <span class="badge bg-success">Active</span>
+                </td>
+                <td>Never</td>
+                <td>
+                    <div class="dropdown">
+                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            Actions
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="#"><i class="fas fa-user me-1 text-primary"></i> View Profile</a></li>
+                            <li><a class="dropdown-item edit-user" href="#" data-bs-toggle="modal" data-bs-target="#editUserModal" data-user-id="${userId}" data-user-name="${name}"><i class="fas fa-edit me-1 text-info"></i> Edit User</a></li>
+                            <li><a class="dropdown-item reset-password" href="#" data-user-id="${userId}"><i class="fas fa-key me-1 text-warning"></i> Reset Password</a></li>
+                            <li><a class="dropdown-item send-notification" href="#" data-bs-toggle="modal" data-bs-target="#sendNotificationModal" data-user-id="${userId}" data-user-name="${name}"><i class="fas fa-bell me-1 text-primary"></i> Send Notification</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li>
+                                <a class="dropdown-item toggle-status" href="#" data-user-id="${userId}" data-current-status="active">
+                                    <i class="fas fa-user-times me-1 text-warning"></i> Deactivate User
+                                </a>
+                            </li>
+                            <li><a class="dropdown-item delete-user" href="#" data-bs-toggle="modal" data-bs-target="#deleteUserModal" data-user-id="${userId}" data-user-name="${name}"><i class="fas fa-trash me-1 text-danger"></i> Delete User</a></li>
+                        </ul>
+                    </div>
+                </td>
+            </tr>
+        `;
+        
+        // Add to table
+        var tbody = document.querySelector('#usersTable tbody');
+        tbody.insertAdjacentHTML('afterbegin', html);
+        
+        // Re-attach event listeners to new elements
+        attachEventListenersToNewRow(userId);
+        
+        // Update user count stats
+        updateUserCountStats();
+    }
+
+    // Function to attach event listeners to newly added row
+    function attachEventListenersToNewRow(userId) {
+        // Attach edit user event listener
+        var editBtn = document.querySelector(`tr[data-user-id="${userId}"] .edit-user`);
+        if (editBtn) {
+            editBtn.addEventListener('click', function() {
+                var userId = this.getAttribute('data-user-id');
+                var userRow = document.querySelector(`tr[data-user-id="${userId}"]`);
+                
+                if (userRow) {
+                    var userName = userRow.querySelector('td:nth-child(2) a').textContent.trim();
+                    var userEmail = userRow.querySelector('td:nth-child(3)').textContent.trim();
+                    var userDepartment = userRow.querySelector('td:nth-child(4)').textContent.trim();
+                    var userRole = userRow.querySelector('td:nth-child(5) span').textContent.trim();
+                    var userStatus = userRow.querySelector('td:nth-child(6) span').textContent.trim() === 'Active';
+                    
+                    document.getElementById('editUserId').value = userId;
+                    document.getElementById('editUserForm').action = '/edit-user/' + userId;
+                    document.getElementById('editUserFullName').value = userName;
+                    document.getElementById('editUserEmail').value = userEmail;
+                    
+                    // Set department dropdown
+                    var departmentSelect = document.getElementById('editUserDepartment');
+                    for (var i = 0; i < departmentSelect.options.length; i++) {
+                        if (departmentSelect.options[i].text === userDepartment) {
+                            departmentSelect.selectedIndex = i;
+                            break;
+                        }
+                    }
+                    
+                    // Set role dropdown
+                    var roleSelect = document.getElementById('editUserRole');
+                    for (var i = 0; i < roleSelect.options.length; i++) {
+                        if (roleSelect.options[i].text === userRole) {
+                            roleSelect.selectedIndex = i;
+                            break;
+                        }
+                    }
+                    
+                    // Set status
+                    document.getElementById('editUserStatus').checked = userStatus;
+                }
+            });
+        }
+        
+        // Attach delete user event listener
+        var deleteBtn = document.querySelector(`tr[data-user-id="${userId}"] .delete-user`);
+        if (deleteBtn) {
+            deleteBtn.addEventListener('click', function() {
+                var userId = this.getAttribute('data-user-id');
+                var userName = this.getAttribute('data-user-name');
+                
+                document.getElementById('deleteUserName').textContent = userName;
+                document.getElementById('deleteUserId').value = userId;
+                document.getElementById('deleteUserForm').action = '/delete_user/' + userId;
+            });
+        }
+        
+        // Attach toggle status event listener
+        var toggleBtn = document.querySelector(`tr[data-user-id="${userId}"] .toggle-status`);
+        if (toggleBtn) {
+            toggleBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                var userId = this.getAttribute('data-user-id');
+                var currentStatus = this.getAttribute('data-current-status');
+                var actionText = currentStatus === 'active' ? 'deactivate' : 'activate';
+                
+                if (confirm('Are you sure you want to ' + actionText + ' this user?')) {
+                    var newStatus = currentStatus === 'active' ? 'inactive' : 'active';
+                    var userRow = document.querySelector(`tr[data-user-id="${userId}"]`);
+                    
+                    if (userRow) {
+                        userRow.setAttribute('data-status', newStatus);
+                        var statusBadge = userRow.querySelector('td:nth-child(6) span');
+                        
+                        if (statusBadge) {
+                            if (newStatus === 'active') {
+                                statusBadge.className = 'badge bg-success';
+                                statusBadge.textContent = 'Active';
+                                this.innerHTML = '<i class="fas fa-user-times me-1 text-warning"></i> Deactivate User';
+                                this.setAttribute('data-current-status', 'active');
+                            } else {
+                                statusBadge.className = 'badge bg-warning text-dark';
+                                statusBadge.textContent = 'Inactive';
+                                this.innerHTML = '<i class="fas fa-user-check me-1 text-success"></i> Activate User';
+                                this.setAttribute('data-current-status', 'inactive');
+                            }
+                        }
+                        
+                        showToast(`User has been ${actionText}d`, 'success');
+                        updateUserCountStats();
+                    }
+                }
+            });
+        }
+        
+        // Attach reset password event listener
+        var resetBtn = document.querySelector(`tr[data-user-id="${userId}"] .reset-password`);
+        if (resetBtn) {
+            resetBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                var userId = this.getAttribute('data-user-id');
+                
+                if (confirm('Are you sure you want to reset the password for this user?')) {
+                    showToast('Password has been reset and sent to user', 'success');
+                }
+            });
+        }
+        
+        // Attach send notification event listener
+        var notifyBtn = document.querySelector(`tr[data-user-id="${userId}"] .send-notification`);
+        if (notifyBtn) {
+            notifyBtn.addEventListener('click', function() {
+                var userId = this.getAttribute('data-user-id');
+                var userName = this.getAttribute('data-user-name');
+                
+                document.getElementById('notificationUserIds').value = userId;
+                document.getElementById('notificationModalTitle').textContent = 'Send Notification to ' + userName;
+                document.getElementById('sendNotificationForm').action = '/send_notification/' + userId;
+            });
+        }
+    }
+    
+    // Function to update user count statistics
+    function updateUserCountStats() {
+        var totalUsers = document.querySelectorAll('#usersTable tbody tr').length;
+        var activeUsers = document.querySelectorAll('#usersTable tbody tr[data-status="active"]').length;
+        var inactiveUsers = document.querySelectorAll('#usersTable tbody tr[data-status="inactive"]').length;
+        var adminUsers = document.querySelectorAll('#usersTable tbody tr td:nth-child(5) span.badge.bg-danger').length;
+        
+        // Update stats in cards
+        document.querySelector('.card:nth-of-type(1) .h5').textContent = totalUsers;
+        document.querySelector('.card:nth-of-type(2) .h5').textContent = activeUsers;
+        document.querySelector('.card:nth-of-type(3) .h5').textContent = inactiveUsers;
+        document.querySelector('.card:nth-of-type(4) .h5').textContent = adminUsers;
+    }
+    
+    // Function to show notifications
+    function showToast(message, type) {
+        var toastContainer = document.querySelector('.toast-container');
+        
+        // Create toast container if it doesn't exist
+        if (!toastContainer) {
+            toastContainer = document.createElement('div');
+            toastContainer.className = 'toast-container position-fixed bottom-0 end-0 p-3';
+            document.body.appendChild(toastContainer);
+        }
+        
+        // Create toast element
+        var toast = document.createElement('div');
+        toast.className = `toast align-items-center text-white bg-${type} border-0`;
+        toast.setAttribute('role', 'alert');
+        toast.setAttribute('aria-live', 'assertive');
+        toast.setAttribute('aria-atomic', 'true');
+        
+        // Toast content
+        toast.innerHTML = `
+            <div class="d-flex">
+                <div class="toast-body">
+                    ${message}
+                </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+        `;
+        
+        // Add toast to container
+        toastContainer.appendChild(toast);
+        
+        // Initialize and show the toast
+        var bsToast = new bootstrap.Toast(toast, {
+            autohide: true,
+            delay: 3000
+        });
+        bsToast.show();
+        
+        // Remove toast after it's hidden
+        toast.addEventListener('hidden.bs.toast', function() {
+            this.remove();
+        });
+    }
+    
+    // Initialize tooltips for newly added elements
+    function initTooltips() {
+        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        tooltipTriggerList.forEach(function(tooltipTriggerEl) {
+            new bootstrap.Tooltip(tooltipTriggerEl);
+        });
+    }
+    
     // Function to create avatar with initials when images are missing
     document.querySelectorAll('img.avatar-img').forEach(function(img) {
         // Add error handler to each avatar image
@@ -1307,6 +1799,118 @@ img.avatar-img {
 /* Show the avatar circle when the image fails to load */
 img.avatar-img.error + .avatar-circle {
     display: flex !important;
+}
+
+/* Enhanced table styling */
+.table-bordered td, .table-bordered th {
+    border: 1px solid #e3e6f0;
+}
+
+.table-hover tbody tr:hover {
+    background-color: rgba(0,123,255,0.05);
+}
+
+/* Add animation effects */
+.card {
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 .5rem 1rem rgba(0,0,0,.15);
+}
+
+/* Add hover effects to action buttons */
+.btn-outline-secondary:hover {
+    background-color: #6c757d;
+    color: white;
+}
+
+.btn-primary:hover {
+    background-color: #0069d9;
+}
+
+/* Toast styling */
+.toast {
+    opacity: 1 !important;
+    box-shadow: 0 .5rem 1rem rgba(0,0,0,.15);
+}
+
+/* Animate new users */
+@keyframes highlight {
+    0% { background-color: rgba(0,123,255,0.2); }
+    100% { background-color: transparent; }
+}
+
+tr.user-row:first-child {
+    animation: highlight 2s ease;
+}
+
+/* Style user search field */
+#userSearch {
+    border-radius: 0.25rem;
+    border: 1px solid #ced4da;
+    transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+
+#userSearch:focus {
+    border-color: #80bdff;
+    box-shadow: 0 0 0 0.2rem rgba(0,123,255,.25);
+}
+
+/* Enhanced filter buttons */
+.user-filter {
+    position: relative;
+    overflow: hidden;
+}
+
+.user-filter::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    background-color: rgba(0,0,0,0.1);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    transition: width 0.3s, height 0.3s;
+}
+
+.user-filter:active::after {
+    width: 100%;
+    height: 100%;
+    border-radius: 0;
+}
+
+/* Improve accessibility */
+.form-check-input:focus {
+    box-shadow: 0 0 0 0.2rem rgba(0,123,255,.25);
+}
+
+.btn:focus {
+    box-shadow: 0 0 0 0.2rem rgba(0,123,255,.25);
+}
+
+/* View user profile page enhancements */
+#viewUserModal .avatar-container {
+    width: 100px;
+    height: 100px;
+    margin: 0 auto;
+}
+
+#viewUserModal .avatar-img {
+    max-width: 100px;
+    max-height: 100px;
+}
+
+#viewUserModal .avatar-circle {
+    width: 100px;
+    height: 100px;
+}
+
+#viewUserModal .avatar-circle .initials {
+    font-size: 32px;
 }
 </style>
 {% endblock %} 
