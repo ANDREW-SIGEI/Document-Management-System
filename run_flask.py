@@ -11,8 +11,8 @@ logging.basicConfig(
 )
 
 try:
-    from debug_app import app
-    print("Successfully imported app from debug_app.py")
+    from app import app
+    print("Successfully imported app from app.py")
     logging.info("Starting KEMRI Laboratory System application in production mode")
     app.run(debug=False, host='0.0.0.0', port=5001)
 except Exception as e:
