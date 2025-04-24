@@ -1,77 +1,154 @@
 {% extends "base.html" %}
 
-{% block title %}Login - KEMRI File Management System{% endblock %}
+{% block title %}Login - KEMRI Laboratory System{% endblock %}
 
 {% block styles %}
     <style>
         .login-container {
             max-width: 450px;
-        margin: 80px auto;
-        padding: 30px;
-        background-color: #fff;
-        border-radius: 10px;
-        box-shadow: 0 0 20px rgba(0,0,0,0.1);
-    }
-    
-    .login-logo {
-        text-align: center;
-        margin-bottom: 25px;
-    }
-    
-    .login-logo img {
-        max-width: 200px;
-        height: auto;
-    }
-    
-    .auth-form-header {
-        text-align: center;
-        margin-bottom: 25px;
-    }
-    
-    .auth-form-header h3 {
-        color: #3d5170;
-        font-weight: 600;
-    }
-    
-    .form-floating {
-        margin-bottom: 20px;
-    }
-    
-    .btn-login {
-        background-color: #2c7be5;
-        border-color: #2c7be5;
+            margin: 80px auto;
+            padding: 35px;
+            background-color: #fff;
+            border-radius: 12px;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.12);
+            transition: all 0.3s ease;
+        }
+        
+        .login-container:hover {
+            box-shadow: 0 12px 40px rgba(0,0,0,0.15);
+        }
+        
+        .login-logo {
+            text-align: center;
+            margin-bottom: 25px;
+        }
+        
+        .login-logo img {
+            max-width: 180px;
+            height: auto;
+            animation: pulse 2s infinite ease-in-out;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        
+        .auth-form-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .auth-form-header h3 {
+            color: #2c3e50;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+        
+        .form-floating {
+            margin-bottom: 20px;
+        }
+        
+        .form-control:focus {
+            border-color: #3498db;
+            box-shadow: 0 0 0 0.25rem rgba(52, 152, 219, 0.25);
+        }
+        
+        .btn-login {
+            background: linear-gradient(135deg, #3498db, #2980b9);
+            border: none;
             width: 100%;
-        padding: 12px;
-        font-weight: 500;
-        margin-top: 10px;
-    }
-    
-    .btn-login:hover {
-        background-color: #1a68d1;
-        border-color: #1a68d1;
-    }
-    
-    .password-toggle {
-        position: absolute;
-        right: 10px;
-        top: 50%;
-        transform: translateY(-50%);
-        cursor: pointer;
-        color: #6c757d;
-        z-index: 10;
-    }
-    
-    .alerts-container {
-        margin-bottom: 20px;
-    }
-    
-    .form-check {
-        margin-bottom: 15px;
-    }
-    
-    .forgot-password {
-        text-align: right;
-        font-size: 0.9rem;
+            padding: 12px;
+            font-weight: 500;
+            margin-top: 15px;
+            border-radius: 6px;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-login:hover {
+            background: linear-gradient(135deg, #2980b9, #3498db);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(41, 128, 185, 0.35);
+        }
+        
+        .password-toggle {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            cursor: pointer;
+            color: #6c757d;
+            z-index: 10;
+            transition: color 0.2s ease;
+        }
+        
+        .password-toggle:hover {
+            color: #3498db;
+        }
+        
+        .alerts-container {
+            margin-bottom: 20px;
+        }
+        
+        .form-check {
+            margin-bottom: 15px;
+        }
+        
+        .forgot-password {
+            text-align: right;
+            font-size: 0.9rem;
+        }
+        
+        .forgot-password a {
+            color: #3498db;
+            transition: color 0.2s ease;
+            text-decoration: none;
+        }
+        
+        .forgot-password a:hover {
+            color: #2980b9;
+            text-decoration: underline;
+        }
+        
+        .input-validation-icon {
+            position: absolute;
+            right: 40px;
+            top: 50%;
+            transform: translateY(-50%);
+            display: none;
+        }
+        
+        .is-valid ~ .input-validation-icon.valid-icon {
+            display: block;
+            color: #2ecc71;
+        }
+        
+        .is-invalid ~ .input-validation-icon.invalid-icon {
+            display: block;
+            color: #e74c3c;
+        }
+        
+        .alert {
+            border-radius: 8px;
+            border-left: 4px solid;
+        }
+        
+        .alert-danger {
+            border-left-color: #e74c3c;
+            background-color: rgba(231, 76, 60, 0.1);
+        }
+        
+        .alert-success {
+            border-left-color: #2ecc71;
+            background-color: rgba(46, 204, 113, 0.1);
+        }
+        
+        .footer-text {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 0.8rem;
+            color: #7f8c8d;
         }
     </style>
 {% endblock %}
@@ -79,49 +156,56 @@
 {% block content %}
 <div class="container">
     <div class="login-container">
+        <div class="login-logo">
+            <img src="{{ url_for('static', filename='images/kemrilogo.png') }}" alt="KEMRI Logo">
+        </div>
+        
         <div class="auth-form-header">
-            <h2 class="mb-3">KEMRI Laboratory System</h2>
-            <p class="text-muted">Please sign in to continue</p>
-            </div>
+            <h3 class="mb-2">Document Management System</h3>
+            <p class="text-muted">Sign in to your account</p>
+        </div>
         
         <div class="alerts-container">
-                {% with messages = get_flashed_messages(with_categories=true) %}
-                    {% if messages %}
-                        {% for category, message in messages %}
-                        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-                            {{ message }}
-                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                        </div>
-                        {% endfor %}
-                    {% endif %}
-                {% endwith %}
-                
-            <!-- Demo Credentials Notice -->
-            <div class="alert alert-info" role="alert">
-                <strong>Demo Login:</strong> Use username: "admin" or email: "admin@example.com" with password: "password"
-            </div>
-            
-            <!-- New User Login Instructions -->
-            <div class="alert alert-warning" role="alert">
-                <strong>New Users:</strong> You can log in with either your full name or email address. Use the same password you entered during registration.
-                        </div>
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                    <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                        <i class="fa fa-{% if category == 'danger' %}exclamation-triangle{% else %}info-circle{% endif %} me-2"></i>
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                     </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+        </div>
         
         <form method="POST" action="{{ url_for('login') }}" id="loginForm" class="needs-validation" novalidate>
-            <div class="form-floating mb-3">
-                <input type="text" class="form-control form-control-lg" id="username" name="username" placeholder="Username or Email" required>
+            <div class="form-floating mb-3 position-relative">
+                <input type="text" class="form-control" id="username" name="username" placeholder="Username or Email" required>
                 <label for="username">Username or Email</label>
+                <div class="input-validation-icon valid-icon">
+                    <i class="fa fa-check-circle"></i>
+                </div>
+                <div class="input-validation-icon invalid-icon">
+                    <i class="fa fa-times-circle"></i>
+                </div>
                 <div class="invalid-feedback">Please enter your username or email</div>
-                        </div>
+            </div>
             
             <div class="form-floating position-relative mb-3">
-                <input type="password" class="form-control form-control-lg" id="password" name="password" placeholder="Password" required>
+                <input type="password" class="form-control" id="password" name="password" placeholder="Password" required>
                 <label for="password">Password</label>
                 <span class="password-toggle" onclick="togglePasswordVisibility()">
                     <i class="fa fa-eye" id="togglePassword"></i>
                 </span>
+                <div class="input-validation-icon valid-icon">
+                    <i class="fa fa-check-circle"></i>
+                </div>
+                <div class="input-validation-icon invalid-icon">
+                    <i class="fa fa-times-circle"></i>
+                </div>
                 <div class="invalid-feedback">Please enter your password</div>
-                    </div>
+            </div>
             
             <div class="row mb-3">
                 <div class="col-6">
@@ -137,8 +221,14 @@
                 </div>
             </div>
             
-            <button type="submit" class="btn btn-primary btn-login">Sign In</button>
+            <button type="submit" class="btn btn-primary btn-login">
+                <i class="fa fa-sign-in-alt me-2"></i>Sign In
+            </button>
         </form>
+        
+        <div class="footer-text mt-4">
+            &copy; {{ now().strftime('%Y') }} KEMRI Laboratory System. All rights reserved.
+        </div>
     </div>
 </div>
 
@@ -151,19 +241,20 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <form id="resetPasswordForm" method="POST" action="{{ url_for('login') }}">
-                    <input type="hidden" name="action" value="reset_password">
+                <form id="resetPasswordForm">
                     <div class="mb-3">
                         <label for="resetEmail" class="form-label">Email address</label>
                         <input type="email" class="form-control" id="resetEmail" name="email" required>
-                        <div class="form-text">Enter your email address and we'll send you instructions to reset your password.</div>
+                        <div class="form-text">Enter your email address to receive password reset instructions.</div>
                     </div>
                     <div id="resetErrorMessages" class="alert alert-danger d-none"></div>
                 </form>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" id="submitResetRequest">Send Reset Link</button>
+                <button type="button" class="btn btn-primary" id="submitResetRequest">
+                    <i class="fa fa-paper-plane me-1"></i> Send Reset Link
+                </button>
             </div>
         </div>
     </div>
@@ -188,73 +279,75 @@
         }
     }
     
-    // Handle password reset request
+    // Live form validation
     document.addEventListener('DOMContentLoaded', function() {
-        const resetForm = document.getElementById('resetPasswordForm');
-        const submitButton = document.getElementById('submitResetRequest');
-        const errorContainer = document.getElementById('resetErrorMessages');
+        const usernameInput = document.getElementById('username');
+        const passwordInput = document.getElementById('password');
+        const submitButton = document.querySelector('.btn-login');
         
-        submitButton.addEventListener('click', function() {
-            // Validate form
-            if (!resetForm.checkValidity()) {
-                resetForm.reportValidity();
+        function validateForm() {
+            let valid = true;
+            
+            if (!usernameInput.value.trim()) {
+                usernameInput.classList.add('is-invalid');
+                usernameInput.classList.remove('is-valid');
+                valid = false;
+            } else {
+                usernameInput.classList.remove('is-invalid');
+                usernameInput.classList.add('is-valid');
+            }
+            
+            if (!passwordInput.value.trim()) {
+                passwordInput.classList.add('is-invalid');
+                passwordInput.classList.remove('is-valid');
+                valid = false;
+            } else {
+                passwordInput.classList.remove('is-invalid');
+                passwordInput.classList.add('is-valid');
+            }
+            
+            submitButton.disabled = !valid;
+            return valid;
+        }
+        
+        // Add input event listeners for real-time validation
+        usernameInput.addEventListener('input', validateForm);
+        passwordInput.addEventListener('input', validateForm);
+        
+        // Form validation on submit
+        document.getElementById('loginForm').addEventListener('submit', function(event) {
+            if (!validateForm()) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+        });
+        
+        // Submit reset password form
+        document.getElementById('submitResetRequest').addEventListener('click', function() {
+            const email = document.getElementById('resetEmail').value;
+            
+            if (!email) {
+                const errorMessage = document.getElementById('resetErrorMessages');
+                errorMessage.textContent = 'Please enter your email address';
+                errorMessage.classList.remove('d-none');
                 return;
             }
             
-            // Prepare form data
-            const formData = new FormData(resetForm);
+            // Close the modal
+            const modal = bootstrap.Modal.getInstance(document.getElementById('resetPasswordModal'));
+            modal.hide();
             
-            // Submit form via AJAX
-            fetch(resetForm.action, {
-                method: 'POST',
-                body: formData,
-                headers: {
-                    'X-Requested-With': 'XMLHttpRequest'
-                }
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    // Close modal and show success message
-                    const modal = bootstrap.Modal.getInstance(document.getElementById('resetPasswordModal'));
-                    modal.hide();
-                    
-                    // Show success message
-                    const alertsContainer = document.querySelector('.alerts-container');
-                    const alertDiv = document.createElement('div');
-                    alertDiv.className = 'alert alert-success alert-dismissible fade show';
-                    alertDiv.setAttribute('role', 'alert');
-                    alertDiv.innerHTML = `
-                        ${data.message}
-                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                    `;
-                    alertsContainer.appendChild(alertDiv);
-                } else {
-                    // Show error message
-                    showErrorMessage(data.message);
-                }
-            })
-            .catch(error => {
-                showErrorMessage('An error occurred. Please try again later.');
-                console.error('Error:', error);
-            });
-        });
-        
-        function showErrorMessage(message) {
-            errorContainer.textContent = message;
-            errorContainer.classList.remove('d-none');
-        }
-        
-        function clearErrorMessage() {
-            errorContainer.textContent = '';
-            errorContainer.classList.add('d-none');
-        }
-        
-        // Clear error messages when modal is closed
-        const resetModal = document.getElementById('resetPasswordModal');
-        resetModal.addEventListener('hidden.bs.modal', function() {
-            clearErrorMessage();
-            resetForm.reset();
+            // Show success message
+            const alertsContainer = document.querySelector('.alerts-container');
+            const alertDiv = document.createElement('div');
+            alertDiv.className = 'alert alert-info alert-dismissible fade show';
+            alertDiv.setAttribute('role', 'alert');
+            alertDiv.innerHTML = `
+                <i class="fa fa-info-circle me-2"></i>
+                Password reset instructions sent to ${email}. Please check your email.
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            `;
+            alertsContainer.appendChild(alertDiv);
         });
     });
 </script>

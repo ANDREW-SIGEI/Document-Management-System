@@ -75,10 +75,10 @@
                             <p class="mb-3 fw-bold">{{ document.code }}</p>
                             
                             <p class="mb-1 small text-muted">Date of Letter</p>
-                            <p class="mb-3">{{ document.date_of_letter.strftime('%d %b %Y') }}</p>
+                            <p class="mb-3">{{ document.date_of_letter }}</p>
                             
                             <p class="mb-1 small text-muted">Date Received</p>
-                            <p class="mb-0">{{ document.date_received.strftime('%d %b %Y') }}</p>
+                            <p class="mb-0">{{ document.date_received }}</p>
                         </div>
                         <div class="col-md-6">
                             <p class="mb-1 small text-muted">Sender</p>
@@ -117,7 +117,7 @@
                         <div class="list-group-item">
                             <div class="d-flex justify-content-between align-items-center">
                                 <h6 class="mb-1">{{ entry.action }}</h6>
-                                <small class="text-muted">{{ entry.timestamp.strftime('%d %b %Y, %H:%M') }}</small>
+                                <small class="text-muted">{{ entry.timestamp }}</small>
                             </div>
                             <p class="mb-1">{{ entry.details }}</p>
                             <small class="text-muted">By {{ entry.user }}</small>
@@ -140,7 +140,7 @@
                             <div class="timeline-marker bg-success"></div>
                             <div class="timeline-content">
                                 <h6 class="mb-1">Document Created</h6>
-                                <p class="mb-0 small text-muted">{{ document.created_at.strftime('%d %b %Y, %H:%M') }}</p>
+                                <p class="mb-0 small text-muted">{{ document.created_at_str }}</p>
                             </div>
                         </li>
                         
@@ -149,7 +149,7 @@
                             <div class="timeline-marker bg-warning"></div>
                             <div class="timeline-content">
                                 <h6 class="mb-1">Marked as {{ document.status }}</h6>
-                                <p class="mb-0 small text-muted">{{ document.updated_at.strftime('%d %b %Y, %H:%M') }}</p>
+                                <p class="mb-0 small text-muted">{{ document.updated_at_str }}</p>
                             </div>
                         </li>
                         {% endif %}
@@ -159,7 +159,7 @@
                             <div class="timeline-marker bg-danger"></div>
                             <div class="timeline-content">
                                 <h6 class="mb-1">Document Ended</h6>
-                                <p class="mb-0 small text-muted">{{ document.updated_at.strftime('%d %b %Y, %H:%M') }}</p>
+                                <p class="mb-0 small text-muted">{{ document.updated_at_str }}</p>
                             </div>
                         </li>
                         {% endif %}
@@ -181,14 +181,14 @@
                             {% for attachment in document.attachments %}
                             <div class="list-group-item d-flex justify-content-between align-items-center">
                                 <div>
-                                    <i class="fas fa-{% if attachment.file_type == 'pdf' %}file-pdf{% elif attachment.file_type in ['doc', 'docx'] %}file-word{% elif attachment.file_type in ['xls', 'xlsx'] %}file-excel{% elif attachment.file_type in ['jpg', 'jpeg', 'png'] %}file-image{% else %}file{% endif %} me-2 text-muted"></i>
-                                    <span>{{ attachment.original_filename }}</span>
+                                    <i class="fas fa-file me-2 text-muted"></i>
+                                    <span>{{ attachment.filename }}</span>
                                     <small class="text-muted ms-2">
-                                        ({{ attachment.file_size|filesizeformat }})
+                                        ({{ attachment.size }})
                                     </small>
                                 </div>
                                 <div>
-                                    <a href="{{ url_for('static', filename='uploads/' + attachment.filename) }}" class="btn btn-sm btn-outline-primary" target="_blank">
+                                    <a href="#" class="btn btn-sm btn-outline-primary">
                                         <i class="fas fa-download me-1"></i> Download
                                     </a>
                                 </div>
@@ -212,20 +212,20 @@
                 <div class="card-body">
                     {% if document.comments %}
                         <div class="comments-list mb-4">
-                            {% for comment in document.comments|sort(attribute='created_at', reverse=true) %}
+                            {% for comment in document.comments %}
                             <div class="comment-item mb-3">
                                 <div class="d-flex">
                                     <div class="comment-avatar me-3">
                                         <div class="avatar-circle">
-                                            {{ comment.user.username[:1] }}
+                                            {{ comment.user[:1] if comment.user else 'U' }}
                                         </div>
                                     </div>
                                     <div class="comment-content">
                                         <div class="d-flex justify-content-between">
-                                            <h6 class="mb-1">{{ comment.user.username }}</h6>
-                                            <small class="text-muted">{{ comment.created_at.strftime('%d %b %Y, %H:%M') }}</small>
+                                            <h6 class="mb-1">{{ comment.user }}</h6>
+                                            <small class="text-muted">{{ comment.timestamp }}</small>
                                         </div>
-                                        <p class="mb-0">{{ comment.comment }}</p>
+                                        <p class="mb-0">{{ comment.text }}</p>
                                     </div>
                                 </div>
                             </div>
@@ -235,7 +235,7 @@
                         <p class="text-muted text-center mb-4">No comments yet</p>
                     {% endif %}
                     
-                    <form action="{{ url_for('add_comment', doc_code=document.code) }}" method="post">
+                    <form action="{{ url_for('add_document_comment', document_code=document.code) }}" method="post">
                         <div class="mb-3">
                             <label for="comment" class="form-label">Add a comment</label>
                             <textarea class="form-control" id="comment" name="comment" rows="3" placeholder="Type your comment here..."></textarea>
@@ -256,7 +256,7 @@
 <div class="modal fade" id="addAttachmentModal" tabindex="-1" aria-labelledby="addAttachmentModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
-            <form action="{{ url_for('add_attachment', doc_code=document.code) }}" method="post" enctype="multipart/form-data">
+            <form action="{{ url_for('attach_related_document', document_code=document.code) }}" method="post" enctype="multipart/form-data">
                 <div class="modal-header">
                     <h5 class="modal-title" id="addAttachmentModalLabel">Add Attachment</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
