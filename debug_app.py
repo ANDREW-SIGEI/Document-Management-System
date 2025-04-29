@@ -6,6 +6,8 @@ from datetime import datetime, timedelta
 import json
 import random
 from werkzeug.utils import secure_filename
+from permissions import requires_permission, requires_role, requires_login, has_permission, can_access_menu, log_activity, check_session_valid
+import time
 
 app = Flask(__name__)
 app.secret_key = 'kemri_secret_key'  # Required for flash messages
@@ -75,17 +77,31 @@ def handle_file_upload(file, document_id=None):
     
     return file_info
 
-# Function to get human-readable file size
+# Function to convert bytes to human-readable size
 def get_human_readable_size(size_bytes):
-    """Convert file size in bytes to human-readable format"""
-    if size_bytes < 1024:
-        return f"{size_bytes} B"
-    elif size_bytes < 1024 * 1024:
-        return f"{size_bytes / 1024:.1f} KB"
-    elif size_bytes < 1024 * 1024 * 1024:
-        return f"{size_bytes / (1024 * 1024):.1f} MB"
-    else:
-        return f"{size_bytes / (1024 * 1024 * 1024):.1f} GB"
+    """
+    Convert a size in bytes to a human-readable string (KB, MB, GB).
+    
+    Args:
+        size_bytes: Size in bytes
+        
+    Returns:
+        str: Human-readable size string
+    """
+    if size_bytes is None or size_bytes == 0:
+        return "0B"
+    
+    try:
+        size_bytes = float(size_bytes)
+        size_names = ["B", "KB", "MB", "GB", "TB"]
+        i = 0
+        while size_bytes >= 1024 and i < len(size_names) - 1:
+            size_bytes /= 1024
+            i += 1
+        
+        return f"{size_bytes:.2f} {size_names[i]}"
+    except (TypeError, ValueError):
+        return "0B"
 
 # Custom Pagination class for templates that expect SQLAlchemy pagination
 class Pagination:
@@ -143,9 +159,10 @@ def has_endpoint(endpoint):
     except:
         return False
 
+# Add permissions functions to Jinja environment
 app.jinja_env.globals['has_endpoint'] = has_endpoint
-
-# Add now() function to Jinja environment
+app.jinja_env.globals['has_permission'] = has_permission
+app.jinja_env.globals['can_access_menu'] = can_access_menu
 app.jinja_env.globals['now'] = datetime.now
 
 # Database path
@@ -197,87 +214,104 @@ def login():
             session.clear()  # Ensure we start with a clean session
             session['user_id'] = user['id']
             session['username'] = user['username']
-            session['role'] = user['role'] 
-            flash('You have been logged in successfully!', 'success')
+            session['role'] = user['role']
+            # Use dictionary access with a default value if the column doesn't exist
+            session['department'] = user['department'] if 'department' in user.keys() else 'None'
+            session['email'] = user['email'] if 'email' in user.keys() else ''
+            session['last_activity'] = time.time()
+            
+            # Log login activity
+            log_activity(user['id'], 'login', {
+                'username': username,
+                'method': 'password',
+                'ip': request.remote_addr
+            })
+            
             return redirect(url_for('dashboard'))
         else:
-            flash('Invalid username or password', 'danger')
+            flash('Invalid username or password.', 'danger')
     
-    return render_template('login.html', current_year=2025)
+    return render_template('login.html')
 
 @app.route('/dashboard')
+@requires_login
 def dashboard():
-    if 'user_id' not in session:
+    """Main dashboard page"""
+    # If user is not logged in, redirect to login
+    if not check_session_valid():
         flash('Please log in to access the dashboard', 'warning')
         return redirect(url_for('login'))
     
-    # Get basic counts for dashboard
-    conn = get_db_connection()
+    # Log this access
+    log_activity(session.get('user_id'), 'view_dashboard', {'request': 'view'})
     
-    # Count users
-    user_count = conn.execute('SELECT COUNT(*) as count FROM user').fetchone()['count']
+    # Sample dashboard data
+    # In a real app, this would be fetched from the database
+    role = session.get('role', 'User')
+    is_admin = role == 'Administrator'
+    is_registry = role == 'Registry'
     
-    # Count documents by status
-    status_counts = {}
-    statuses = ['Incoming', 'Pending', 'Received', 'Outgoing', 'Ended']
-    for status in statuses:
-        count = conn.execute('SELECT COUNT(*) as count FROM document WHERE status = ?', 
-                            (status,)).fetchone()['count']
-        status_counts[status] = count
+    # Different stats based on role
+    if is_admin:
+        # Admin sees system-wide stats
+        stats = {
+            'total_documents': 127,
+            'pending_approval': 14,
+            'documents_today': 8,
+            'active_users': 18
+        }
+    elif is_registry:
+        # Registry staff see document processing stats
+        stats = {
+            'total_documents': 127,
+            'pending_approval': 14,
+            'to_be_processed': 6,
+            'processed_today': 12
+        }
+    else:
+        # Regular users see their own document stats
+        stats = {
+            'my_documents': 15,
+            'pending_approval': 3,
+            'completed': 8,
+            'drafts': 4
+        }
     
-    # Get recent logs
-    recent_logs = conn.execute('''
-        SELECT * FROM system_log ORDER BY timestamp DESC LIMIT 10
-    ''').fetchall()
+    # Recent activity for the dashboard
+    recent_activity = [
+        {'type': 'document', 'action': 'created', 'title': 'Research Proposal', 'time': '2 hours ago'},
+        {'type': 'document', 'action': 'approved', 'title': 'Budget Request', 'time': '4 hours ago'},
+        {'type': 'user', 'action': 'login', 'title': 'System Login', 'time': '5 hours ago'},
+        {'type': 'document', 'action': 'rejected', 'title': 'Equipment Request', 'time': '1 day ago'},
+        {'type': 'document', 'action': 'modified', 'title': 'Project Timeline', 'time': '2 days ago'}
+    ]
     
-    # Get urgent documents
-    urgent_docs = conn.execute('''
-        SELECT * FROM document 
-        WHERE priority = 'Urgent' 
-        ORDER BY created_at DESC LIMIT 5
-    ''').fetchall()
+    # Only show notifications relevant to user role
+    notifications = []
     
-    # Count total documents
-    total_documents = conn.execute('SELECT COUNT(*) as count FROM document').fetchone()['count']
+    if is_admin:
+        notifications.extend([
+            {'type': 'system', 'message': 'Database backup completed successfully', 'time': '1 hour ago'},
+            {'type': 'user', 'message': '2 new user registrations pending approval', 'time': '3 hours ago'}
+        ])
     
-    conn.close()
+    if is_admin or is_registry:
+        notifications.extend([
+            {'type': 'document', 'message': '14 documents awaiting registry approval', 'time': '2 hours ago'},
+            {'type': 'workflow', 'message': '3 workflows completed today', 'time': '4 hours ago'}
+        ])
     
-    # Add registry pending approvals for staff with registry role
-    # In a real app, check if user has registry role
-    is_registry_staff = session.get('role') in ['Registry', 'Administrator']
-    pending_registry_count = 7  # Simulated count for demo
+    # All users see these notifications
+    notifications.extend([
+        {'type': 'document', 'message': 'Your document "Budget Request" was approved', 'time': '5 hours ago'},
+        {'type': 'message', 'message': 'You have 3 unread messages', 'time': '1 day ago'}
+    ])
     
-    # Get pending registry documents (simple sample data)
-    registry_documents = []
-    if is_registry_staff:
-        for i in range(1, 4):
-            doc_date = datetime.now() - timedelta(days=i % 3)
-            tracking_code = f"KEMRI-{doc_date.strftime('%Y%m%d')}-{1000+i}"
-            
-            document = {
-                'id': i,
-                'tracking_code': tracking_code,
-                'title': f"Document {i} requiring approval",
-                'sender': f"Department {i % 5 + 1}",
-                'recipient': f"Recipient {i % 3 + 1}",
-                'date_submitted': doc_date.strftime('%Y-%m-%d %H:%M'),
-                'priority': ['Normal', 'Priority', 'Urgent'][i % 3],
-                'document_type': ['Letter', 'Report', 'Requisition'][i % 3],
-                'status': 'Pending Registry Approval'
-            }
-            registry_documents.append(document)
-    
-    return render_template(
-        'dashboard_new.html', 
-        status_counts=status_counts,
-        recent_logs=recent_logs,
-        urgent_docs=urgent_docs,
-        total_documents=total_documents,
-        total_users=user_count,
-        is_registry_staff=is_registry_staff,
-        pending_registry_count=pending_registry_count,
-        registry_documents=registry_documents
-    )
+    return render_template('dashboard.html', 
+                           stats=stats,
+                           recent_activity=recent_activity,
+                           notifications=notifications,
+                           user_role=role)
 
 @app.route('/logout')
 def logout():
@@ -286,32 +320,19 @@ def logout():
     return redirect(url_for('login'))
 
 @app.route('/user-management')
+@requires_permission('view_users')
 def user_management():
-    if 'user_id' not in session:
-        flash('Please log in to access user management', 'warning')
-        return redirect(url_for('login'))
-    
-    if session['role'] != 'Administrator':
-        flash('You do not have permission to access user management', 'danger')
-        return redirect(url_for('dashboard'))
+    """User management page"""
+    # Log this action
+    log_activity(session.get('user_id'), 'view_user_management', {'request': 'view'})
     
     conn = get_db_connection()
-    users = conn.execute('SELECT * FROM user').fetchall()
+    users = conn.execute('SELECT * FROM user ORDER BY username').fetchall()
     conn.close()
     
-    # Available roles for user creation
-    roles = ['Administrator', 'Registry', 'User', 'Supervisor']
-    
-    # Sample departments for user creation
-    departments = [
-        'Administration',
-        'Research',
-        'Laboratory',
-        'Finance',
-        'IT',
-        'Registry',
-        'Operations'
-    ]
+    # Sample roles and departments
+    roles = ['Administrator', 'Registry', 'Supervisor', 'User']
+    departments = ['Central Registry', 'IT', 'Finance', 'HR', 'Research', 'Laboratory']
     
     return render_template('user_management.html', 
                            users=users, 
@@ -335,62 +356,83 @@ def page_not_found(e):
     return redirect(url_for('dashboard'))
 
 @app.route('/track_document', methods=['GET', 'POST'])
+@requires_permission('track_document')
 def track_document():
-    if 'user_id' not in session:
-        flash('Please log in to access this page', 'warning')
-        return redirect(url_for('login'))
-
+    """Document tracking page with search functionality"""
+    # Log this action
+    log_activity(session.get('user_id'), 'view_track_document', {'request': 'view'})
+    
     search_results = None
     recent_documents = None
     error_message = None
-
+    
     if request.method == 'POST':
+        # Handle tracking code search
         tracking_code = request.form.get('tracking_code')
         if tracking_code:
-            # Dummy data for demonstration - replace with actual database query
-            search_results = [{
-                'tracking_code': tracking_code,
-                'title': 'Sample Document',
-                'sender': 'John Doe',
-                'recipient': 'Jane Smith',
-                'status': 'In Progress',
-                'date_created': datetime.now().strftime('%Y-%m-%d'),
-                'last_updated': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            }]
-    else:
-        # Handle GET request with search parameters
-        sender = request.args.get('sender', '')
-        recipient = request.args.get('recipient', '')
-        status = request.args.get('status', '')
-        date_range = request.args.get('date_range', 'all')
-
-        if any([sender, recipient, status, date_range != 'all']):
-            # Dummy search results - replace with actual database query
-            search_results = [{
-                'tracking_code': 'DOC123',
-                'title': 'Research Report',
-                'sender': sender or 'John Doe',
-                'recipient': recipient or 'Jane Smith',
-                'status': status or 'Pending',
-                'date_created': datetime.now().strftime('%Y-%m-%d'),
-                'last_updated': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            }]
-        else:
-            # Show recent documents on initial page load
-            recent_documents = [{
-                'tracking_code': f'DOC{i}',
-                'title': f'Document {i}',
-                'sender': f'Sender {i}',
+            # In a real app, search the database for this tracking code
+            # For demonstration, return a redirect to a details page with sample data
+            
+            # Simulate tracking code validation
+            if tracking_code.startswith('KMR-'):
+                # Valid tracking code format
+                return redirect(url_for('track_by_code', tracking_code=tracking_code))
+            else:
+                error_message = f"Invalid tracking code format: {tracking_code}. Please use format KMR-YYYY-XXX."
+                
+    elif request.method == 'GET':
+        # Handle advanced search by fields
+        if any(field in request.args for field in ['sender', 'recipient', 'status', 'date_range']):
+            sender = request.args.get('sender', '')
+            recipient = request.args.get('recipient', '')
+            status = request.args.get('status', '')
+            date_range = request.args.get('date_range', '')
+            
+            # In a real app, search the database using these parameters
+            # For demonstration, return sample results
+            search_results = [
+                {
+                    'tracking_code': 'KMR-2023-001',
+                    'title': 'Research Proposal: Malaria Prevention Study',
+                    'sender': 'Dr. Jane Smith',
+                    'recipient': 'Ethics Committee', 
+                    'status': 'Processing',
+                    'date_created': 'March 15, 2023',
+                    'priority': 'Priority'
+                },
+                {
+                    'tracking_code': 'KMR-2023-002',
+                    'title': 'Annual Budget Report 2023',
+                    'sender': 'Finance Department',
+                    'recipient': 'Board of Directors',
+                    'status': 'Awaiting Approval',
+                    'date_created': 'February 10, 2023',
+                    'priority': 'Urgent'
+                }
+            ]
+    
+    # For initial page load, show recent documents
+    if not search_results and not error_message:
+        # In a real app, get recent documents from database
+        # For demonstration, return sample data
+        recent_documents = []
+        for i in range(1, 6):
+            doc_date = datetime.now() - timedelta(days=i)
+            doc = {
+                'tracking_code': f'KMR-2023-00{i}',
+                'title': f'Sample Document {i}',
+                'sender': f'Department {i}',
                 'recipient': f'Recipient {i}',
-                'status': ['Pending', 'In Progress', 'Completed'][i % 3],
-                'date_created': (datetime.now() - timedelta(days=i)).strftime('%Y-%m-%d'),
-                'last_updated': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            } for i in range(1, 6)]
-
+                'status': ['Received', 'Processing', 'Completed', 'Pending', 'Awaiting Approval'][i-1],
+                'date_created': doc_date.strftime('%B %d, %Y'),
+                'priority': ['Normal', 'Priority', 'Urgent'][i % 3]
+            }
+            recent_documents.append(doc)
+    
     return render_template('track_document.html',
-                         search_results=search_results,
-                         recent_documents=recent_documents,
-                         error_message=error_message)
+                          search_results=search_results,
+                          recent_documents=recent_documents,
+                          error_message=error_message)
 
 @app.route('/document_details/<doc_code>')
 def document_details(doc_code):
@@ -546,6 +588,35 @@ def compose():
             
             # Set initial status to "Pending Registry Approval"
             initial_status = "Pending Registry Approval"
+            
+            # Store the document in a session list for demo purposes
+            if 'composed_documents' not in session:
+                session['composed_documents'] = []
+                
+            # Create a document object
+            document = {
+                'tracking_code': tracking_code,
+                'title': title,
+                'type': doc_type,
+                'document_type': doc_type,  # For compatibility with both naming conventions
+                'submitted_by': sender,
+                'sender': sender,  # For compatibility with both naming conventions
+                'recipient': recipient,
+                'date_created': datetime.now().strftime('%Y-%m-%d'),
+                'date_submitted': datetime.now().strftime('%Y-%m-%d'),  # For compatibility
+                'current_department': 'Registry',
+                'status': initial_status,
+                'priority': priority,
+                'steps_completed': 1,
+                'total_steps': 6,
+                'last_activity': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                'details': details,
+                'required_action': required_action
+            }
+            
+            # Add the document to the session
+            session['composed_documents'].append(document)
+            session.modified = True
             
             # For demo purposes, flash success messages
             flash(f'Document "{title}" successfully submitted with tracking code: {tracking_code}', 'success')
@@ -759,14 +830,33 @@ def outgoing():
     
     # Add other variables needed by the template
     documents = []
+    
+    # Get documents from session if available
+    if 'composed_documents' in session:
+        documents = session['composed_documents']
+        
+        # Check for any status updates from registry decisions
+        for doc in documents:
+            # Make sure tracking code is used as code for outgoing page
+            if 'code' not in doc and 'tracking_code' in doc:
+                doc['code'] = doc['tracking_code']
+            
+            # Ensure status is preserved
+            if 'status' not in doc:
+                doc['status'] = 'Pending Registry Approval'
+    
     search_query = request.args.get('search', '')
     priority_filter = request.args.get('priority', 'All')
     sort_by = request.args.get('sort_by', 'date')
     sort_order = request.args.get('sort_order', 'desc')
     page = request.args.get('page', 1, type=int)
     
+    # Filter documents based on priority if filter is set
+    if priority_filter != 'All':
+        documents = [doc for doc in documents if doc.get('priority') == priority_filter]
+    
     # Create pagination object with proper iter_pages method
-    pagination = Pagination(page=page, per_page=10, total_items=17)
+    pagination = Pagination(page=page, per_page=10, total_items=len(documents) or 17)
     
     return render_template('outgoing.html', 
                           active_page='outgoing',
@@ -779,90 +869,62 @@ def outgoing():
                           pagination=pagination)
 
 @app.route('/database_management')
+@requires_permission('database_management')
 def database_management():
-    if 'user_id' not in session:
-        return redirect(url_for('login'))
-        
-    if session.get('role') != 'Administrator':
-        flash('You do not have permission to access database management', 'danger')
-        return redirect(url_for('dashboard'))
+    """Database management route"""
+    # Log this access
+    log_activity(session.get('user_id'), 'view_database_management', {'request': 'view'})
     
-    # Add statistics data needed for the database_management template
+    # Get database statistics
     stats = {
         'total_documents': 127,
-        'total_users': 15,
-        'total_logs': 450,
-        'total_attachments': 83,
-        'db_size': '7.2 MB',
-        'health_percentage': 98
+        'total_users': 18,
+        'total_logs': 1523,
+        'total_attachments': 324,
+        'db_size': '42.8 MB',
+        'health': 98
     }
     
-    # Add sample backups for the template
+    # Sample backup data
     backups = [
-        {
-            'filename': 'backup_20250427_120000.db',
-            'date': 'Apr 27, 2025 12:00',
-            'size': '6.8 MB'
-        },
-        {
-            'filename': 'backup_20250426_120000.db',
-            'date': 'Apr 26, 2025 12:00',
-            'size': '6.7 MB'
-        },
-        {
-            'filename': 'backup_20250425_120000.db',
-            'date': 'Apr 25, 2025 12:00',
-            'size': '6.5 MB'
-        }
+        {'filename': 'backup_20250428_full.sql', 'date': '2025-04-28 23:00', 'size': '38.2 MB'},
+        {'filename': 'backup_20250427_full.sql', 'date': '2025-04-27 23:00', 'size': '37.9 MB'},
+        {'filename': 'backup_20250426_full.sql', 'date': '2025-04-26 23:00', 'size': '37.8 MB'},
+        {'filename': 'backup_20250425_full.sql', 'date': '2025-04-25 23:00', 'size': '36.5 MB'},
+        {'filename': 'backup_20250424_full.sql', 'date': '2025-04-24 23:00', 'size': '36.1 MB'}
     ]
     
-    # Add sample logs
-    recent_logs = [
-        {
-            'timestamp': datetime.now() - timedelta(hours=1),
-            'action': 'Backup',
-            'log_type': 'Success',
-            'user': 'admin',
-            'details': 'Database backup completed successfully'
-        },
-        {
-            'timestamp': datetime.now() - timedelta(hours=2),
-            'action': 'Optimize',
-            'log_type': 'Success',
-            'user': 'admin',
-            'details': 'Database optimization completed'
-        },
-        {
-            'timestamp': datetime.now() - timedelta(hours=6),
-            'action': 'Vacuum',
-            'log_type': 'Success',
-            'user': 'admin',
-            'details': 'Database vacuum process completed'
-        }
+    # Sample recent logs
+    logs = [
+        {'action': 'Automatic Backup', 'timestamp': '2025-04-29 23:00:12', 'status': 'Success'},
+        {'action': 'Index Optimization', 'timestamp': '2025-04-29 22:15:03', 'status': 'Success'},
+        {'action': 'Cache Purge', 'timestamp': '2025-04-29 22:00:01', 'status': 'Success'},
+        {'action': 'User Import', 'timestamp': '2025-04-29 15:23:45', 'status': 'Success'},
+        {'action': 'Manual Backup', 'timestamp': '2025-04-29 14:08:22', 'status': 'Success'}
     ]
     
-    # Add performance metrics
+    # Performance metrics
     performance = {
-        'response_time': 115,
-        'queries_per_second': 13.2,
-        'slow_queries': 0,
-        'cache_hit_ratio': 96
+        'response_time': '125ms',
+        'queries_per_second': 42,
+        'slow_queries': 3,
+        'cache_hit_ratio': '94%'
     }
     
     return render_template('database_management.html', 
-                          active_page='database_management',
-                          stats=stats,
-                          backups=backups,
-                          recent_logs=recent_logs,
-                          performance=performance,
-                          now=datetime.now)
+                           stats=stats,
+                           backups=backups,
+                           logs=logs,
+                           performance=performance)
 
 @app.route('/reports')
+@requires_permission('view_reports')
 def reports():
-    if 'user_id' not in session:
-        return redirect(url_for('login'))
+    """Reports and analytics page"""
+    # Log this action
+    log_activity(session.get('user_id'), 'view_reports', {'request': 'view'})
     
-    # Add dummy filters data for the reports template
+    # Get filters from request args with defaults
     filters = {
         'date_range': request.args.get('date_range', 'last-30-days'),
         'status': request.args.get('status', 'all'),
@@ -870,79 +932,41 @@ def reports():
         'department': request.args.get('department', 'all')
     }
     
-    # Add dummy report data
+    # Mock report data
     report_data = {
         'total_documents': 127,
-        'incoming_count': 45,
-        'outgoing_count': 82,
-        'by_priority': {
-            'Urgent': 18,
-            'Priority': 53,
-            'Normal': 56
-        },
-        'by_status': {
-            'Incoming': 23,
-            'Pending': 14,
-            'Received': 35,
-            'Outgoing': 39,
-            'Ended': 16
-        }
+        'incoming_documents': 45,
+        'outgoing_documents': 82,
+        'pending_approval': 14,
+        'overdue': 3,
+        'completion_rate': 92,
     }
     
-    # Create chart data
+    # Status breakdown data for pie chart
+    status_data = {
+        'Incoming': {'total': 18, 'percentage': 14, 'trend': 5, 'normal': 10, 'priority': 5, 'urgent': 3},
+        'Pending': {'total': 31, 'percentage': 24, 'trend': -3, 'normal': 15, 'priority': 12, 'urgent': 4},
+        'Received': {'total': 25, 'percentage': 20, 'trend': 2, 'normal': 12, 'priority': 10, 'urgent': 3},
+        'Outgoing': {'total': 45, 'percentage': 35, 'trend': 7, 'normal': 20, 'priority': 18, 'urgent': 7},
+        'Ended': {'total': 8, 'percentage': 7, 'trend': -1, 'normal': 4, 'priority': 3, 'urgent': 1}
+    }
+    
+    # Chart data for monthly trends
     chart_data = {
         'labels': ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
-        'datasets': {
-            'incoming': [12, 19, 8, 15, 10, 14],
-            'outgoing': [8, 15, 12, 9, 16, 11]
-        }
+        'datasets': [
+            {
+                'label': 'Incoming',
+                'data': [12, 19, 15, 17, 22, 24]
+            },
+            {
+                'label': 'Outgoing',
+                'data': [15, 22, 18, 21, 27, 32]
+            }
+        ]
     }
     
-    # Create status data required by the template
-    status_data = {
-        'Incoming': {
-            'total': 23,
-            'normal': 8,
-            'priority': 10,
-            'urgent': 5,
-            'percent': 18,
-            'trend': 'up'
-        },
-        'Pending': {
-            'total': 14,
-            'normal': 5,
-            'priority': 6,
-            'urgent': 3,
-            'percent': 11,
-            'trend': 'down'
-        },
-        'Received': {
-            'total': 35,
-            'normal': 15,
-            'priority': 12,
-            'urgent': 8,
-            'percent': 28,
-            'trend': 'up'
-        },
-        'Outgoing': {
-            'total': 39,
-            'normal': 18,
-            'priority': 16,
-            'urgent': 5,
-            'percent': 31,
-            'trend': 'up'
-        },
-        'Ended': {
-            'total': 16,
-            'normal': 10,
-            'priority': 4,
-            'urgent': 2,
-            'percent': 12,
-            'trend': 'down'
-        }
-    }
-    
-    # Add average times data
+    # Add average times data that the template expects
     avg_times = {
         'Incoming': '1.5 days',
         'Pending': '3.2 days',
@@ -951,13 +975,13 @@ def reports():
         'Ended': '4.5 days'
     }
     
-    # Prepare JSON data for charts
+    # Add priority and status chart data for template
     status_chart_data = json.dumps([
-        {'name': 'Incoming', 'value': 23, 'color': '#2196F3'},
-        {'name': 'Pending', 'value': 14, 'color': '#FFC107'},
-        {'name': 'Received', 'value': 35, 'color': '#4CAF50'},
-        {'name': 'Outgoing', 'value': 39, 'color': '#9C27B0'},
-        {'name': 'Ended', 'value': 16, 'color': '#F44336'}
+        {'name': 'Incoming', 'value': 18, 'color': '#2196F3'},
+        {'name': 'Pending', 'value': 31, 'color': '#FFC107'},
+        {'name': 'Received', 'value': 25, 'color': '#4CAF50'},
+        {'name': 'Outgoing', 'value': 45, 'color': '#9C27B0'},
+        {'name': 'Ended', 'value': 8, 'color': '#F44336'}
     ])
     
     priority_chart_data = json.dumps([
@@ -966,16 +990,26 @@ def reports():
         {'name': 'Urgent', 'value': 18, 'color': '#F44336'}
     ])
     
-    return render_template('reports.html', 
-                          active_page='reports',
+    # Only administrators can see system-wide reports
+    system_stats = None
+    if session.get('role') == 'Administrator':
+        system_stats = {
+            'active_users': 14,
+            'disk_usage': '42.8 MB',
+            'avg_response_time': '125ms',
+            'total_logins': 187
+        }
+    
+    return render_template('reports.html',
                           filters=filters,
                           report_data=report_data,
-                          chart_data=chart_data,
                           status_data=status_data,
+                          chart_data=chart_data,
+                          system_stats=system_stats,
                           avg_times=avg_times,
-                          total_documents=127,
                           status_chart_data=status_chart_data,
-                          priority_chart_data=priority_chart_data)
+                          priority_chart_data=priority_chart_data,
+                          total_documents=127)
 
 @app.route('/maintenance')
 def maintenance():
@@ -1121,9 +1155,120 @@ def debug_login():
     session['user_id'] = 1
     session['username'] = f'{role.lower()}_user'
     session['role'] = role
+    session['department'] = 'Demo Department'
+    session['email'] = f'{role.lower()}@example.com'
+    session['last_activity'] = time.time()
+    
+    # Log the debug login activity
+    log_activity(1, 'debug_login', {
+        'role': role,
+        'method': 'debug',
+        'ip': request.remote_addr
+    })
     
     flash(f'You are now logged in as a {role}', 'success')
     return redirect(url_for('dashboard'))
+
+@app.route('/access-denied')
+def access_denied():
+    """Show access denied page with reason"""
+    missing_permission = request.args.get('permission')
+    previous_url = request.args.get('previous') or request.referrer
+    
+    return render_template('access_denied.html', 
+                           missing_permission=missing_permission,
+                           previous_url=previous_url)
+
+@app.route('/bulk_user_action', methods=['POST'])
+def bulk_user_action():
+    """Handle bulk actions on users"""
+    if 'user_id' not in session:
+        flash('Please log in to perform this action', 'warning')
+        return redirect(url_for('login'))
+    
+    if session['role'] != 'Administrator':
+        flash('You do not have permission to perform this action', 'danger')
+        return redirect(url_for('dashboard'))
+    
+    # Get form data
+    user_ids = request.form.get('user_ids', '').split(',')
+    action = request.form.get('action', '')
+    
+    if not user_ids or not action:
+        flash('No users selected or action specified', 'warning')
+        return redirect(url_for('user_management'))
+    
+    try:
+        # Handle different actions
+        if action == 'activate':
+            # In a real app, update the database to activate users
+            flash(f'{len(user_ids)} users activated successfully', 'success')
+        
+        elif action == 'deactivate':
+            # In a real app, update the database to deactivate users
+            flash(f'{len(user_ids)} users deactivated successfully', 'success')
+        
+        elif action == 'delete':
+            # In a real app, delete users from the database
+            flash(f'{len(user_ids)} users deleted successfully', 'success')
+        
+        elif action == 'assign_role':
+            role = request.form.get('role', '')
+            if not role:
+                flash('No role specified', 'warning')
+                return redirect(url_for('user_management'))
+            # In a real app, update the database to assign roles
+            flash(f'{len(user_ids)} users assigned to role: {role}', 'success')
+        
+        elif action == 'assign_department':
+            department = request.form.get('department', '')
+            if not department:
+                flash('No department specified', 'warning')
+                return redirect(url_for('user_management'))
+            # In a real app, update the database to assign departments
+            flash(f'{len(user_ids)} users assigned to department: {department}', 'success')
+        
+        elif action == 'reset-password':
+            # In a real app, reset passwords for users
+            flash(f'Password reset for {len(user_ids)} users', 'success')
+        
+        elif action == 'export':
+            # In a real app, export user data to file
+            flash(f'User data exported successfully', 'success')
+        
+        elif action == 'send_credentials':
+            # In a real app, send credentials to users
+            flash(f'Credentials sent to {len(user_ids)} users', 'success')
+        
+        else:
+            flash(f'Unknown action: {action}', 'warning')
+    
+    except Exception as e:
+        # Log the error and show a flash message
+        print(f"Error performing bulk action: {str(e)}")
+        flash(f'An error occurred while performing the action: {str(e)}', 'danger')
+    
+    return redirect(url_for('user_management'))
+
+@app.route('/import_users', methods=['POST'])
+def import_users():
+    """Import users from uploaded CSV file"""
+    if 'user_id' not in session:
+        flash('Please log in to import users', 'warning')
+        return redirect(url_for('login'))
+    
+    if session['role'] != 'Administrator':
+        flash('You do not have permission to import users', 'danger')
+        return redirect(url_for('dashboard'))
+    
+    # For debug mode, just flash a message and redirect back
+    flash('User import functionality is not implemented in debug mode', 'info')
+    return redirect(url_for('user_management'))
+
+@app.errorhandler(403)
+def forbidden(error):
+    """Handle 403 Forbidden errors"""
+    return render_template('access_denied.html'), 403
 
 @app.route('/track/code/<tracking_code>')
 def track_by_code(tracking_code):
@@ -1387,53 +1532,211 @@ def update_document_status(tracking_code):
     return redirect(url_for('track_document'))
 
 @app.route('/registry_approval', methods=['GET'])
+@requires_permission('registry_approval')
 def registry_approval():
-    """Registry page to approve or reject documents"""
-    if 'user_id' not in session:
-        flash('Please log in to access registry approval', 'warning')
-        return redirect(url_for('login'))
+    """Registry approval workflow page"""
+    # Log this action
+    log_activity(session.get('user_id'), 'view_registry_workflow', {'request': 'view'})
     
-    # In a real implementation, check if user has registry privileges
-    # For demo purposes, assume the user can access if they are an Administrator
-    if session.get('role') not in ['Administrator', 'Registry']:
-        flash('You do not have permission to access the registry workflow', 'danger')
-        return redirect(url_for('dashboard'))
+    # Get filter parameters from query string with defaults
+    status_filter = request.args.get('status', 'pending')
+    department_filter = request.args.get('department', 'all')
+    date_filter = request.args.get('date', 'all')
+    priority_filter = request.args.get('priority', 'all')
+    search_query = request.args.get('search', '')
+    sort_by = request.args.get('sort_by', 'date')
+    sort_order = request.args.get('sort_order', 'desc')
     
-    # Get pending documents from the database
-    # For demo, generate sample data
-    pending_approvals = []
-    
-    for i in range(1, 8):
-        # Create demo document
-        doc_date = datetime.now() - timedelta(days=i % 3)
-        tracking_code = f"KEMRI-{doc_date.strftime('%Y%m%d')}-{1000+i}"
-        
-        document = {
-            'id': i,
-            'tracking_code': tracking_code,
-            'title': f"Document {i} requiring approval",
-            'sender': f"Department {i % 5 + 1}",
-            'recipient': f"Recipient {i % 3 + 1}",
-            'date_submitted': doc_date.strftime('%Y-%m-%d %H:%M'),
-            'priority': ['Normal', 'Priority', 'Urgent'][i % 3],
-            'document_type': ['Letter', 'Report', 'Requisition', 'Application', 'Memo'][i % 5],
-            'status': 'Pending Registry Approval'
+    # Enhanced sample documents for registry approval
+    documents = [
+        {
+            'id': 1,
+            'tracking_code': 'KEMRI-20250428-1001',
+            'title': 'Research Grant Application',
+            'sender': 'Dr. Jane Smith',
+            'department': 'Research',
+            'received_date': '2025-04-28',
+            'date_submitted': '2025-04-28',
+            'status': 'pending',
+            'priority': 'High',
+            'notes': 'Awaiting approval to proceed to director',
+            'document_type': 'Grant Application',
+            'workflow_stage': 'Initial Review',
+            'days_in_stage': 2
+        },
+        {
+            'id': 2,
+            'tracking_code': 'KEMRI-20250427-1002',
+            'title': 'Laboratory Equipment Request',
+            'sender': 'Dr. Michael Johnson',
+            'department': 'Laboratory',
+            'received_date': '2025-04-27',
+            'date_submitted': '2025-04-27',
+            'status': 'pending',
+            'priority': 'Medium',
+            'notes': 'Request for new PCR equipment',
+            'document_type': 'Equipment Request',
+            'workflow_stage': 'Initial Review',
+            'days_in_stage': 3
+        },
+        {
+            'id': 3,
+            'tracking_code': 'KEMRI-20250426-1003',
+            'title': 'Annual Department Budget',
+            'sender': 'Finance Department',
+            'department': 'Finance',
+            'received_date': '2025-04-26',
+            'date_submitted': '2025-04-26',
+            'status': 'approved',
+            'priority': 'High',
+            'notes': 'Approved on 2025-04-28',
+            'document_type': 'Budget Document',
+            'workflow_stage': 'Completed',
+            'days_in_stage': 0
+        },
+        {
+            'id': 4,
+            'tracking_code': 'KEMRI-20250425-1004',
+            'title': 'Staff Training Program',
+            'sender': 'HR Department',
+            'department': 'HR',
+            'received_date': '2025-04-25',
+            'date_submitted': '2025-04-25',
+            'status': 'rejected',
+            'priority': 'Medium',
+            'notes': 'Rejected due to budget constraints',
+            'document_type': 'Training Program',
+            'workflow_stage': 'Completed',
+            'days_in_stage': 0
+        },
+        {
+            'id': 5,
+            'tracking_code': 'KEMRI-20250424-1005',
+            'title': 'Research Ethics Application',
+            'sender': 'Dr. Sarah Williams',
+            'department': 'Research',
+            'received_date': '2025-04-24',
+            'date_submitted': '2025-04-24',
+            'status': 'in_review',
+            'priority': 'Urgent',
+            'notes': 'Under review by Ethics Committee',
+            'document_type': 'Ethics Application',
+            'workflow_stage': 'Ethics Review',
+            'days_in_stage': 5
+        },
+        {
+            'id': 6,
+            'tracking_code': 'KEMRI-20250423-1006',
+            'title': 'COVID-19 Research Proposal',
+            'sender': 'Dr. James Lee',
+            'department': 'Virology',
+            'received_date': '2025-04-23',
+            'date_submitted': '2025-04-23',
+            'status': 'pending',
+            'priority': 'Urgent',
+            'notes': 'Urgent review requested due to funding deadline',
+            'document_type': 'Research Proposal',
+            'workflow_stage': 'Initial Review',
+            'days_in_stage': 6
         }
-        pending_approvals.append(document)
+    ]
     
-    # Calculate stats for the page
-    approved_today = 3  # Simulated count for demo
-    rejected_today = 1  # Simulated count for demo
-    avg_time = '1.5h'   # Simulated average processing time
+    # Add composed documents from session to the documents list
+    if 'composed_documents' in session:
+        for composed_doc in session['composed_documents']:
+            # Convert document to match the expected format for approval
+            approval_doc = {
+                'id': len(documents) + 1,
+                'tracking_code': composed_doc['tracking_code'],
+                'title': composed_doc['title'],
+                'sender': composed_doc.get('sender', composed_doc.get('submitted_by', '')),
+                'department': composed_doc.get('sender_department', 'Unknown'),
+                'received_date': composed_doc.get('date_created', datetime.now().strftime('%Y-%m-%d')),
+                'date_submitted': composed_doc.get('date_submitted', datetime.now().strftime('%Y-%m-%d')),
+                'status': 'pending',
+                'priority': composed_doc.get('priority', 'Normal'),
+                'notes': composed_doc.get('details', 'Document awaiting initial review'),
+                'document_type': composed_doc.get('type', composed_doc.get('document_type', 'Unknown')),
+                'workflow_stage': 'Initial Review',
+                'days_in_stage': 0
+            }
+            
+            # Check if document is already in the list
+            if not any(doc['tracking_code'] == approval_doc['tracking_code'] for doc in documents):
+                documents.append(approval_doc)
     
-    return render_template(
-        'registry_workflow.html', 
-        pending_approvals=pending_approvals,
-        approved_today=approved_today,
-        rejected_today=rejected_today,
-        avg_time=avg_time,
-        active_page='registry_approval'
-    )
+    # Filter documents based on query parameters
+    filtered_documents = []
+    for doc in documents:
+        # Status filter
+        if status_filter != 'all' and doc['status'] != status_filter:
+            continue
+            
+        # Department filter
+        if department_filter != 'all' and doc['department'] != department_filter:
+            continue
+            
+        # Priority filter
+        if priority_filter != 'all' and doc['priority'] != priority_filter:
+            continue
+            
+        # Search query
+        if search_query and search_query.lower() not in doc['title'].lower() and search_query.lower() not in doc['tracking_code'].lower():
+            continue
+            
+        # Date filtering
+        if date_filter == 'today':
+            if doc['received_date'] != datetime.now().strftime('%Y-%m-%d'):
+                continue
+        elif date_filter == 'week':
+            # Simple approximation for demo
+            today = datetime.now().date()
+            doc_date = datetime.strptime(doc['received_date'], '%Y-%m-%d').date()
+            if (today - doc_date).days > 7:
+                continue
+        
+        filtered_documents.append(doc)
+    
+    # Sort documents
+    if sort_by == 'date':
+        filtered_documents.sort(key=lambda x: x['received_date'], reverse=(sort_order == 'desc'))
+    elif sort_by == 'priority':
+        # Define priority order for sorting (Urgent > High > Medium > Low)
+        priority_order = {'Urgent': 0, 'High': 1, 'Medium': 2, 'Low': 3}
+        filtered_documents.sort(key=lambda x: priority_order.get(x['priority'], 4), reverse=(sort_order != 'desc'))
+    elif sort_by == 'title':
+        filtered_documents.sort(key=lambda x: x['title'], reverse=(sort_order == 'desc'))
+    
+    # Calculate stats for the dashboard
+    stats = {
+        'total_pending': sum(1 for doc in documents if doc['status'] == 'pending'),
+        'urgent_count': sum(1 for doc in documents if doc['priority'] == 'Urgent'),
+        'priority_count': sum(1 for doc in documents if doc['priority'] == 'Priority' or doc['priority'] == 'High'),
+        'avg_processing_time': '1.2h',  # This would be calculated from actual data in a real app
+        'completed_today': sum(1 for doc in documents if doc['status'] in ['approved', 'rejected'] and doc['received_date'] == datetime.now().strftime('%Y-%m-%d')),
+    }
+    
+    # Get department list for filter dropdown
+    departments = list(set(doc['department'] for doc in documents))
+    departments.sort()
+    
+    # Get document types for filter dropdown
+    document_types = list(set(doc.get('document_type', '') for doc in documents if doc.get('document_type')))
+    document_types.sort()
+    
+    return render_template('registry_approval.html', 
+                          documents=filtered_documents,
+                          stats=stats,
+                          departments=departments,
+                          document_types=document_types,
+                          status_filter=status_filter,
+                          department_filter=department_filter,
+                          priority_filter=priority_filter,
+                          date_filter=date_filter,
+                          search_query=search_query,
+                          sort_by=sort_by,
+                          sort_order=sort_order,
+                          active_page='registry_workflow')
 
 @app.route('/registry_decision/<tracking_code>', methods=['POST'])
 def registry_decision(tracking_code):
@@ -1442,20 +1745,69 @@ def registry_decision(tracking_code):
         flash('Please log in to make registry decisions', 'warning')
         return redirect(url_for('login'))
     
+    # Get form data
     decision = request.form.get('decision')
     comments = request.form.get('comments', '')
     next_department = request.form.get('department', '')
+    reject_reason = request.form.get('reject_reason', '')
+    assignee = request.form.get('assignee', '')
+    priority = request.form.get('priority', '')
+    due_date = request.form.get('due_date', '')
     
-    # In a real implementation, update the database with the decision
-    # For demo, just flash a message
-    if decision == 'approve':
-        flash(f'Document {tracking_code} has been approved and forwarded to {next_department}', 'success')
-    elif decision == 'reject':
-        flash(f'Document {tracking_code} has been rejected with comments: {comments}', 'warning')
-    else:
-        flash(f'Document {tracking_code} has been put on hold with comments: {comments}', 'info')
+    # Create an audit trail entry
+    decision_data = {
+        'tracking_code': tracking_code,
+        'user_id': session.get('user_id'),
+        'decision': decision,
+        'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        'comments': comments,
+        'next_department': next_department,
+        'assignee': assignee
+    }
     
-    # Redirect back to approval page
+    # Log this decision
+    log_activity(session.get('user_id'), 'registry_decision', decision_data)
+    
+    # In a real app, update document status in the database
+    
+    # For demo, update in the session if the document exists there
+    if 'composed_documents' in session:
+        for doc in session['composed_documents']:
+            if doc.get('tracking_code') == tracking_code:
+                if decision == 'approve':
+                    doc['status'] = f"Approved - Forwarded to {next_department}"
+                    flash(f"Document {tracking_code} has been approved and forwarded to {next_department}", 'success')
+                elif decision == 'reject':
+                    doc['status'] = f"Rejected - {reject_reason}"
+                    flash(f"Document {tracking_code} has been rejected. Reason: {reject_reason}", 'warning')
+                elif decision == 'request_changes':
+                    doc['status'] = "Changes Requested"
+                    flash(f"Changes have been requested for document {tracking_code}", 'info')
+                
+                # Update other fields
+                if priority:
+                    doc['priority'] = priority
+                if assignee:
+                    doc['assignee'] = assignee
+                if due_date:
+                    doc['due_date'] = due_date
+                
+                # Add decision to document history
+                if 'history' not in doc:
+                    doc['history'] = []
+                
+                doc['history'].append({
+                    'action': f"Registry {decision.replace('_', ' ').title()}",
+                    'user': session.get('username', 'Registry Officer'),
+                    'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                    'comments': comments,
+                    'next_department': next_department
+                })
+                
+                # Mark session as modified
+                session.modified = True
+                break
+    
     return redirect(url_for('registry_approval'))
 
 @app.route('/update_incoming_status/<doc_code>', methods=['POST'])
@@ -1486,18 +1838,47 @@ def update_outgoing_status(doc_code):
         flash('Please log in to update document status', 'warning')
         return redirect(url_for('login'))
     
-    if request.method == 'POST':
-        new_status = request.form.get('status')
-        
-        # In a real app, update the database with the new status
-        # For demo purposes, just flash a message
-        flash(f'Document {doc_code} status updated to {new_status}', 'success')
-        
-        # Log the status change in the document history
-        # This would be done in a real implementation
-        
-        return redirect(url_for('document_details', doc_code=doc_code))
+    # Get the new status from the form
+    new_status = request.form.get('status', '')
     
+    if not new_status:
+        flash('No status provided', 'danger')
+        return redirect(url_for('outgoing'))
+    
+    # In a real app, update the document status in the database
+    # For demo, update in the session if the document exists there
+    if 'composed_documents' in session:
+        found = False
+        for doc in session['composed_documents']:
+            # Check both code and tracking_code
+            if (doc.get('code') == doc_code) or (doc.get('tracking_code') == doc_code):
+                doc['status'] = new_status
+                doc['last_updated'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                
+                # Add to history if available
+                if 'history' not in doc:
+                    doc['history'] = []
+                
+                doc['history'].append({
+                    'action': f"Status Updated to {new_status}",
+                    'user': session.get('username', 'User'),
+                    'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                    'status': new_status
+                })
+                
+                # Mark session as modified
+                session.modified = True
+                found = True
+                break
+        
+        if found:
+            flash(f'Document {doc_code} status updated to {new_status}', 'success')
+        else:
+            flash(f'Document {doc_code} not found', 'warning')
+    else:
+        flash('No documents in session', 'warning')
+    
+    # Redirect back to the outgoing documents page
     return redirect(url_for('outgoing'))
 
 @app.route('/confirm_document_receipt/<document_code>/<int:transfer_id>', methods=['POST'])
@@ -1548,196 +1929,759 @@ def download_file(filename):
         flash('An error occurred while trying to download the file', 'danger')
         return redirect(url_for('dashboard'))
 
-@app.route('/file_manager', methods=['GET', 'POST'])
+@app.route('/file_manager')
+@requires_permission('file_manager')
 def file_manager():
-    """View and manage uploaded files"""
+    """File manager route - manage uploaded files"""
+    # Log this access
+    log_activity(session.get('user_id'), 'view_file_manager', {'request': 'view'})
+    
+    # Get all files from the uploads directory
+    files = []
+    total_size = 0
+    file_types = {}
+    
+    try:
+        for filename in os.listdir(app.config['UPLOAD_FOLDER']):
+            file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            if os.path.isfile(file_path):
+                # Get file stats
+                file_stats = os.stat(file_path)
+                size = file_stats.st_size
+                total_size += size
+                
+                # Parse the filename to extract metadata
+                # Assuming format: [document_id]_[timestamp]_[original_filename]
+                parts = filename.split('_', 2)
+                doc_id = parts[0] if len(parts) >= 2 else 'unknown'
+                original_name = parts[2] if len(parts) >= 3 else filename
+                
+                # Try to determine file type from extension
+                file_ext = original_name.rsplit('.', 1)[1].lower() if '.' in original_name else ''
+                
+                # Count file types for statistics
+                if file_ext:
+                    if file_ext in file_types:
+                        file_types[file_ext] += 1
+                    else:
+                        file_types[file_ext] = 1
+                
+                # Get creation and modification times
+                creation_time = datetime.fromtimestamp(file_stats.st_ctime)
+                modification_time = datetime.fromtimestamp(file_stats.st_mtime)
+                
+                files.append({
+                    'name': original_name,
+                    'filename': filename,  # Stored filename for download
+                    'path': filename,      # Keep path for backward compatibility
+                    'size': get_human_readable_size(size),
+                    'size_bytes': size,
+                    'doc_id': doc_id,
+                    'type': file_ext.upper() if file_ext else 'UNKNOWN',
+                    'file_ext': file_ext,
+                    'icon': 'fa-file',  # Assuming a default icon
+                    'created': creation_time.strftime('%Y-%m-%d %H:%M:%S'),
+                    'modified': modification_time.strftime('%Y-%m-%d %H:%M:%S'),
+                    'original_name': original_name
+                })
+    except Exception as e:
+        flash(f'Error accessing files: {str(e)}', 'danger')
+    
+    # Sort files by creation date (newest first)
+    files.sort(key=lambda x: x['created'], reverse=True)
+    
+    # Get stats
+    stats = {
+        'total_files': len(files),
+        'total_size': get_human_readable_size(total_size),
+        'upload_folder': app.config['UPLOAD_FOLDER'],
+        'max_upload_size': get_human_readable_size(app.config['MAX_CONTENT_LENGTH']),
+        'file_types': file_types
+    }
+    
+    return render_template('file_manager.html', 
+                           files=files,
+                           stats=stats,
+                           active_page='file_manager')
+
+@app.route('/file_upload', methods=['POST'])
+@requires_permission('file_manager')
+def file_upload():
+    """Handle file uploads for the file manager"""
     if 'user_id' not in session:
-        flash('Please log in to access the file manager', 'warning')
+        flash('Please log in to upload files', 'warning')
         return redirect(url_for('login'))
     
-    # Sample files for demonstration
-    sample_files = [
-        {
-            'id': 1, 
-            'filename': 'KMR001_2023_Annual_Report.pdf', 
-            'original_filename': 'Annual Report 2023.pdf',
-            'document_id': 'KMR001',
-            'file_size': 2500000,
-            'file_size_readable': '2.4 MB',
-            'file_type': 'pdf',
-            'modified_date': '2023-12-15 14:30:22',
-            'department': 'Research'
-        },
-        {
-            'id': 2, 
-            'filename': 'KMR002_2023_Lab_Results_Q1.xlsx', 
-            'original_filename': 'Lab Results Q1.xlsx',
-            'document_id': 'KMR002',
-            'file_size': 1200000,
-            'file_size_readable': '1.2 MB',
-            'file_type': 'xlsx',
-            'modified_date': '2023-11-10 09:15:43',
-            'department': 'Laboratory'
-        },
-        {
-            'id': 3, 
-            'filename': 'KMR003_2023_Project_Proposal.docx', 
-            'original_filename': 'Project Proposal.docx',
-            'document_id': 'KMR003',
-            'file_size': 890000,
-            'file_size_readable': '890 KB',
-            'file_type': 'docx',
-            'modified_date': '2023-12-01 16:45:11',
-            'department': 'Projects'
-        },
-        {
-            'id': 4, 
-            'filename': 'KMR004_2023_Budget_2024.xlsx', 
-            'original_filename': 'Budget 2024.xlsx',
-            'document_id': 'KMR004',
-            'file_size': 1500000,
-            'file_size_readable': '1.5 MB',
-            'file_type': 'xlsx',
-            'modified_date': '2023-12-20 10:05:38',
-            'department': 'Finance'
-        },
-        {
-            'id': 5, 
-            'filename': 'KMR005_2023_Meeting_Minutes.pdf', 
-            'original_filename': 'Meeting Minutes.pdf',
-            'document_id': 'KMR005',
-            'file_size': 450000,
-            'file_size_readable': '450 KB',
-            'file_type': 'pdf',
-            'modified_date': '2023-12-18 13:20:17',
-            'department': 'Administration'
-        }
-    ]
+    if request.method != 'POST':
+        return redirect(url_for('file_manager'))
     
-    # Filter files based on search query if provided
-    search_query = request.args.get('search', '')
-    files = sample_files
+    # Check if the post request has the file part
+    if 'file' not in request.files:
+        flash('No file part in the request', 'danger')
+        return redirect(url_for('file_manager'))
     
-    if search_query:
-        files = [file for file in files if 
-                search_query.lower() in file['original_filename'].lower() or 
-                search_query.lower() in file['document_id'].lower() or 
-                search_query.lower() in file['file_type'].lower() or 
-                search_query.lower() in file.get('department', '').lower()]
+    file = request.files['file']
     
-    # Handle file upload (POST request)
-    if request.method == 'POST':
-        # Check if file part exists in the request
-        if 'file' not in request.files:
-            flash('No file part in the request', 'danger')
-            return redirect(request.url)
+    # If user does not select file, browser also submits an empty part without filename
+    if file.filename == '':
+        flash('No file selected for uploading', 'danger')
+        return redirect(url_for('file_manager'))
+    
+    # Get form data
+    title = request.form.get('title', '').strip()
+    document_id = request.form.get('document_id', '').strip()
+    
+    # Validate file type and size
+    if not allowed_file(file.filename):
+        allowed_ext_list = ', '.join(app.config['ALLOWED_EXTENSIONS'])
+        flash(f'Invalid file type. Allowed types: {allowed_ext_list}', 'danger')
+        return redirect(url_for('file_manager'))
+    
+    try:
+        # Upload the file
+        file_info = handle_file_upload(file, document_id if document_id else None)
         
-        file = request.files['file']
-        
-        # If user does not select file, the browser submits an empty file
-        if file.filename == '':
-            flash('No file selected', 'danger')
-            return redirect(request.url)
-        
-        if file and allowed_file(file.filename):
-            # In a real app, this would save the file and update the database
-            # For demo purposes, we'll just simulate success
-            flash('File uploaded successfully', 'success')
-            return redirect(url_for('file_manager'))
+        if file_info:
+            flash(f'File "{file_info["original_filename"]}" uploaded successfully', 'success')
         else:
-            flash('File type not allowed', 'danger')
-            return redirect(request.url)
+            flash('File upload failed', 'danger')
+    except Exception as e:
+        flash(f'Error uploading file: {str(e)}', 'danger')
     
-    return render_template(
-        'file_manager.html',
-        active_page='file_manager',
-        files=files,
-        total_files=len(files),
-        total_size=get_human_readable_size(sum(f['file_size'] for f in files)),
-        search_query=search_query
-    )
+    return redirect(url_for('file_manager'))
 
-@app.route('/delete_file/<filename>', methods=['POST'])
-def delete_file(filename):
+@app.route('/delete_file', methods=['POST'])
+@requires_permission('file_manager')
+def delete_file():
     """Delete a file from the uploads directory"""
     if 'user_id' not in session:
         flash('Please log in to delete files', 'warning')
         return redirect(url_for('login'))
     
-    # Check if user has permission to delete files
-    if session.get('role') != 'Administrator':
-        flash('You do not have permission to delete files', 'danger')
+    if request.method != 'POST':
         return redirect(url_for('file_manager'))
     
-    # Ensure the filename is secure and exists
+    # Check if request is AJAX (JSON) or form
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.headers.get('Content-Type') == 'application/json'
+    
+    # Get filename from form data or JSON data
+    if request.is_json:
+        data = request.get_json()
+        filename = data.get('filename')
+    else:
+        filename = request.form.get('filename')
+    
+    # Validate filename
     if not filename or '..' in filename:
-        flash('Invalid file request', 'danger')
+        message = 'Invalid file request'
+        if is_ajax:
+            return jsonify({'success': False, 'message': message})
+        flash(message, 'danger')
         return redirect(url_for('file_manager'))
     
     try:
-        # For demo purposes, we'll just simulate success
-        # In a real app, this would check if the file exists and delete it
-        flash(f'File {filename} deleted successfully', 'success')
-        return redirect(url_for('file_manager'))
+        # Check if file exists
+        file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        if os.path.isfile(file_path):
+            # Delete the file
+            os.remove(file_path)
+            message = f'File "{filename}" has been deleted'
+            
+            # Log the activity
+            log_activity(session.get('user_id'), 'delete_file', {'filename': filename, 'path': file_path})
+            
+            if is_ajax:
+                return jsonify({'success': True, 'message': message})
+            flash(message, 'success')
+        else:
+            message = 'File not found'
+            if is_ajax:
+                return jsonify({'success': False, 'message': message})
+            flash(message, 'danger')
     except Exception as e:
-        app.logger.error(f"File deletion error: {str(e)}")
-        flash('An error occurred while trying to delete the file', 'danger')
-        return redirect(url_for('file_manager'))
+        message = f'Error deleting file: {str(e)}'
+        if is_ajax:
+            return jsonify({'success': False, 'message': message})
+        flash(message, 'danger')
+    
+    return redirect(url_for('file_manager'))
 
-@app.route('/add_user', methods=['POST'])
-def add_user():
-    """Add a new user to the system"""
-    if 'user_id' not in session:
-        flash('Please log in to access this feature', 'warning')
+@app.route('/document_workflow/<tracking_code>')
+@requires_permission('track_document')
+def document_workflow(tracking_code):
+    if 'user' not in session:
+        flash('Please log in to continue.', 'warning')
+        return redirect(url_for('login'))
+        
+    # In a real app, we would fetch document data from the database
+    # For demo, we'll use hardcoded data based on tracking code
+    document = None
+    
+    if tracking_code == 'KMR-2023-001':
+        document = {
+            'tracking_code': 'KMR-2023-001',
+            'title': 'Annual Financial Report 2023',
+            'type': 'Financial Report',
+            'submitted_by': 'John Smith',
+            'date_created': '2023-10-15',
+            'current_department': 'Registry',
+            'status': 'Pending',
+            'priority': 'Urgent',
+            'current_stage_time': '1 day 2 hours',
+            'total_time': '1 day 3 hours',
+            'efficiency': '85%',
+            'sla_status': 'On track',
+            'steps_completed': 2,
+            'total_steps': 6,
+            'workflow': [
+                {
+                    'step': 'Document Created',
+                    'status': 'Completed',
+                    'icon': 'file-alt',
+                    'description': 'John Smith created this document',
+                    'timestamp': '2023-10-15 09:30 AM'
+                },
+                {
+                    'step': 'Submitted for Review',
+                    'status': 'Completed',
+                    'icon': 'paper-plane',
+                    'description': 'Document submitted to Registry department',
+                    'timestamp': '2023-10-15 10:15 AM'
+                },
+                {
+                    'step': 'Registry Review',
+                    'status': 'In Progress',
+                    'icon': 'clipboard-check',
+                    'description': 'Document is being reviewed by Registry',
+                    'timestamp': '2023-10-15 10:20 AM'
+                },
+                {
+                    'step': 'Departmental Review',
+                    'status': 'Pending',
+                    'icon': 'user-check',
+                    'description': 'Department review and approval',
+                    'timestamp': None
+                },
+                {
+                    'step': 'Final Approval',
+                    'status': 'Pending',
+                    'icon': 'check-double',
+                    'description': 'Final review and approval process',
+                    'timestamp': None
+                },
+                {
+                    'step': 'Process Complete',
+                    'status': 'Pending',
+                    'icon': 'flag-checkered',
+                    'description': 'Document processing completed',
+                    'timestamp': None
+                }
+            ],
+            'attachments': [
+                {
+                    'name': 'Financial_Report_2023.pdf',
+                    'type': 'pdf',
+                    'icon': 'file-pdf'
+                },
+                {
+                    'name': 'Financial_Data.xlsx',
+                    'type': 'excel',
+                    'icon': 'file-excel'
+                },
+                {
+                    'name': 'Executive_Summary.docx',
+                    'type': 'word',
+                    'icon': 'file-word'
+                }
+            ]
+        }
+    elif tracking_code == 'KMR-2023-002':
+        document = {
+            'tracking_code': 'KMR-2023-002',
+            'title': 'Research Grant Application',
+            'type': 'Grant Application',
+            'submitted_by': 'Emily Johnson',
+            'date_created': '2023-10-15',
+            'current_department': 'Registry',
+            'status': 'Pending',
+            'priority': 'Priority',
+            'current_stage_time': '6 hours',
+            'total_time': '8 hours',
+            'efficiency': '92%',
+            'sla_status': 'On track',
+            'steps_completed': 2,
+            'total_steps': 6,
+            'workflow': [
+                {
+                    'step': 'Document Created',
+                    'status': 'Completed',
+                    'icon': 'file-alt',
+                    'description': 'Emily Johnson created this document',
+                    'timestamp': '2023-10-15 12:30 PM'
+                },
+                {
+                    'step': 'Submitted for Review',
+                    'status': 'Completed',
+                    'icon': 'paper-plane',
+                    'description': 'Document submitted to Registry department',
+                    'timestamp': '2023-10-15 01:45 PM'
+                },
+                {
+                    'step': 'Registry Review',
+                    'status': 'In Progress',
+                    'icon': 'clipboard-check',
+                    'description': 'Document is being reviewed by Registry',
+                    'timestamp': '2023-10-15 02:00 PM'
+                },
+                {
+                    'step': 'Departmental Review',
+                    'status': 'Pending',
+                    'icon': 'user-check',
+                    'description': 'Department review and approval',
+                    'timestamp': None
+                },
+                {
+                    'step': 'Final Approval',
+                    'status': 'Pending',
+                    'icon': 'check-double',
+                    'description': 'Final review and approval process',
+                    'timestamp': None
+                },
+                {
+                    'step': 'Process Complete',
+                    'status': 'Pending',
+                    'icon': 'flag-checkered',
+                    'description': 'Document processing completed',
+                    'timestamp': None
+                }
+            ],
+            'attachments': [
+                {
+                    'name': 'Research_Proposal.pdf',
+                    'type': 'pdf',
+                    'icon': 'file-pdf'
+                },
+                {
+                    'name': 'Budget_Breakdown.xlsx',
+                    'type': 'excel',
+                    'icon': 'file-excel'
+                },
+                {
+                    'name': 'CV_Emily_Johnson.pdf',
+                    'type': 'pdf',
+                    'icon': 'file-pdf'
+                }
+            ]
+        }
+    
+    if document is None:
+        flash(f'Document with tracking code {tracking_code} not found.', 'danger')
+        return redirect(url_for('track_document'))
+        
+    return render_template('registry_workflow.html', document=document)
+
+@app.route('/registry_dashboard')
+@requires_permission('registry_approval')
+def registry_dashboard():
+    """Registry workflow dashboard with metrics and overview"""
+    # Log this access
+    log_activity(session.get('user_id'), 'view_registry_dashboard', {'request': 'view'})
+    
+    # Get filter parameters
+    date_range = request.args.get('date_range', 'week')
+    
+    # In a real app, these metrics would be calculated from database queries
+    # For demo purposes, use sample data
+    
+    # Sample overall metrics
+    overall_metrics = {
+        'total_documents': 127,
+        'documents_pending': 42,
+        'documents_in_review': 35,
+        'documents_approved': 38,
+        'documents_rejected': 12,
+        'avg_processing_time': '2.3 days',
+        'sla_compliance': '94%',
+        'documents_overdue': 3
+    }
+    
+    # Sample department metrics
+    department_metrics = [
+        {
+            'name': 'Research',
+            'total': 45,
+            'pending': 15,
+            'approved': 20,
+            'rejected': 5,
+            'in_review': 5,
+            'avg_time': '2.1 days'
+        },
+        {
+            'name': 'Finance',
+            'total': 30,
+            'pending': 10,
+            'approved': 12,
+            'rejected': 3,
+            'in_review': 5,
+            'avg_time': '1.8 days'
+        },
+        {
+            'name': 'HR',
+            'total': 20,
+            'pending': 5,
+            'approved': 10,
+            'rejected': 2,
+            'in_review': 3,
+            'avg_time': '1.5 days'
+        },
+        {
+            'name': 'Laboratory',
+            'total': 15,
+            'pending': 8,
+            'approved': 2,
+            'rejected': 1,
+            'in_review': 4,
+            'avg_time': '3.2 days'
+        },
+        {
+            'name': 'IT',
+            'total': 17,
+            'pending': 4,
+            'approved': 8,
+            'rejected': 1,
+            'in_review': 4,
+            'avg_time': '2.0 days'
+        }
+    ]
+    
+    # Sample document type metrics
+    document_type_metrics = [
+        {
+            'type': 'Research Proposal',
+            'total': 35,
+            'pending': 12,
+            'approved': 15,
+            'rejected': 3,
+            'in_review': 5,
+            'avg_time': '3.5 days'
+        },
+        {
+            'type': 'Budget Request',
+            'total': 28,
+            'pending': 8,
+            'approved': 12,
+            'rejected': 2,
+            'in_review': 6,
+            'avg_time': '2.2 days'
+        },
+        {
+            'type': 'Equipment Request',
+            'total': 22,
+            'pending': 10,
+            'approved': 5,
+            'rejected': 2,
+            'in_review': 5,
+            'avg_time': '2.8 days'
+        },
+        {
+            'type': 'Leave Application',
+            'total': 18,
+            'pending': 4,
+            'approved': 10,
+            'rejected': 1,
+            'in_review': 3,
+            'avg_time': '1.2 days'
+        },
+        {
+            'type': 'Ethics Application',
+            'total': 24,
+            'pending': 8,
+            'approved': 10,
+            'rejected': 4,
+            'in_review': 2,
+            'avg_time': '4.5 days'
+        }
+    ]
+    
+    # Sample workflow bottlenecks (stages with highest average processing time)
+    bottlenecks = [
+        {
+            'stage': 'Ethics Review',
+            'avg_time': '5.2 days',
+            'documents_in_stage': 8,
+            'trend': '+0.5 days',  # Increasing (getting worse)
+            'recommendation': 'Add additional reviewer to Ethics Committee'
+        },
+        {
+            'stage': 'Financial Approval',
+            'avg_time': '3.8 days',
+            'documents_in_stage': 12,
+            'trend': '-0.2 days',  # Decreasing (improving)
+            'recommendation': 'Continue monitoring'
+        },
+        {
+            'stage': 'Director Review',
+            'avg_time': '2.9 days',
+            'documents_in_stage': 5,
+            'trend': '+0.3 days',
+            'recommendation': 'Create pre-review checklist to streamline decisions'
+        }
+    ]
+    
+    # Sample recent activity
+    recent_activity = [
+        {
+            'timestamp': '2025-04-30 14:23:15',
+            'user': 'John Smith',
+            'action': 'Approved',
+            'document': 'Research Proposal',
+            'tracking_code': 'KEMRI-20250430-1001',
+            'notes': 'Approved and forwarded to Ethics Committee'
+        },
+        {
+            'timestamp': '2025-04-30 13:05:42',
+            'user': 'Jane Doe',
+            'action': 'Rejected',
+            'document': 'Budget Request',
+            'tracking_code': 'KEMRI-20250430-1002',
+            'notes': 'Missing supporting documentation'
+        },
+        {
+            'timestamp': '2025-04-30 11:30:18',
+            'user': 'Mark Johnson',
+            'action': 'Forwarded',
+            'document': 'Equipment Request',
+            'tracking_code': 'KEMRI-20250429-1008',
+            'notes': 'Forwarded to Finance for final approval'
+        },
+        {
+            'timestamp': '2025-04-30 10:15:33',
+            'user': 'Sarah Williams',
+            'action': 'Changes Requested',
+            'document': 'Research Ethics Application',
+            'tracking_code': 'KEMRI-20250429-1006',
+            'notes': 'Need additional details on participant consent'
+        },
+        {
+            'timestamp': '2025-04-30 09:45:20',
+            'user': 'Robert Brown',
+            'action': 'Received',
+            'document': 'Leave Application',
+            'tracking_code': 'KEMRI-20250430-1003',
+            'notes': 'Acknowledged receipt'
+        }
+    ]
+    
+    # Generate chart data (for visualization in JavaScript)
+    # Daily document volume for the past week
+    daily_volume = [
+        {'date': '2025-04-24', 'submitted': 18, 'approved': 15, 'rejected': 3},
+        {'date': '2025-04-25', 'submitted': 22, 'approved': 18, 'rejected': 4},
+        {'date': '2025-04-26', 'submitted': 15, 'approved': 12, 'rejected': 2},
+        {'date': '2025-04-27', 'submitted': 8, 'approved': 6, 'rejected': 1},  # Weekend
+        {'date': '2025-04-28', 'submitted': 25, 'approved': 20, 'rejected': 5},
+        {'date': '2025-04-29', 'submitted': 28, 'approved': 22, 'rejected': 6},
+        {'date': '2025-04-30', 'submitted': 20, 'approved': 15, 'rejected': 4}
+    ]
+    
+    # Processing time by document type
+    processing_times = [
+        {'type': 'Research Proposal', 'time': 3.5},
+        {'type': 'Budget Request', 'time': 2.2},
+        {'type': 'Equipment Request', 'time': 2.8},
+        {'type': 'Leave Application', 'time': 1.2},
+        {'type': 'Ethics Application', 'time': 4.5}
+    ]
+    
+    # Status distribution
+    status_distribution = [
+        {'status': 'Pending', 'count': 42, 'color': '#ffc107'},
+        {'status': 'In Review', 'count': 35, 'color': '#17a2b8'},
+        {'status': 'Approved', 'count': 38, 'color': '#28a745'},
+        {'status': 'Rejected', 'count': 12, 'color': '#dc3545'}
+    ]
+    
+    # Trend data for workflow metrics over time
+    trends = {
+        'processing_time': [2.8, 2.5, 2.4, 2.3, 2.3, 2.2, 2.3],  # Days (past 7 days)
+        'sla_compliance': [90, 92, 93, 91, 94, 95, 94],  # Percentage (past 7 days)
+        'document_volume': [18, 22, 15, 8, 25, 28, 20]  # Total documents (past 7 days)
+    }
+    
+    # Documents requiring immediate attention (overdue or high priority)
+    urgent_documents = [
+        {
+            'tracking_code': 'KEMRI-20250428-1005',
+            'title': 'COVID-19 Research Funding',
+            'status': 'Pending',
+            'days_in_stage': 3,
+            'due_date': '2025-04-30',
+            'priority': 'Urgent',
+            'is_overdue': True
+        },
+        {
+            'tracking_code': 'KEMRI-20250429-1003',
+            'title': 'Laboratory Safety Audit',
+            'status': 'In Review',
+            'days_in_stage': 2,
+            'due_date': '2025-05-01',
+            'priority': 'Urgent',
+            'is_overdue': False
+        },
+        {
+            'tracking_code': 'KEMRI-20250427-1008',
+            'title': 'Emergency Medical Supplies',
+            'status': 'Pending',
+            'days_in_stage': 4,
+            'due_date': '2025-04-29',
+            'priority': 'Urgent',
+            'is_overdue': True
+        }
+    ]
+    
+    return render_template('registry_dashboard.html',
+                           overall_metrics=overall_metrics,
+                           department_metrics=department_metrics,
+                           document_type_metrics=document_type_metrics,
+                           bottlenecks=bottlenecks,
+                           recent_activity=recent_activity,
+                           daily_volume=daily_volume,
+                           processing_times=processing_times,
+                           status_distribution=status_distribution,
+                           trends=trends,
+                           urgent_documents=urgent_documents,
+                           date_range=date_range,
+                           active_page='registry_dashboard')
+
+@app.route('/workflow_notification', methods=['POST'])
+@requires_permission('registry_approval')
+def workflow_notification():
+    """Send notifications to stakeholders about workflow updates"""
+    if request.method != 'POST':
+        return jsonify({'success': False, 'message': 'Method not allowed'}), 405
+    
+    # Get notification data from request
+    data = request.json
+    if not data:
+        return jsonify({'success': False, 'message': 'No data provided'}), 400
+    
+    tracking_code = data.get('tracking_code')
+    recipients = data.get('recipients', [])
+    message = data.get('message', '')
+    notification_type = data.get('type', 'status_update')
+    
+    if not tracking_code or not recipients or not message:
+        return jsonify({'success': False, 'message': 'Missing required parameters'}), 400
+    
+    # Log the notification
+    log_activity(session.get('user_id'), 'send_workflow_notification', {
+        'tracking_code': tracking_code,
+        'recipients': recipients,
+        'message': message,
+        'type': notification_type
+    })
+    
+    # In a real app, this would send actual notifications via email, SMS, or in-app
+    # For demo purposes, just return success
+    
+    return jsonify({
+        'success': True,
+        'message': f'Notification about document {tracking_code} sent to {len(recipients)} recipients',
+        'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    })
+
+@app.route('/registry_workflow')
+@requires_permission('registry_approval')
+def registry_workflow():
+    if 'user' not in session:
+        flash('Please log in to continue.', 'warning')
         return redirect(url_for('login'))
     
-    if session['role'] != 'Administrator':
-        flash('You do not have permission to add users', 'danger')
-        return redirect(url_for('dashboard'))
+    # Start with demo data
+    documents = [
+        {
+            'tracking_code': 'KMR-2023-001',
+            'title': 'Annual Financial Report 2023',
+            'type': 'Financial Report',
+            'submitted_by': 'John Smith',
+            'date_created': '2023-10-15',
+            'current_department': 'Registry',
+            'status': 'Pending',
+            'priority': 'Urgent',
+            'steps_completed': 2,
+            'total_steps': 6,
+            'last_activity': '2023-10-15 10:20 AM'
+        },
+        {
+            'tracking_code': 'KMR-2023-002',
+            'title': 'Research Grant Application',
+            'type': 'Grant Application',
+            'submitted_by': 'Emily Johnson',
+            'date_created': '2023-10-15',
+            'current_department': 'Registry',
+            'status': 'Pending',
+            'priority': 'Priority',
+            'steps_completed': 2,
+            'total_steps': 6,
+            'last_activity': '2023-10-15 02:00 PM'
+        },
+        {
+            'tracking_code': 'KMR-2023-003',
+            'title': 'Equipment Requisition Request',
+            'type': 'Procurement',
+            'submitted_by': 'Robert Chen',
+            'date_created': '2023-10-16',
+            'current_department': 'Registry',
+            'status': 'Pending',
+            'priority': 'Normal',
+            'steps_completed': 2,
+            'total_steps': 5,
+            'last_activity': '2023-10-16 09:15 AM'
+        },
+        {
+            'tracking_code': 'KMR-2023-004',
+            'title': 'Staff Training Program Proposal',
+            'type': 'HR',
+            'submitted_by': 'Sarah Williams',
+            'date_created': '2023-10-17',
+            'current_department': 'HR',
+            'status': 'Approved',
+            'priority': 'Priority',
+            'steps_completed': 3,
+            'total_steps': 5,
+            'last_activity': '2023-10-17 03:45 PM'
+        },
+        {
+            'tracking_code': 'KMR-2023-005',
+            'title': 'Laboratory Equipment Maintenance Report',
+            'type': 'Technical',
+            'submitted_by': 'Michael Lee',
+            'date_created': '2023-10-18',
+            'current_department': 'Finance',
+            'status': 'Rejected',
+            'priority': 'Normal',
+            'steps_completed': 2,
+            'total_steps': 4,
+            'last_activity': '2023-10-18 11:30 AM'
+        }
+    ]
     
-    # Get form data
-    username = request.form.get('username')
-    email = request.form.get('email')
-    role = request.form.get('role')
-    department = request.form.get('department', '')
-    password = request.form.get('password', 'defaultpassword')  # In production, you should generate a secure password
+    # Add any documents from the session
+    if 'composed_documents' in session:
+        # Add each composed document that's not already in the list
+        existing_tracking_codes = [doc['tracking_code'] for doc in documents]
+        for doc in session['composed_documents']:
+            if doc['tracking_code'] not in existing_tracking_codes:
+                # Make sure the document has the required fields
+                if 'last_activity' not in doc:
+                    doc['last_activity'] = datetime.now().strftime('%Y-%m-%d %H:%M')
+                if 'steps_completed' not in doc:
+                    doc['steps_completed'] = 1
+                if 'total_steps' not in doc:
+                    doc['total_steps'] = 6
+                documents.append(doc)
     
-    # Validate required fields
-    if not username or not email or not role:
-        flash('Username, email, and role are required fields', 'danger')
-        return redirect(url_for('user_management'))
-    
-    try:
-        # Connect to database
-        conn = get_db_connection()
-        
-        # Check if username already exists
-        existing_user = conn.execute('SELECT * FROM user WHERE username = ?', (username,)).fetchone()
-        if existing_user:
-            flash(f'Username "{username}" already exists', 'danger')
-            conn.close()
-            return redirect(url_for('user_management'))
-        
-        # Check if email already exists
-        existing_email = conn.execute('SELECT * FROM user WHERE email = ?', (email,)).fetchone()
-        if existing_email:
-            flash(f'Email "{email}" is already registered', 'danger')
-            conn.close()
-            return redirect(url_for('user_management'))
-        
-        # Insert new user
-        conn.execute(
-            'INSERT INTO user (username, email, password, role, department, is_active) VALUES (?, ?, ?, ?, ?, ?)',
-            (username, email, password, role, department, 1)
-        )
-        conn.commit()
-        conn.close()
-        
-        flash(f'User "{username}" created successfully', 'success')
-    except Exception as e:
-        flash(f'Error creating user: {str(e)}', 'danger')
-    
-    return redirect(url_for('user_management'))
+    return render_template('registry_workflow_list.html', documents=documents)
 
 if __name__ == '__main__':
     # Ensure the database exists

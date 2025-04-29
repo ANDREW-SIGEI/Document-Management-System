@@ -215,7 +215,17 @@
                                         {{ doc.details if doc.details else 'N/A' }}
                                     </div>
                                 </td>
-                                <td>{{ doc.date_of_letter.strftime('%d-%m-%Y') }}</td>
+                                <td>
+                                    {% if doc.date_of_letter is defined and doc.date_of_letter %}
+                                        {% if doc.date_of_letter is string %}
+                                            {{ doc.date_of_letter }}
+                                        {% else %}
+                                            {{ doc.date_of_letter.strftime('%d-%m-%Y') }}
+                                        {% endif %}
+                                    {% else %}
+                                        {{ doc.date_created if doc.date_created is defined else 'N/A' }}
+                                    {% endif %}
+                                </td>
                                 <td>
                                     <span class="badge bg-{% if doc.priority == 'Urgent' %}danger{% elif doc.priority == 'Priority' %}warning{% else %}secondary{% endif %}">
                                         {{ doc.priority }}
