@@ -1,23 +1,61 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, Response, session, send_file
-from flask_sqlalchemy import SQLAlchemy
-from config import Config
-from datetime import datetime, timedelta
-import json
-import random
-from sqlalchemy import case
-import uuid
 import os
-from werkzeug.utils import secure_filename
-import time
-import csv
-import io
-from werkzeug.security import generate_password_hash, check_password_hash
+import sys
+import json
+import sqlite3
+import random
+import psutil
+import shutil
+import hashlib
+import platform
+import threading
+from datetime import datetime, timedelta
 from functools import wraps
+from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.utils import secure_filename
+from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, send_file, make_response, g
+from flask_sqlalchemy import SQLAlchemy
 
+# Initialize Flask app
 app = Flask(__name__)
-app.config.from_object(Config)
-app.secret_key = 'kemri_secret_key'  # Required for flash messages
+app.config['SECRET_KEY'] = 'supersecretkey'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///documents.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['UPLOAD_FOLDER'] = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'uploads')
+
+# Ensure the upload folder exists
+os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+
+# Initialize SQLAlchemy
 db = SQLAlchemy(app)
+
+# Add a context processor to make current_year available in all templates
+@app.context_processor
+def inject_current_year():
+    return {'current_year': datetime.now().year}
+
+# Add utility functions for checking if endpoints exist
+@app.context_processor
+def utility_processor():
+    def has_endpoint(endpoint):
+        return endpoint in app.view_functions
+    return {'has_endpoint': has_endpoint}
+
+# Define the login_required decorator
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user_id' not in session:
+            flash('Please log in to access this page.', 'warning')
+            return redirect(url_for('login', next=request.url))
+        return f(*args, **kwargs)
+    return decorated_function
+
+# Define current_user
+def current_user():
+    if 'user_id' in session:
+        user_id = session['user_id']
+        return User.query.get(user_id)
+    return None
 
 # Example model
 class User(db.Model):
@@ -62,6 +100,8 @@ class Document(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     processed_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    physical_location = db.Column(db.String(200), nullable=True)  # Building/office/room
+    expected_return_date = db.Column(db.DateTime, nullable=True)  # When document should be returned
     
     processor = db.relationship('User', backref=db.backref('processed_documents', lazy=True))
     
@@ -95,6 +135,26 @@ class DocumentAction(db.Model):
     
     def __repr__(self):
         return f'<DocumentAction {self.action}>'
+
+# Document Transfer History Model
+class DocumentTransfer(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    document_id = db.Column(db.Integer, db.ForeignKey('document.id'), nullable=False)
+    from_user = db.Column(db.String(100), nullable=False)
+    to_user = db.Column(db.String(100), nullable=False)
+    from_department = db.Column(db.String(100), nullable=True)
+    to_department = db.Column(db.String(100), nullable=True)
+    transfer_date = db.Column(db.DateTime, default=datetime.utcnow)
+    transfer_reason = db.Column(db.Text, nullable=True)
+    received = db.Column(db.Boolean, default=False)
+    received_date = db.Column(db.DateTime, nullable=True)
+    ip_address = db.Column(db.String(50), nullable=True)
+    device_info = db.Column(db.String(200), nullable=True)
+    
+    document = db.relationship('Document', backref=db.backref('transfers', lazy=True, order_by='DocumentTransfer.transfer_date'))
+    
+    def __repr__(self):
+        return f'<DocumentTransfer {self.from_user} to {self.to_user}>'
 
 # Initialize the database
 with app.app_context():
@@ -260,7 +320,8 @@ def login():
             flash('Invalid username or password', 'danger')
     
     # GET request or failed login - show login form
-    return render_template('login.html')
+    current_year = datetime.now().year
+    return render_template('login.html', current_year=current_year)
 
 @app.route('/dashboard', methods=['GET', 'POST'])
 def dashboard():
@@ -1341,34 +1402,176 @@ def print_documents():
 @app.route('/document/<string:doc_code>')
 def document_details(doc_code):
     """View detailed information about a document"""
-    # Get the document
-    document = Document.query.filter_by(code=doc_code).first_or_404()
+    try:
+        # Check for user login
+        if 'logged_in' not in session:
+            return redirect(url_for('login'))
+            
+        # Get the current user
+        current_user_name = session.get('username', 'System')
+        
+        # Look up the document in the database
+        document = Document.query.filter_by(code=doc_code).first()
+        if document:
+            # Get document history from actions
+            history = []
+            for action in document.actions:
+                history.append({
+                    'action': action.action,
+                    'user': action.user,
+                    'timestamp': action.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+                    'details': action.action_description
+                })
+                
+            # Get transfer history
+            transfers = []
+            for transfer in document.transfers:
+                transfers.append({
+                    'from_user': transfer.from_user,
+                    'to_user': transfer.to_user,
+                    'from_department': transfer.from_department,
+                    'to_department': transfer.to_department,
+                    'timestamp': transfer.transfer_date.strftime('%Y-%m-%d %H:%M:%S'),
+                    'reason': transfer.transfer_reason,
+                    'received': transfer.received,
+                    'received_date': transfer.received_date.strftime('%Y-%m-%d %H:%M:%S') if transfer.received_date else None,
+                    'id': transfer.id
+                })
+            
+            # Format dates for display
+            document.date_of_letter_str = document.date_of_letter.strftime('%Y-%m-%d')
+            document.date_received_str = document.date_received.strftime('%Y-%m-%d')
+            document.created_at_str = document.created_at.strftime('%Y-%m-%d %H:%M:%S')
+            document.updated_at_str = document.updated_at.strftime('%Y-%m-%d %H:%M:%S')
+            
+            # Format expected return date if it exists
+            if document.expected_return_date:
+                document.expected_return_date_str = document.expected_return_date.strftime('%Y-%m-%d')
+            else:
+                document.expected_return_date_str = 'N/A'
+            
+            # Mock attachments data - in a real app, this would come from a related table
+            document.attachments = [
+                {'id': 1, 'filename': 'attachment1.pdf', 'size': '245 KB', 'uploaded_at': (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d %H:%M')},
+                {'id': 2, 'filename': 'attachment2.docx', 'size': '125 KB', 'uploaded_at': (datetime.now() - timedelta(hours=3)).strftime('%Y-%m-%d %H:%M')}
+            ]
+            
+            # Mock comments data - in a real app, this would come from a related table
+            document.comments = [
+                {'id': 1, 'user': 'John Doe', 'text': 'This needs urgent attention.', 'timestamp': (datetime.now() - timedelta(days=2)).strftime('%Y-%m-%d %H:%M')},
+                {'id': 2, 'user': 'Jane Smith', 'text': 'I have reviewed this document.', 'timestamp': (datetime.now() - timedelta(hours=12)).strftime('%Y-%m-%d %H:%M')}
+            ]
+            
+            # Log document view
+            log = SystemLog(
+                log_type='Info',
+                user=current_user_name,
+                action='Document Viewed',
+                details=f'User {current_user_name} viewed document {doc_code}'
+            )
+            db.session.add(log)
+            db.session.commit()
+            
+            return render_template('document_details.html', 
+                                  document=document, 
+                                  history=history,
+                                  transfers=transfers,
+                                  active_page='documents',
+                                  is_current_holder=(document.current_holder == current_user_name))
+                                  
+        # If not found in DB, check the JSON tracking file
+        else:
+            # This would be replaced with actual code to read from a JSON file
+            # For demo purposes, we'll just show a generic document
+            # Create a mock document with tracking history
+            mock_document = {
+                'code': doc_code,
+                'title': f'Document {doc_code}',
+                'sender': 'Ministry of Health',
+                'recipient': 'KEMRI Director',
+                'details': 'This is a sample document for demonstration purposes.',
+                'required_action': 'Review and approve',
+                'date_of_letter': datetime.now().strftime('%Y-%m-%d'),
+                'date_received': datetime.now().strftime('%Y-%m-%d'),
+                'priority': 'Normal',
+                'status': 'Pending',
+                'current_holder': 'Dr. John Smith',
+                'created_at_str': (datetime.now() - timedelta(days=5)).strftime('%Y-%m-%d %H:%M:%S'),
+                'updated_at_str': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                'physical_location': 'Main Building, Room 101',
+                'expected_return_date_str': (datetime.now() + timedelta(days=14)).strftime('%Y-%m-%d')
+            }
+            
+            # Mock history data
+            history = [
+                {
+                    'action': 'Document Created',
+                    'user': 'System',
+                    'timestamp': (datetime.now() - timedelta(days=5)).strftime('%Y-%m-%d %H:%M:%S'),
+                    'details': 'Document was created in the system'
+                },
+                {
+                    'action': 'Document Received',
+                    'user': 'Jane Smith',
+                    'timestamp': (datetime.now() - timedelta(days=4)).strftime('%Y-%m-%d %H:%M:%S'),
+                    'details': 'Document was marked as received'
+                },
+                {
+                    'action': 'Document Reassigned',
+                    'user': 'Jane Smith',
+                    'timestamp': (datetime.now() - timedelta(days=3)).strftime('%Y-%m-%d %H:%M:%S'),
+                    'details': 'Document reassigned from Jane Smith to Dr. John Smith'
+                }
+            ]
+            
+            # Mock transfer history
+            transfers = [
+                {
+                    'from_user': 'Jane Smith',
+                    'to_user': 'Dr. John Smith',
+                    'from_department': 'Reception',
+                    'to_department': 'Research Department',
+                    'timestamp': (datetime.now() - timedelta(days=3)).strftime('%Y-%m-%d %H:%M:%S'),
+                    'reason': 'For research review',
+                    'received': True,
+                    'received_date': (datetime.now() - timedelta(days=3, hours=-2)).strftime('%Y-%m-%d %H:%M:%S'),
+                    'id': 1
+                }
+            ]
+            
+            # Mock attachments
+            mock_document['attachments'] = [
+                {'id': 1, 'filename': 'attachment1.pdf', 'size': '245 KB', 'uploaded_at': (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d %H:%M')},
+                {'id': 2, 'filename': 'attachment2.docx', 'size': '125 KB', 'uploaded_at': (datetime.now() - timedelta(hours=3)).strftime('%Y-%m-%d %H:%M')}
+            ]
+            
+            # Mock comments
+            mock_document['comments'] = [
+                {'id': 1, 'user': 'John Doe', 'text': 'This needs urgent attention.', 'timestamp': (datetime.now() - timedelta(days=2)).strftime('%Y-%m-%d %H:%M')},
+                {'id': 2, 'user': 'Jane Smith', 'text': 'I have reviewed this document.', 'timestamp': (datetime.now() - timedelta(hours=12)).strftime('%Y-%m-%d %H:%M')}
+            ]
+            
+            # Log document view
+            log = SystemLog(
+                log_type='Info',
+                user=current_user_name,
+                action='Document Viewed',
+                details=f'User {current_user_name} viewed document {doc_code} from JSON storage'
+            )
+            db.session.add(log)
+            db.session.commit()
+            
+            return render_template('document_details.html', 
+                                  document=mock_document, 
+                                  history=history,
+                                  transfers=transfers,
+                                  active_page='documents',
+                                  is_current_holder=(mock_document['current_holder'] == current_user_name))
     
-    # Count all documents by status for the sidebar
-    document_counts = {
-        'Incoming': Document.query.filter_by(status='Incoming').count(),
-        'Pending': Document.query.filter_by(status='Pending').count(),
-        'Received': Document.query.filter_by(status='Received').count(),
-        'Outgoing': Document.query.filter_by(status='Outgoing').count(),
-        'Sent': Document.query.filter_by(status='Sent').count(),
-        'Ended': Document.query.filter_by(status='Ended').count()
-    }
-    
-    # Get relevant documents (same sender or recipient)
-    related_documents = Document.query.filter(
-        db.or_(
-            Document.sender == document.sender,
-            Document.recipient == document.recipient
-        ),
-        Document.code != document.code
-    ).limit(5).all()
-    
-    return render_template(
-        'document_details.html', 
-        document=document, 
-        document_counts=document_counts,
-        related_documents=related_documents
-    )
+    except Exception as e:
+        app.logger.error(f"Error viewing document: {str(e)}")
+        flash(f'Error viewing document: {str(e)}', 'danger')
+        return redirect(url_for('track_document'))
 
 @app.route('/document/<string:doc_code>/update', methods=['POST'])
 def update_document(doc_code):
@@ -2058,30 +2261,81 @@ def set_document_priority(document_code):
 
 @app.route('/reassign_document/<document_code>', methods=['POST'])
 def reassign_document(document_code):
-    """Reassign a document to another user/department"""
+    """Reassign a document to another user/department with enhanced tracking"""
     try:
         new_holder = request.form.get('new_holder')
+        new_department = request.form.get('new_department', '')
+        transfer_reason = request.form.get('transfer_reason', '')
+        location = request.form.get('physical_location', '')
+        expected_return_date_str = request.form.get('expected_return_date', '')
+        
         if not new_holder:
-            flash('New holder/department is required', 'warning')
+            flash('New holder is required', 'warning')
             return redirect(url_for('track_document_details', document_code=document_code))
+        
+        # Get current user information
+        current_user_name = session.get('username', 'System')
+        current_dept = session.get('department', 'Unknown')
+        
+        # Process expected return date if provided
+        expected_return_date = None
+        if expected_return_date_str:
+            try:
+                expected_return_date = datetime.strptime(expected_return_date_str, '%Y-%m-%d')
+            except ValueError:
+                flash('Invalid date format for expected return date', 'warning')
         
         # Check if document exists in database
         db_document = Document.query.filter_by(code=document_code).first()
         if db_document:
-            # Update database document
+            # Create transfer record
+            transfer = DocumentTransfer(
+                document_id=db_document.id,
+                from_user=db_document.current_holder,
+                to_user=new_holder,
+                from_department=current_dept,
+                to_department=new_department,
+                transfer_reason=transfer_reason,
+                ip_address=request.remote_addr,
+                device_info=request.user_agent.string
+            )
+            db.session.add(transfer)
+            
+            # Update document current holder and location info
             old_holder = db_document.current_holder
             db_document.current_holder = new_holder
+            
+            # Update location if provided
+            if location:
+                db_document.physical_location = location
+                
+            # Update expected return date if provided
+            if expected_return_date:
+                db_document.expected_return_date = expected_return_date
             
             # Create action record
             action = DocumentAction(
                 document_id=db_document.id,
                 action='Document Reassigned',
-                user='Admin User',  # In a real app, get the current user
-                action_description=f'Document reassigned from {old_holder} to {new_holder}',
+                user=current_user_name,
+                action_description=f'Document reassigned from {old_holder} to {new_holder}' + 
+                                  (f' in {new_department}' if new_department else '') +
+                                  (f'. Location: {location}' if location else '') +
+                                  (f'. Expected return: {expected_return_date_str}' if expected_return_date_str else ''),
                 status_before=db_document.status,
                 status_after=db_document.status
             )
             db.session.add(action)
+            db.session.commit()
+            
+            # Create a system log entry
+            log = SystemLog(
+                log_type='Info',
+                user=current_user_name,
+                action='Document Reassigned',
+                details=f'Document {document_code} reassigned from {old_holder} to {new_holder}'
+            )
+            db.session.add(log)
             db.session.commit()
             
             flash(f'Document reassigned to {new_holder}', 'success')
@@ -2105,15 +2359,39 @@ def reassign_document(document_code):
                 # Create action record
                 action = {
                     'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                    'user': 'Admin User',  # In a real app, get the current user
+                    'user': current_user_name,
                     'action': 'Document Reassigned',
-                    'notes': f'Document reassigned from {old_holder} to {new_holder}',
+                    'notes': f'Document reassigned from {old_holder} to {new_holder}' + 
+                            (f' in {new_department}' if new_department else '') +
+                            (f'. Location: {location}' if location else '') +
+                            (f'. Expected return: {expected_return_date_str}' if expected_return_date_str else ''),
                     'previous_status': tracking_data['documents'][document_index].get('status', ''),
                     'new_status': tracking_data['documents'][document_index].get('status', '')
                 }
                 
+                # Create transfer record
+                transfer = {
+                    'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                    'from_user': old_holder,
+                    'to_user': new_holder,
+                    'from_department': current_dept,
+                    'to_department': new_department,
+                    'reason': transfer_reason,
+                    'received': False,
+                    'ip_address': request.remote_addr,
+                    'device_info': request.user_agent.string
+                }
+                
                 # Update document
                 tracking_data['documents'][document_index]['current_holder'] = new_holder
+                
+                # Add location if provided
+                if location:
+                    tracking_data['documents'][document_index]['physical_location'] = location
+                    
+                # Add expected return date if provided
+                if expected_return_date_str:
+                    tracking_data['documents'][document_index]['expected_return_date'] = expected_return_date_str
                 
                 # Add to actions
                 if 'actions' not in tracking_data['documents'][document_index]:
@@ -2121,8 +2399,14 @@ def reassign_document(document_code):
                 
                 tracking_data['documents'][document_index]['actions'].append(action)
                 
+                # Add to transfers
+                if 'transfers' not in tracking_data['documents'][document_index]:
+                    tracking_data['documents'][document_index]['transfers'] = []
+                
+                tracking_data['documents'][document_index]['transfers'].append(transfer)
+                
                 # Update audit trail
-                tracking_data['documents'][document_index]['audit_trail']['last_modified_by'] = "1"
+                tracking_data['documents'][document_index]['audit_trail']['last_modified_by'] = current_user_name
                 tracking_data['documents'][document_index]['audit_trail']['last_modified_on'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                 
                 # Save updated data
@@ -3095,22 +3379,64 @@ def backup_database():
     except Exception as e:
         return jsonify({'success': False, 'message': f'Backup failed: {str(e)}'})
 
-# Define the login_required decorator
-def login_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if 'user_id' not in session:
-            flash('Please log in to access this page.', 'warning')
-            return redirect(url_for('login', next=request.url))
-        return f(*args, **kwargs)
-    return decorated_function
+@app.route('/confirm_document_receipt/<document_code>/<int:transfer_id>', methods=['POST'])
+def confirm_document_receipt(document_code, transfer_id):
+    """Confirm receipt of a transferred document"""
+    try:
+        # Get current user information
+        current_user_name = session.get('username', 'System')
+        
+        # Check if document and transfer exist
+        db_document = Document.query.filter_by(code=document_code).first()
+        if not db_document:
+            flash('Document not found', 'danger')
+            return redirect(url_for('track_document'))
+            
+        transfer = DocumentTransfer.query.get(transfer_id)
+        if not transfer:
+            flash('Transfer record not found', 'danger')
+            return redirect(url_for('document_details', doc_code=document_code))
+            
+        # Update transfer record
+        transfer.received = True
+        transfer.received_date = datetime.utcnow()
+        
+        # Create action record
+        action = DocumentAction(
+            document_id=db_document.id,
+            action='Document Receipt Confirmed',
+            user=current_user_name,
+            action_description=f'Receipt confirmed by {current_user_name} for document transferred from {transfer.from_user} to {transfer.to_user}',
+            status_before=db_document.status,
+            status_after=db_document.status
+        )
+        db.session.add(action)
+        
+        # Create a system log entry
+        log = SystemLog(
+            log_type='Success',
+            user=current_user_name,
+            action='Document Receipt Confirmed',
+            details=f'Document {document_code} receipt confirmed by {current_user_name}'
+        )
+        db.session.add(log)
+        db.session.commit()
+        
+        flash('Document receipt confirmed successfully', 'success')
+        return redirect(url_for('document_details', doc_code=document_code))
+        
+    except Exception as e:
+        app.logger.error(f"Error confirming document receipt: {str(e)}")
+        flash(f'Error confirming document receipt: {str(e)}', 'danger')
+        return redirect(url_for('document_details', doc_code=document_code))
 
-# Define current_user
-def current_user():
-    if 'user_id' in session:
-        user_id = session['user_id']
-        return User.query.get(user_id)
-    return None
+@app.route('/logout')
+def logout():
+    """Logout user and redirect to login page"""
+    # Clear session data
+    session.clear()
+    flash('You have been logged out successfully', 'info')
+    return redirect(url_for('login'))
 
 if __name__ == '__main__':
-    app.run(debug=False, host='0.0.0.0') 
+    app.run(host='0.0.0.0', port=5001)

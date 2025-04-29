@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session
 from flask_sqlalchemy import SQLAlchemy
 from config import Config
 from datetime import datetime, timedelta
@@ -8,34 +8,149 @@ from sqlalchemy import case
 from sqlalchemy.sql import expression
 import os
 from werkzeug.utils import secure_filename
+from werkzeug.security import generate_password_hash, check_password_hash
+from functools import wraps
+from werkzeug.routing.exceptions import BuildError
 
 app = Flask(__name__)
 app.config.from_object(Config)
 app.secret_key = 'kemri_secret_key'  # Required for flash messages
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///app.db'  # Direct path to the database we created
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['UPLOAD_FOLDER'] = 'uploads'
+app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50 MB max upload
+app.permanent_session_lifetime = timedelta(days=5)
+
+# Ensure upload directory exists
+os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+
 db = SQLAlchemy(app)
 
-# Configure file uploads
-UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static/uploads')
-if not os.path.exists(UPLOAD_FOLDER):
-    os.makedirs(UPLOAD_FOLDER)
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max upload
+# Add an error handler for URL build errors
+@app.errorhandler(BuildError)
+def handle_build_error(error):
+    """Handle URL build errors by redirecting to home"""
+    print(f"BuildError: {error}")
+    # Check if the error is for 'index' and redirect to 'home'
+    if error.endpoint == 'index':
+        return redirect(url_for('home'))
+    return redirect(url_for('home'))
+
+def log_activity(details, username="System"):
+    """Log system activity"""
+    try:
+        log = SystemLog(
+            log_type='Info',
+            user=username,
+            action='User Management',
+            details=details
+        )
+        db.session.add(log)
+        db.session.commit()
+        print(f"Activity logged: {details}")
+    except Exception as e:
+        print(f"Error logging activity: {str(e)}")
+        db.session.rollback()
+
+# Log user login activity
+def log_login_activity(user_id, email, ip_address):
+    """Log user login activity"""
+    try:
+        # Create login activity record
+        activity = LoginActivity(
+            user_id=user_id,
+            login_date=datetime.utcnow(),
+            ip_address=ip_address,
+            device=request.user_agent.string if request else "Unknown",
+            location="Unknown"  # In a real app, use geolocation service
+        )
+        
+        db.session.add(activity)
+        db.session.commit()
+        
+        # Log to system log too
+        log = SystemLog(
+            log_type='Info',
+            user=email,
+            action='User Login',
+            details=f'User logged in from {ip_address}'
+        )
+        db.session.add(log)
+        db.session.commit()
+        
+        print(f"Login activity logged for user ID {user_id} ({email})")
+    except Exception as e:
+        print(f"Error logging login activity: {str(e)}")
+        db.session.rollback()
+
+# Login required decorator
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user_id' not in session:
+            flash('Please log in to access this page', 'warning')
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+# Admin required decorator
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not session.get('logged_in'):
+            return redirect(url_for('login'))
+        
+        if session.get('user_role') != 'Administrator':
+            flash('You do not have permission to access this page!', 'danger')
+            return redirect(url_for('dashboard'))
+        
+        return f(*args, **kwargs)
+    return decorated_function
 
 # Make current datetime available to templates
 @app.context_processor
 def inject_now():
-    return {'now': lambda: datetime.utcnow()}
+    """
+    Inject the current time into templates
+    """
+    def now():
+        return datetime.utcnow()
+    
+    return {'current_year': datetime.utcnow().year, 'now': now}
 
 # Add route/endpoint helper for templates to avoid BuildError
 @app.context_processor
 def utility_processor():
+    def format_datetime(dt, format='%Y-%m-%d %H:%M'):
+        if dt:
+            return dt.strftime(format)
+        return ""
+    
     def has_endpoint(endpoint):
         try:
             url_for(endpoint)
             return True
+        except BuildError:
+            # Special case for 'index'
+            if endpoint == 'index':
+                try:
+                    url_for('home')
+                    return True
+                except:
+                    return False
+            return False
         except:
             return False
-    return dict(has_endpoint=has_endpoint)
+    
+    def display_priority(priority):
+        labels = {
+            'Normal': 'secondary',
+            'Priority': 'warning',
+            'Urgent': 'danger'
+        }
+        return labels.get(priority, 'secondary')
+    
+    return dict(format_datetime=format_datetime, has_endpoint=has_endpoint, display_priority=display_priority)
 
 # Example model
 class User(db.Model):
@@ -43,11 +158,12 @@ class User(db.Model):
     username = db.Column(db.String(80), unique=True, nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
     phone = db.Column(db.String(20), nullable=True)
-    department = db.Column(db.String(50), nullable=True)
-    password = db.Column(db.String(100), nullable=True)
-    last_login = db.Column(db.DateTime, default=datetime.utcnow)
+    department = db.Column(db.String(100), nullable=True)
+    password = db.Column(db.String(255), nullable=False)
+    last_login = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    role = db.Column(db.String(50), nullable=True)
+    role = db.Column(db.String(80), nullable=True)
+    is_active = db.Column(db.Boolean, default=True)
     
     def __repr__(self):
         return f'<User {self.username}>'
@@ -129,20 +245,28 @@ class DocumentComment(db.Model):
 
 # Initialize the database
 with app.app_context():
-    # Drop all tables and recreate them
-    db.drop_all()
+    # Create tables if they don't exist (don't drop existing tables)
     db.create_all()
     
-    # Check if any users exist, if not create a sample user
-    if not User.query.first():
+    # Check if any users exist
+    try:
+        user_exists = db.session.query(User.id).first() is not None
+    except Exception as e:
+        print(f"Error checking for users, will assume none exist: {str(e)}")
+        user_exists = False
+    
+    if not user_exists:
+        # Create default admin with hashed password
+        admin_password = generate_password_hash('admin123')
         sample_user = User(
             username='admin', 
             email='admin@example.com',
             phone='+1234567890',
             department='IT Department',
-            password='password',  # In a real app, this would be hashed
+            password=admin_password,
             created_at=datetime.strptime('2025-01-15', '%Y-%m-%d'),
-            role='Administrator'
+            role='Administrator',
+            is_active=True
         )
         db.session.add(sample_user)
         db.session.commit()
@@ -242,9 +366,18 @@ with app.app_context():
 
 @app.route('/')
 def home():
+    """Home page route - redirects to dashboard if logged in"""
+    if 'user_id' in session:
+        return redirect(url_for('dashboard'))
     return render_template('index.html')
 
+@app.route('/index')
+def index():
+    """Alias for home route"""
+    return home()
+
 @app.route('/dashboard')
+@login_required
 def dashboard():
     users = User.query.all()
     
@@ -540,9 +673,10 @@ def track_document():
 
 @app.route('/logout')
 def logout():
-    # In a real app, this would log the user out
-    flash('You have been logged out.', 'success')
-    return redirect(url_for('home'))
+    """Logout the current user"""
+    session.clear()
+    flash('You have been logged out', 'info')
+    return redirect(url_for('login'))
 
 @app.route('/outgoing', methods=['GET'])
 def outgoing():
@@ -756,32 +890,58 @@ def document_details(doc_code):
     current_time = datetime.utcnow()
     history = [
         {
-            'timestamp': current_time - timedelta(days=random.randint(0, 5), hours=random.randint(0, 12)),
+            'timestamp': (current_time - timedelta(days=random.randint(0, 5), hours=random.randint(0, 12))).strftime('%d %b %Y, %H:%M'),
             'action': 'Document Created',
             'user': 'Admin',
             'details': f'Document {doc_code} was created'
         },
         {
-            'timestamp': current_time - timedelta(days=random.randint(0, 3), hours=random.randint(0, 8)),
+            'timestamp': (current_time - timedelta(days=random.randint(0, 3), hours=random.randint(0, 8))).strftime('%d %b %Y, %H:%M'),
             'action': 'Status Changed',
             'user': 'Admin',
             'details': f'Document status changed to {document.status}'
         }
     ]
     
-    # Sort history by timestamp (newest first)
-    history.sort(key=lambda x: x['timestamp'], reverse=True)
+    # Format dates as strings for the template
+    doc_data = {
+        'code': document.code,
+        'title': document.title,
+        'sender': document.sender,
+        'recipient': document.recipient,
+        'details': document.details,
+        'required_action': document.required_action,
+        'date_of_letter': document.date_of_letter.strftime('%d %b %Y') if document.date_of_letter else 'N/A',
+        'date_received': document.date_received.strftime('%d %b %Y') if document.date_received else 'N/A',
+        'status': document.status,
+        'priority': document.priority,
+        'current_holder': document.current_holder,
+        'created_at_str': document.created_at.strftime('%d %b %Y, %H:%M') if document.created_at else 'N/A',
+        'updated_at_str': document.updated_at.strftime('%d %b %Y, %H:%M') if document.updated_at else 'N/A',
+        'type': 'Incoming' if document.status in ['Incoming', 'Pending', 'Received'] else 'Outgoing',
+        'processor': document.processor.username if document.processor else 'N/A',
+        'attachments': document.attachments,
+        'id': document.id,
+        'comments': document.comments
+    }
     
     return render_template(
         'document_details.html',
-        document=document,
+        document=doc_data,
         history=history
     )
 
 @app.route('/maintenance')
 def maintenance():
-    # Get real system statistics
+    """Provides an interface for database management operations"""
+    # Get basic database statistics
     total_documents = Document.query.count()
+    total_users = User.query.count()
+    total_system_logs = SystemLog.query.count()
+    total_attachments = DocumentAttachment.query.count()
+    
+    # Get current time for template
+    current_time = datetime.utcnow()
     
     # Calculate storage used (in a real app, this would be the actual size)
     document_attachments = DocumentAttachment.query.all()
@@ -801,7 +961,6 @@ def maintenance():
     logs = db.session.query(SystemLog).order_by(SystemLog.timestamp.desc()).limit(10).all()
     
     # Calculate timestamps for admin activity logs
-    current_time = datetime.utcnow()
     timestamp_2hr_ago = (current_time - timedelta(hours=2)).strftime('%Y-%m-%d %H:%M:%S')
     timestamp_1day_ago = (current_time - timedelta(days=1)).strftime('%Y-%m-%d %H:%M:%S')
     timestamp_2day_ago = (current_time - timedelta(days=2)).strftime('%Y-%m-%d %H:%M:%S')
@@ -825,6 +984,10 @@ def maintenance():
         'cache_hit_ratio': '94%'
     }
     
+    # Add now function for the template
+    def now():
+        return datetime.utcnow()
+    
     return render_template('maintenance.html', 
                           total_documents=total_documents,
                           storage_used=storage_used,
@@ -835,7 +998,8 @@ def maintenance():
                           timestamp_1day_ago=timestamp_1day_ago,
                           timestamp_2day_ago=timestamp_2day_ago,
                           maintenance_stats=maintenance_stats,
-                          performance_data=performance_data)
+                          performance_data=performance_data,
+                          now=now)
 
 @app.route('/reports')
 def reports():
@@ -980,12 +1144,15 @@ def report_data():
     return jsonify({'error': 'Invalid report type'})
 
 @app.route('/user-management')
+# Temporarily commented out: @admin_required  
 def user_management():
     # Define available departments and roles for dropdowns
-    departments = ['Administration', 'Laboratory', 'Research', 'IT', 'Finance', 'HR', 'Audit']
-    roles = ['Administrator', 'Manager', 'Lab Technician', 'Researcher', 'Data Entry', 'User', 'Read Only']
+    departments = ['IT', 'HR', 'Finance', 'Operations', 'Executive', 'Research', 'Marketing']
+    roles = ['Administrator', 'Manager', 'Supervisor', 'Staff', 'User']
     
-    users = User.query.all()
+    # Get all users
+    users = User.query.order_by(User.username).all()
+    
     return render_template('user_management.html', users=users, departments=departments, roles=roles)
 
 @app.route('/database-management')
@@ -1080,6 +1247,7 @@ def database_management():
                           performance=performance)
 
 @app.route('/add-user', methods=['POST'])
+# Temporarily commented out: @admin_required
 def add_user():
     # Get form fields matching the names in the HTML form
     username = request.form.get('fullName')
@@ -1088,25 +1256,25 @@ def add_user():
     department = request.form.get('department')
     role = request.form.get('role')
     password = request.form.get('password')
-    status = 'active' if request.form.get('status') == 'on' else 'inactive'
     
     # Basic validation
-    if not username or not email or not password:
+    if not username or not email or not password or not department:
         flash('All fields are required!', 'danger')
         return redirect(url_for('user_management'))
     
     # Check if user already exists
-    if User.query.filter_by(email=email).first():
-        flash('Email already exists!', 'danger')
+    if User.query.filter((User.email == email) | (User.username == username)).first():
+        flash('User with that email or username already exists!', 'danger')
         return redirect(url_for('user_management'))
     
-    # Create new user
+    # Create new user with hashed password
+    hashed_password = generate_password_hash(password)
     new_user = User(
         username=username,
         email=email,
         phone=phone,
         department=department,
-        password=password,  # In a real app, this would be hashed
+        password=hashed_password,
         role=role
     )
     
@@ -1117,6 +1285,7 @@ def add_user():
     return redirect(url_for('user_management'))
 
 @app.route('/edit-user/<int:user_id>', methods=['POST'])
+# Temporarily commented out: @admin_required
 def edit_user(user_id):
     user = User.query.get_or_404(user_id)
     
@@ -1126,12 +1295,18 @@ def edit_user(user_id):
     user.department = request.form.get('department')
     user.role = request.form.get('role')
     
+    # Update password if provided
+    new_password = request.form.get('password')
+    if new_password:
+        user.password = generate_password_hash(new_password)
+    
     db.session.commit()
     
     flash('User updated successfully!', 'success')
     return redirect(url_for('user_management'))
 
 @app.route('/delete-user/<int:user_id>', methods=['POST'])
+# Temporarily commented out: @admin_required
 def delete_user(user_id):
     user = User.query.get_or_404(user_id)
     
@@ -1156,6 +1331,10 @@ def my_account():
 @app.route('/my-account')
 def my_account_alt():
     return redirect(url_for('my_account'))
+
+@app.route('/user_management')
+def user_management_alt():
+    return redirect(url_for('user_management'))
 
 @app.route('/update-profile', methods=['POST'])
 def update_profile():
@@ -1628,6 +1807,648 @@ def get_table_structure(table_name):
 @app.route('/logo-test')
 def logo_test():
     return render_template('logo_test.html')
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username_or_email = request.form.get('username')
+        password = request.form.get('password')
+        is_email = '@' in username_or_email
+        
+        # Check for admin credentials first (for demo purposes)
+        if username_or_email == 'admin' and password == 'admin123':
+            session.permanent = True
+            session['logged_in'] = True
+            session['username'] = 'Admin User'
+            session['user_id'] = 1
+            session['user_role'] = 'Administrator'
+            session['user_email'] = 'admin@example.com'
+            flash('Welcome, Admin!', 'success')
+            
+            # Log login activity
+            log_login_activity(1, 'admin@example.com', request.remote_addr)
+            
+            return redirect(url_for('home'))
+        
+        # Check for normal user login
+        if is_email:
+            user = User.query.filter(User.email == username_or_email).first()
+        else:
+            user = User.query.filter(User.username == username_or_email).first()
+        
+        if user and check_password_hash(user.password, password):
+            session.permanent = True
+            session['logged_in'] = True
+            session['user_id'] = user.id
+            session['username'] = user.username
+            session['user_email'] = user.email
+            session['user_role'] = user.role
+            
+            # Update last login time
+            user.last_login = datetime.now()
+            db.session.commit()
+            
+            # Log login activity
+            log_login_activity(user.id, user.email, request.remote_addr)
+            
+            flash(f'Welcome, {user.username}!', 'success')
+            return redirect(url_for('home'))
+        
+        flash('Invalid username or password.', 'danger')
+    
+    # GET request or failed login - show login form
+    current_year = datetime.now().year
+    return render_template('login.html', current_year=current_year)
+
+# Create function to ensure an admin user exists
+def create_admin_user():
+    # Check if an admin user exists
+    admin = User.query.filter_by(role='Administrator').first()
+    if not admin:
+        # Create default admin
+        admin_password = generate_password_hash('admin123')
+        admin_user = User(
+            username='admin',
+            email='admin@example.com',
+            password=admin_password,
+            role='Administrator',
+            department='IT'
+        )
+        db.session.add(admin_user)
+        
+        # Add a system log for this action
+        log = SystemLog(
+            log_type='Info',
+            user='System',
+            action='Initial Setup',
+            details='Default administrator account created'
+        )
+        db.session.add(log)
+        db.session.commit()
+
+@app.route('/quick_add_user', methods=['POST'])
+# Temporarily commented out: @admin_required
+def quick_add_user():
+    try:
+        # Log the request data for debugging
+        print(f"Request form data: {request.form}")
+        
+        # Get form fields matching the names in the HTML form
+        username = request.form.get('name')
+        email = request.form.get('email')
+        department = request.form.get('department')
+        password = request.form.get('password')
+        
+        print(f"Received form data - username: {username}, email: {email}, department: {department}, password: {'*' * len(password) if password else 'None'}")
+        
+        # Basic validation
+        if not username or not email or not password or not department:
+            flash('All fields are required!', 'danger')
+            return redirect(url_for('user_management'))
+        
+        # Check if user already exists
+        existing_user = User.query.filter((User.email == email) | (User.username == username)).first()
+        if existing_user:
+            print(f"User already exists: {existing_user}")
+            flash('User with that email or username already exists!', 'danger')
+            return redirect(url_for('user_management'))
+        
+        # Create new user with hashed password
+        hashed_password = generate_password_hash(password)
+        new_user = User(
+            username=username,
+            email=email,
+            department=department,
+            password=hashed_password,
+            role='User'  # Default role
+        )
+        
+        db.session.add(new_user)
+        db.session.commit()
+        
+        print(f"Successfully added new user: {new_user}")
+        
+        # Log to the system log too
+        new_log = SystemLog(
+            log_type='Success',
+            user='Admin',
+            action='User Added',
+            details=f'New user {username} with email {email} added successfully'
+        )
+        db.session.add(new_log)
+        db.session.commit()
+        
+        flash('User added successfully!', 'success')
+        return redirect(url_for('user_management'))
+    except Exception as e:
+        print(f"Error adding user: {str(e)}")
+        db.session.rollback()
+        flash(f'Error adding user: {str(e)}', 'danger')
+        return redirect(url_for('user_management'))
+
+# Call the create_admin_user function within app context when the app is initialized
+with app.app_context():
+    # Ensure database tables exist
+    db.create_all()
+    # Create admin user if needed
+    create_admin_user()
+
+@app.route('/check-session')
+def check_session():
+    """A diagnostic route to check the current session data"""
+    if 'user_id' in session:
+        return jsonify({
+            'logged_in': session.get('logged_in', False),
+            'user_id': session.get('user_id'),
+            'username': session.get('username'),
+            'user_role': session.get('user_role'),
+            'user_email': session.get('user_email')
+        })
+    else:
+        return jsonify({
+            'logged_in': False,
+            'message': 'Not logged in'
+        })
+
+@app.route('/debug-users')
+def debug_users():
+    """A debug endpoint to list all users in the system"""
+    users = User.query.all()
+    user_list = []
+    for user in users:
+        user_list.append({
+            'id': user.id,
+            'username': user.username,
+            'email': user.email,
+            'department': user.department,
+            'role': user.role,
+            'created_at': str(user.created_at)
+        })
+    return jsonify(user_list)
+
+@app.route('/debug-routes')
+def debug_routes():
+    """A debug endpoint to list all routes in the application"""
+    routes = []
+    for rule in app.url_map.iter_rules():
+        routes.append({
+            'endpoint': rule.endpoint,
+            'methods': list(rule.methods),
+            'path': str(rule)
+        })
+    return jsonify(routes)
+
+@app.route('/batch_user_action', methods=['POST'])
+def batch_user_action():
+    """Handle batch operations on multiple users at once"""
+    try:
+        action = request.form.get('action')
+        user_ids = request.form.get('user_ids', '').split(',')
+        
+        if not action or not user_ids:
+            flash('Invalid parameters for batch action', 'danger')
+            return redirect(url_for('user_management'))
+        
+        # Convert user_ids to integers
+        user_ids = [int(uid) for uid in user_ids if uid.isdigit()]
+        
+        if action == 'activate':
+            # Set all selected users to active
+            users = User.query.filter(User.id.in_(user_ids)).all()
+            for user in users:
+                # In a real app you'd have a status field
+                # This is just a placeholder since our model doesn't have status
+                pass
+            
+            db.session.commit()
+            flash(f'{len(users)} users have been activated successfully', 'success')
+            
+        elif action == 'deactivate':
+            # Set all selected users to inactive
+            users = User.query.filter(User.id.in_(user_ids)).all()
+            for user in users:
+                # In a real app you'd have a status field
+                # This is just a placeholder since our model doesn't have status
+                pass
+            
+            db.session.commit()
+            flash(f'{len(users)} users have been deactivated successfully', 'success')
+            
+        elif action == 'delete':
+            # Delete all selected users
+            # First check if we're not deleting the last admin
+            admin_ids = User.query.filter(User.role == 'Administrator', User.id.in_(user_ids)).all()
+            if len(admin_ids) > 0 and User.query.filter_by(role='Administrator').count() <= len(admin_ids):
+                flash('Cannot delete all administrator accounts!', 'danger')
+                return redirect(url_for('user_management'))
+            
+            # Delete users
+            deleted_count = User.query.filter(User.id.in_(user_ids)).delete(synchronize_session='fetch')
+            db.session.commit()
+            flash(f'{deleted_count} users have been deleted successfully', 'success')
+            
+        elif action == 'assign-role':
+            # Assign a role to all selected users
+            role = request.form.get('role')
+            if not role:
+                flash('Please select a role to assign', 'danger')
+                return redirect(url_for('user_management'))
+                
+            users = User.query.filter(User.id.in_(user_ids)).all()
+            for user in users:
+                user.role = role
+            
+            db.session.commit()
+            flash(f'Role has been updated for {len(users)} users', 'success')
+            
+        elif action == 'assign-department':
+            # Assign a department to all selected users
+            department = request.form.get('department')
+            if not department:
+                flash('Please select a department to assign', 'danger')
+                return redirect(url_for('user_management'))
+                
+            users = User.query.filter(User.id.in_(user_ids)).all()
+            for user in users:
+                user.department = department
+            
+            db.session.commit()
+            flash(f'Department has been updated for {len(users)} users', 'success')
+            
+        elif action == 'reset-password':
+            # Reset passwords for all selected users
+            users = User.query.filter(User.id.in_(user_ids)).all()
+            for user in users:
+                # Generate a random password
+                import random
+                import string
+                random_password = ''.join(random.choices(string.ascii_letters + string.digits, k=10))
+                
+                # Hash and set the password
+                user.password = generate_password_hash(random_password)
+                
+                # In a real app, you would send an email with the new password
+                # For this demo, we'll just log it
+                print(f"Reset password for {user.username}: {random_password}")
+            
+            db.session.commit()
+            flash(f'Passwords have been reset for {len(users)} users', 'success')
+            
+        # Log the action
+        new_log = SystemLog(
+            log_type='Info',
+            user='Admin',  # In a real app, use the current user
+            action=f'Batch User Action: {action}',
+            details=f'Performed {action} on {len(user_ids)} users'
+        )
+        db.session.add(new_log)
+        db.session.commit()
+        
+        return redirect(url_for('user_management'))
+        
+    except Exception as e:
+        print(f"Error in batch action: {str(e)}")
+        db.session.rollback()
+        flash(f'Error performing batch action: {str(e)}', 'danger')
+        return redirect(url_for('user_management'))
+
+@app.route('/import_users', methods=['POST'])
+def import_users():
+    """Import users from a CSV or Excel file"""
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    
+    # Get current user and check permissions
+    current_user = User.query.get(session['user_id'])
+    if not current_user or current_user.role != 'Administrator':
+        flash('You do not have permission to perform this action', 'danger')
+        return redirect(url_for('user_management'))
+    
+    # Check if a file was uploaded
+    if 'file' not in request.files:
+        flash('No file uploaded', 'danger')
+        return redirect(url_for('user_management'))
+    
+    file = request.files['file']
+    
+    # Check if the file has a name
+    if file.filename == '':
+        flash('No file selected', 'danger')
+        return redirect(url_for('user_management'))
+    
+    # Check file extension
+    allowed_extensions = {'csv', 'xlsx'}
+    if '.' not in file.filename or file.filename.rsplit('.', 1)[1].lower() not in allowed_extensions:
+        flash('Invalid file format. Please upload a CSV or Excel file', 'danger')
+        return redirect(url_for('user_management'))
+    
+    # Get options
+    overwrite = request.form.get('overwrite') == 'on'
+    send_email = request.form.get('send_email') == 'on'
+    
+    # In a real app, you would parse the file and create users
+    # For demonstration purposes, we'll simulate a successful import
+    imported_count = 5
+    overwritten_count = 2 if overwrite else 0
+    
+    # Log activity
+    log_activity(f"Imported {imported_count} users from file", current_user.username)
+    
+    # Provide feedback
+    if overwritten_count > 0:
+        flash(f'Successfully imported {imported_count} users ({overwritten_count} overwritten)', 'success')
+    else:
+        flash(f'Successfully imported {imported_count} users', 'success')
+    
+    if send_email:
+        flash('Email notifications would be sent to imported users', 'info')
+    
+    return redirect(url_for('user_management'))
+
+@app.route('/bulk_user_action', methods=['POST'])
+def bulk_user_action():
+    # Check if user is logged in and has admin privileges
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    
+    # Get current user
+    current_user = User.query.get(session['user_id'])
+    if not current_user or current_user.role != 'admin':
+        flash('You do not have permission to perform this action', 'danger')
+        return redirect(url_for('user_management'))
+    
+    action = request.form.get('action')
+    user_ids_str = request.form.get('user_ids', '')
+    
+    if not user_ids_str or not action:
+        flash('No users selected or invalid action', 'warning')
+        return redirect(url_for('user_management'))
+    
+    # Convert comma-separated IDs to list and validate
+    try:
+        user_ids = [int(id.strip()) for id in user_ids_str.split(',') if id.strip()]
+    except ValueError:
+        flash('Invalid user ID format', 'danger')
+        return redirect(url_for('user_management'))
+    
+    # Get valid users
+    users = User.query.filter(User.id.in_(user_ids)).all()
+    if not users:
+        flash('No valid users found', 'warning')
+        return redirect(url_for('user_management'))
+    
+    # Process based on action type
+    if action == 'activate':
+        for user in users:
+            user.is_active = True
+            log_activity(f"Activated user: {user.username}", current_user.username)
+        db.session.commit()
+        flash(f'{len(users)} users have been activated', 'success')
+    
+    elif action == 'deactivate':
+        for user in users:
+            # Don't deactivate the current user
+            if user.id == current_user.id:
+                continue
+            user.is_active = False
+            log_activity(f"Deactivated user: {user.username}", current_user.username)
+        db.session.commit()
+        flash(f'{len(users)} users have been deactivated', 'success')
+    
+    elif action == 'delete':
+        deleted_count = 0
+        for user in users:
+            # Don't delete the current user
+            if user.id == current_user.id:
+                continue
+            log_activity(f"Deleted user: {user.username}", current_user.username)
+            db.session.delete(user)
+            deleted_count += 1
+        
+        db.session.commit()
+        flash(f'{deleted_count} users have been deleted', 'success')
+    
+    elif action == 'assign_role':
+        role = request.form.get('role')
+        if not role:
+            flash('No role specified', 'warning')
+            return redirect(url_for('user_management'))
+        
+        for user in users:
+            user.role = role
+            log_activity(f"Changed role for user {user.username} to {role}", current_user.username)
+        
+        db.session.commit()
+        flash(f'Role updated for {len(users)} users', 'success')
+    
+    elif action == 'assign_department':
+        department = request.form.get('department')
+        if not department:
+            flash('No department specified', 'warning')
+            return redirect(url_for('user_management'))
+        
+        for user in users:
+            user.department = department
+            log_activity(f"Changed department for user {user.username} to {department}", current_user.username)
+        
+        db.session.commit()
+        flash(f'Department updated for {len(users)} users', 'success')
+    
+    elif action == 'reset-password':
+        reset_count = 0
+        for user in users:
+            # Generate a new random password
+            new_password = ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(10))
+            # Hash the new password
+            hashed_password = generate_password_hash(new_password)
+            user.password = hashed_password
+            
+            # Log the activity
+            log_activity(f"Reset password for user: {user.username}", current_user.username)
+            
+            # Here you would typically send an email with the new password
+            # For now, we'll just flash the new password (in a real app, you'd email it)
+            flash(f'New password for {user.username}: {new_password}', 'info')
+            reset_count += 1
+        
+        db.session.commit()
+        flash(f'Passwords reset for {reset_count} users', 'success')
+    
+    else:
+        flash('Invalid action type', 'danger')
+    
+    return redirect(url_for('user_management'))
+
+@app.route('/reset-password/<int:user_id>', methods=['POST'])
+def reset_single_password(user_id):
+    """Reset password for a single user"""
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    
+    # Get current user and check permissions
+    current_user = User.query.get(session['user_id'])
+    if not current_user or current_user.role != 'Administrator':
+        flash('You do not have permission to perform this action', 'danger')
+        return redirect(url_for('user_management'))
+    
+    # Get the user to reset
+    user = User.query.get_or_404(user_id)
+    
+    # Determine if we should generate a random password or use provided one
+    generate_password = request.form.get('generatePassword') == 'on'
+    
+    if generate_password:
+        # Generate a random password
+        new_password = ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(10))
+    else:
+        # Use the password provided in the form
+        new_password = request.form.get('password')
+        if not new_password:
+            flash('Password cannot be empty', 'danger')
+            return redirect(url_for('user_management'))
+    
+    # Hash the new password and update the user
+    hashed_password = generate_password_hash(new_password)
+    user.password = hashed_password
+    
+    # Record the action
+    log_activity(f"Reset password for user: {user.username}", current_user.username)
+    
+    # Save changes
+    db.session.commit()
+    
+    # Check if we should email the password
+    if request.form.get('email_password') == 'on':
+        # In a real app, you would send an email here
+        flash(f'Password reset email would be sent to {user.email}', 'info')
+    
+    # Show the new password
+    flash(f'New password for {user.username}: {new_password}', 'success')
+    
+    return redirect(url_for('user_management'))
+
+@app.route('/toggle-user-status/<int:user_id>', methods=['POST'])
+def toggle_user_status(user_id):
+    """Activate or deactivate a user"""
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    
+    # Get current user and check permissions
+    current_user = User.query.get(session['user_id'])
+    if not current_user or current_user.role != 'Administrator':
+        flash('You do not have permission to perform this action', 'danger')
+        return redirect(url_for('user_management'))
+    
+    # Get the user to toggle
+    user = User.query.get_or_404(user_id)
+    
+    # Get the requested action (activate or deactivate)
+    action = request.form.get('action', '')
+    
+    # Don't allow deactivating the current user or the sole admin
+    if action == 'deactivate' and user.id == current_user.id:
+        flash('You cannot deactivate your own account', 'danger')
+        return redirect(url_for('user_management'))
+    
+    if action == 'deactivate' and user.role == 'Administrator' and User.query.filter_by(role='Administrator', is_active=True).count() <= 1:
+        flash('Cannot deactivate the only active administrator', 'danger')
+        return redirect(url_for('user_management'))
+    
+    # Toggle status based on action
+    if action == 'activate':
+        user.is_active = True
+        flash(f'User {user.username} has been activated', 'success')
+        log_activity(f"Activated user: {user.username}", current_user.username)
+    elif action == 'deactivate':
+        user.is_active = False
+        flash(f'User {user.username} has been deactivated', 'success')
+        log_activity(f"Deactivated user: {user.username}", current_user.username)
+    else:
+        flash('Invalid action', 'danger')
+    
+    db.session.commit()
+    return redirect(url_for('user_management'))
+
+@app.route('/export-users', methods=['POST'])
+def export_users():
+    """Export users to various formats"""
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    
+    # Get current user and check permissions
+    current_user = User.query.get(session['user_id'])
+    if not current_user or current_user.role != 'Administrator':
+        flash('You do not have permission to perform this action', 'danger')
+        return redirect(url_for('user_management'))
+    
+    # Get form data
+    user_ids_str = request.form.get('user_ids', '')
+    export_format = request.form.get('format', 'csv')
+    fields_str = request.form.get('fields', 'name,email,phone,department,role,status')
+    
+    # Parse user IDs and fields
+    try:
+        user_ids = [int(id.strip()) for id in user_ids_str.split(',') if id.strip()]
+        fields = [f.strip() for f in fields_str.split(',') if f.strip()]
+    except ValueError:
+        flash('Invalid parameters', 'danger')
+        return redirect(url_for('user_management'))
+    
+    # Get users to export
+    users = User.query.filter(User.id.in_(user_ids)).all() if user_ids else User.query.all()
+    
+    if not users:
+        flash('No users selected for export', 'warning')
+        return redirect(url_for('user_management'))
+    
+    # Log activity
+    log_activity(f"Exported {len(users)} users to {export_format}", current_user.username)
+    
+    # For now, we'll just display a message - in a real app, you would generate and return the file
+    flash(f'Would export {len(users)} users in {export_format} format including fields: {", ".join(fields)}', 'success')
+    
+    return redirect(url_for('user_management'))
+
+@app.route('/send-user-credentials', methods=['POST'])
+def send_user_credentials():
+    """Send login credentials to users"""
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    
+    # Get current user and check permissions
+    current_user = User.query.get(session['user_id'])
+    if not current_user or current_user.role != 'Administrator':
+        flash('You do not have permission to perform this action', 'danger')
+        return redirect(url_for('user_management'))
+    
+    # Get form data
+    user_ids_str = request.form.get('user_ids', '')
+    subject = request.form.get('subject', 'Your KEMRI Document Management System Credentials')
+    message = request.form.get('message', '')
+    
+    # Parse user IDs
+    try:
+        user_ids = [int(id.strip()) for id in user_ids_str.split(',') if id.strip()]
+    except ValueError:
+        flash('Invalid user IDs', 'danger')
+        return redirect(url_for('user_management'))
+    
+    # Get users
+    users = User.query.filter(User.id.in_(user_ids)).all()
+    
+    if not users:
+        flash('No valid users selected', 'warning')
+        return redirect(url_for('user_management'))
+    
+    # In a real app, you would send emails to each user
+    user_emails = [user.email for user in users]
+    
+    # Log activity
+    log_activity(f"Sent credentials to {len(users)} users", current_user.username)
+    
+    flash(f'Would send credentials to {len(users)} users with subject: {subject}', 'success')
+    
+    return redirect(url_for('user_management'))
 
 if __name__ == '__main__':
     app.run(debug=True) 

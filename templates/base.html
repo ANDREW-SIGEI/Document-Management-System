@@ -228,6 +228,16 @@
                     <i class="fas fa-search"></i> Track Document
                 </a>
                 {% endif %}
+                {% if has_endpoint('file_manager') %}
+                <a href="{{ url_for('file_manager') }}" class="sidebar-menu-item {% if request.endpoint == 'file_manager' %}active{% endif %}">
+                    <i class="fas fa-file"></i> File Manager
+                </a>
+                {% endif %}
+                {% if has_endpoint('registry_approval') and session.get('role') in ['Administrator', 'Registry'] %}
+                <a href="{{ url_for('registry_approval') }}" class="sidebar-menu-item {% if request.endpoint == 'registry_approval' %}active{% endif %}">
+                    <i class="fas fa-clipboard-check"></i> Registry Workflow
+                </a>
+                {% endif %}
                 
                 <!-- Separator before logout -->
                 <div class="border-top my-3"></div>
@@ -273,7 +283,7 @@
             <!-- Footer -->
             <footer class="footer">
                 <div class="container">
-                    <span>&copy; {{ now().strftime('%Y') }} KEMRI Laboratory System. All rights reserved.</span>
+                    <span>&copy; {{ current_year }} KEMRI Laboratory System. All rights reserved.</span>
                 </div>
             </footer>
         </div>

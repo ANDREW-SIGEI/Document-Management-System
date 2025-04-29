@@ -3,494 +3,593 @@
 {% block title %}Incoming Documents - Document Management System{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap">
-    <h1 class="h2 mb-2 mb-md-0">Incoming Documents</h1>
-    <div class="d-flex gap-2">
-        <a href="{{ url_for('track_document') }}" class="btn btn-info mr-2">
-            <i class="fas fa-search"></i> Track Document
-        </a>
-        <a href="/compose?type=incoming" class="btn btn-primary">
-            <i class="fas fa-plus"></i> New Incoming Document
-        </a>
-        <button type="button" class="btn btn-outline-primary" id="bulkActionsBtn" disabled data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-            <i class="fas fa-tasks"></i> Bulk Actions
-        </button>
-        <div class="dropdown-menu dropdown-menu-right" aria-labelledby="bulkActionsBtn">
-            <form id="bulkActionForm" action="{{ url_for('incoming_bulk_action') }}" method="post" aria-label="Bulk actions form">
-                <input type="hidden" name="bulk_action" id="bulkActionType" value="" title="Bulk action type">
-                <div id="selectedDocsContainer"></div>
-                <button type="button" class="dropdown-item bulk-action-btn" data-action="mark_pending">
-                    <i class="fas fa-clock text-warning"></i> Mark as Pending
-                </button>
-                <button type="button" class="dropdown-item bulk-action-btn" data-action="mark_received">
-                    <i class="fas fa-check-circle text-success"></i> Mark as Received
-                </button>
-                <div class="dropdown-divider"></div>
-                <button type="button" class="dropdown-item bulk-action-btn" data-action="print">
-                    <i class="fas fa-print text-secondary"></i> Print Selected
-                </button>
-                <button type="button" class="dropdown-item bulk-action-btn" data-action="export">
-                    <i class="fas fa-file-export text-primary"></i> Export Selected
-                </button>
-            </form>
+<div class="container-fluid py-4">
+    <div class="row mb-4">
+        <div class="col">
+            <h2><i class="fas fa-download me-2"></i>Incoming Documents</h2>
+            <p class="text-muted">Manage and track all documents received by your organization</p>
         </div>
     </div>
-</div>
 
-{% with messages = get_flashed_messages(with_categories=true) %}
-  {% if messages %}
-    {% for category, message in messages %}
-      <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-        {{ message }}
-        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-          <span aria-hidden="true">&times;</span>
-        </button>
-      </div>
-    {% endfor %}
-  {% endif %}
-{% endwith %}
-
-<!-- Quick Search and Filters -->
-<div class="card mb-4">
-    <div class="card-body">
-        <form id="searchForm" action="{{ url_for('incoming') }}" method="GET">
-            <div class="row">
-                <div class="col-lg-8 col-md-12 mb-3 mb-lg-0">
-                    <div class="input-group">
-                        <input type="text" class="form-control" name="search" value="{{ search_query }}" placeholder="Search by code, sender, title or content...">
-                        <div class="input-group-append">
-                            <button class="btn btn-primary" type="submit" aria-label="Search">
-                                <i class="fas fa-search"></i> Search
-                            </button>
+    <!-- Status Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card border-primary mb-3">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-primary mb-1">All Incoming</h6>
+                            <h3 class="mb-0">{{ status_counts.Incoming + status_counts.Pending + status_counts.Received }}</h3>
+                        </div>
+                        <div class="bg-primary bg-opacity-10 rounded-circle p-3">
+                            <i class="fas fa-inbox fa-2x text-primary"></i>
                         </div>
                     </div>
                 </div>
-                <div class="col-lg-4 col-md-12">
-                    <div class="d-flex flex-wrap">
-                        <div class="input-group input-group-sm mr-2 mb-2 mb-md-0">
-                            <div class="input-group-prepend">
-                                <label class="input-group-text" for="statusFilter">Status</label>
-                            </div>
-                            <select class="custom-select" id="statusFilter" name="status" title="Filter by status">
-                                <option value="All" {% if status_filter == 'All' %}selected{% endif %}>All Statuses</option>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-warning mb-3">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-warning mb-1">Pending</h6>
+                            <h3 class="mb-0">{{ status_counts.Pending }}</h3>
+                        </div>
+                        <div class="bg-warning bg-opacity-10 rounded-circle p-3">
+                            <i class="fas fa-clock fa-2x text-warning"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-success mb-3">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-success mb-1">Received</h6>
+                            <h3 class="mb-0">{{ status_counts.Received }}</h3>
+                        </div>
+                        <div class="bg-success bg-opacity-10 rounded-circle p-3">
+                            <i class="fas fa-check-circle fa-2x text-success"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-danger mb-3">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-danger mb-1">Urgent</h6>
+                            <h3 class="mb-0">{{ priority_counts.Urgent }}</h3>
+                        </div>
+                        <div class="bg-danger bg-opacity-10 rounded-circle p-3">
+                            <i class="fas fa-exclamation-circle fa-2x text-danger"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Advanced Search & Filter -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Search & Filter</h5>
+            <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#filterCollapse">
+                <i class="fas fa-filter me-1"></i> Filters
+            </button>
+        </div>
+        <div class="collapse" id="filterCollapse">
+            <div class="card-body border-bottom">
+                <form action="{{ url_for('incoming') }}" method="GET">
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Keyword Search</label>
+                            <input type="text" class="form-control" name="search" placeholder="Search by title, sender, recipient..." value="{{ search_query }}">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Status</label>
+                            <select class="form-select" name="status" title="Filter by status">
+                                <option value="all">All Statuses</option>
                                 <option value="Incoming" {% if status_filter == 'Incoming' %}selected{% endif %}>Incoming</option>
                                 <option value="Pending" {% if status_filter == 'Pending' %}selected{% endif %}>Pending</option>
                                 <option value="Received" {% if status_filter == 'Received' %}selected{% endif %}>Received</option>
                             </select>
                         </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Priority</label>
+                            <select class="form-select" name="priority" title="Filter by priority">
+                                <option value="All" {% if priority_filter == 'All' %}selected{% endif %}>All Priorities</option>
+                                <option value="Normal" {% if priority_filter == 'Normal' %}selected{% endif %}>Normal</option>
+                                <option value="Priority" {% if priority_filter == 'Priority' %}selected{% endif %}>Priority</option>
+                                <option value="Urgent" {% if priority_filter == 'Urgent' %}selected{% endif %}>Urgent</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Date Range</label>
+                            <select class="form-select" name="date_range" id="date_range" title="Filter by date range">
+                                <option value="all" {% if date_range == 'all' %}selected{% endif %}>All Time</option>
+                                <option value="today" {% if date_range == 'today' %}selected{% endif %}>Today</option>
+                                <option value="week" {% if date_range == 'week' %}selected{% endif %}>This Week</option>
+                                <option value="month" {% if date_range == 'month' %}selected{% endif %}>This Month</option>
+                                <option value="custom" {% if date_range == 'custom' %}selected{% endif %}>Custom Range</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Sort By</label>
+                            <select class="form-select" name="sort_by" title="Sort documents by">
+                                <option value="date" {% if sort_by == 'date' %}selected{% endif %}>Date</option>
+                                <option value="priority" {% if sort_by == 'priority' %}selected{% endif %}>Priority</option>
+                                <option value="sender" {% if sort_by == 'sender' %}selected{% endif %}>Sender</option>
+                            </select>
+                        </div>
+                        <div class="col-md-12 date-range-inputs" {% if date_range == 'custom' %}style="display: flex"{% else %}style="display: none"{% endif %}>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <label class="form-label">Start Date</label>
+                                    <input type="date" class="form-control" name="start_date" value="{{ start_date }}">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">End Date</label>
+                                    <input type="date" class="form-control" name="end_date" value="{{ end_date }}">
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    <input type="hidden" name="priority" id="priorityFilter" value="{{ priority_filter }}">
-                    <input type="hidden" name="sort_by" id="sortBy" value="{{ sort_by }}">
-                    <input type="hidden" name="sort_order" id="sortOrder" value="{{ sort_order }}">
-                    <input type="hidden" name="page" id="page" value="{{ pagination.page }}">
+                    <div class="d-flex justify-content-end mt-3">
+                        <a href="{{ url_for('incoming') }}" class="btn btn-outline-secondary me-2">Reset</a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-search me-1"></i> Search
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Documents Table with Batch Actions -->
+    <div class="card shadow-sm">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Incoming Documents</h5>
+            <div>
+                <button class="btn btn-sm btn-outline-primary me-2" data-bs-toggle="modal" data-bs-target="#importModal">
+                    <i class="fas fa-file-import me-1"></i> Import
+                </button>
+                <div class="dropdown d-inline-block">
+                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" title="More options">
+                        <i class="fas fa-ellipsis-v"></i>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><a class="dropdown-item" href="#" id="selectAllBtn"><i class="fas fa-check-square me-2"></i>Select All</a></li>
+                        <li><a class="dropdown-item" href="#" id="deselectAllBtn"><i class="fas fa-square me-2"></i>Deselect All</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#exportModal"><i class="fas fa-file-export me-2"></i>Export</a></li>
+                        <li><a class="dropdown-item" href="#" onclick="window.print()"><i class="fas fa-print me-2"></i>Print</a></li>
+                    </ul>
                 </div>
             </div>
+        </div>
+        <form action="{{ url_for('incoming_bulk_action') }}" method="POST" id="bulkActionForm">
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width: 40px;">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="selectAll" title="Select all documents">
+                                    </div>
+                                </th>
+                                <th>Document ID</th>
+                                <th>Title</th>
+                                <th>Sender</th>
+                                <th>Date Received</th>
+                                <th>Status</th>
+                                <th>Priority</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% if documents %}
+                                {% for doc in documents %}
+                                <tr>
+                                    <td>
+                                        <div class="form-check">
+                                            <input class="form-check-input doc-select" type="checkbox" name="selected_docs[]" value="{{ doc.id }}" title="Select document">
+                                        </div>
+                                    </td>
+                                    <td><a href="{{ url_for('document_details', doc_code=doc.code) }}" class="text-primary">{{ doc.code }}</a></td>
+                                    <td>{{ doc.title }}</td>
+                                    <td>{{ doc.sender }}</td>
+                                    <td>{{ doc.date_received }}</td>
+                                    <td>
+                                        <span class="badge rounded-pill bg-{{ 'primary' if doc.status == 'Incoming' else 'warning' if doc.status == 'Pending' else 'success' }}">
+                                            {{ doc.status }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="badge rounded-pill bg-{{ 'danger' if doc.priority == 'Urgent' else 'warning' if doc.priority == 'Priority' else 'info' }}">
+                                            {{ doc.priority }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <div class="btn-group">
+                                            <a href="{{ url_for('document_details', doc_code=doc.code) }}" class="btn btn-sm btn-outline-primary">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                            <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown">
+                                                <span class="visually-hidden">Toggle Dropdown</span>
+                                            </button>
+                                            <ul class="dropdown-menu dropdown-menu-end">
+                                                <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#forwardModal" data-doc-id="{{ doc.id }}"><i class="fas fa-share me-2"></i>Forward</a></li>
+                                                <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#statusModal" data-doc-id="{{ doc.id }}"><i class="fas fa-exchange-alt me-2"></i>Change Status</a></li>
+                                                <li><hr class="dropdown-divider"></li>
+                                                <li><a class="dropdown-item text-danger" href="#" data-bs-toggle="modal" data-bs-target="#archiveModal" data-doc-id="{{ doc.id }}"><i class="fas fa-archive me-2"></i>Archive</a></li>
+                                            </ul>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr>
+                                    <td colspan="8" class="text-center py-4">
+                                        <div class="py-5">
+                                            <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                                            <h5>No incoming documents found</h5>
+                                            <p class="text-muted">Try adjusting your search or filter criteria</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            {% if documents %}
+            <div class="card-footer bg-white d-flex justify-content-between align-items-center">
+                <div class="bulk-actions">
+                    <select class="form-select form-select-sm d-inline-block w-auto" name="bulk_action" title="Select bulk action">
+                        <option value="">Bulk Actions</option>
+                        <option value="mark_received">Mark as Received</option>
+                        <option value="mark_pending">Mark as Pending</option>
+                        <option value="assign">Assign to Department</option>
+                        <option value="archive">Archive</option>
+                    </select>
+                    <button type="submit" class="btn btn-sm btn-secondary">Apply</button>
+                </div>
+                
+                <nav aria-label="Document navigation">
+                    <ul class="pagination pagination-sm mb-0">
+                        {% if pagination.has_prev %}
+                            <li class="page-item">
+                                <a class="page-link" href="{{ url_for('incoming', page=pagination.prev_num, search=search_query, priority=priority_filter, sort_by=sort_by, sort_order=sort_order) }}">Previous</a>
+                            </li>
+                        {% else %}
+                            <li class="page-item disabled">
+                                <a class="page-link" href="#">Previous</a>
+                            </li>
+                        {% endif %}
+                        
+                        {% for page_num in pagination.iter_pages() %}
+                            {% if page_num %}
+                                {% if page_num != pagination.page %}
+                                    <li class="page-item">
+                                        <a class="page-link" href="{{ url_for('incoming', page=page_num, search=search_query, priority=priority_filter, sort_by=sort_by, sort_order=sort_order) }}">{{ page_num }}</a>
+                                    </li>
+                                {% else %}
+                                    <li class="page-item active">
+                                        <a class="page-link" href="#">{{ page_num }}</a>
+                                    </li>
+                                {% endif %}
+                            {% else %}
+                                <li class="page-item disabled">
+                                    <a class="page-link" href="#">...</a>
+                                </li>
+                            {% endif %}
+                        {% endfor %}
+                        
+                        {% if pagination.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="{{ url_for('incoming', page=pagination.next_num, search=search_query, priority=priority_filter, sort_by=sort_by, sort_order=sort_order) }}">Next</a>
+                            </li>
+                        {% else %}
+                            <li class="page-item disabled">
+                                <a class="page-link" href="#">Next</a>
+                            </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+            </div>
+            {% endif %}
         </form>
     </div>
 </div>
 
-<!-- Stats Cards -->
-<div class="row mb-4">
-    <div class="col-md-4 col-sm-6 mb-3 mb-md-0">
-        <div class="card border-left-info shadow h-100 py-2">
-            <div class="card-body">
-                <div class="row no-gutters align-items-center">
-                    <div class="col mr-2">
-                        <div class="text-xs font-weight-bold text-info text-uppercase mb-1">Incoming</div>
-                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ status_counts.Incoming }}</div>
-                    </div>
-                    <div class="col-auto">
-                        <i class="fas fa-inbox fa-2x text-gray-300"></i>
-                    </div>
-                </div>
-                <div class="mt-2">
-                    <a href="{{ url_for('incoming', status='Incoming') }}" class="btn btn-sm btn-outline-info btn-block">View Only Incoming</a>
-                </div>
+<!-- Modals -->
+<!-- Forward Document Modal -->
+<div class="modal fade" id="forwardModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Forward Document</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-        </div>
-    </div>
-    <div class="col-md-4 col-sm-6 mb-3 mb-md-0">
-        <div class="card border-left-warning shadow h-100 py-2">
-            <div class="card-body">
-                <div class="row no-gutters align-items-center">
-                    <div class="col mr-2">
-                        <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">Pending</div>
-                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ status_counts.Pending }}</div>
+            <div class="modal-body">
+                <form>
+                    <input type="hidden" id="forward_doc_id" name="doc_id">
+                    <div class="mb-3">
+                        <label class="form-label">Forward To Department</label>
+                        <select class="form-select" name="department">
+                            <option value="">Select Department</option>
+                            <option value="Finance">Finance</option>
+                            <option value="HR">Human Resources</option>
+                            <option value="IT">IT Department</option>
+                            <option value="Research">Research</option>
+                            <option value="Operations">Operations</option>
+                        </select>
                     </div>
-                    <div class="col-auto">
-                        <i class="fas fa-clock fa-2x text-gray-300"></i>
+                    <div class="mb-3">
+                        <label class="form-label">Forward To Person (Optional)</label>
+                        <select class="form-select" name="person">
+                            <option value="">Select Person</option>
+                            <option value="1">John Doe</option>
+                            <option value="2">Jane Smith</option>
+                            <option value="3">Mark Johnson</option>
+                        </select>
                     </div>
-                </div>
-                <div class="mt-2">
-                    <a href="{{ url_for('incoming', status='Pending') }}" class="btn btn-sm btn-outline-warning btn-block">View Only Pending</a>
-                </div>
+                    <div class="mb-3">
+                        <label class="form-label">Comments</label>
+                        <textarea class="form-control" name="comments" rows="3" placeholder="Add any notes or instructions..."></textarea>
+                    </div>
+                </form>
             </div>
-        </div>
-    </div>
-    <div class="col-md-4 col-sm-6">
-        <div class="card border-left-success shadow h-100 py-2">
-            <div class="card-body">
-                <div class="row no-gutters align-items-center">
-                    <div class="col mr-2">
-                        <div class="text-xs font-weight-bold text-success text-uppercase mb-1">Received</div>
-                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ status_counts.Received }}</div>
-                    </div>
-                    <div class="col-auto">
-                        <i class="fas fa-check-circle fa-2x text-gray-300"></i>
-                    </div>
-                </div>
-                <div class="mt-2">
-                    <a href="{{ url_for('incoming', status='Received') }}" class="btn btn-sm btn-outline-success btn-block">View Only Received</a>
-                </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary">Forward Document</button>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Priority Filter Tabs -->
-<div class="card mb-4">
-    <div class="card-body p-0">
-        <ul class="nav nav-pills nav-fill">
-            <li class="nav-item">
-                <a class="nav-link {% if priority_filter == 'All' %}active{% endif %} priority-filter" href="#" data-priority="All">
-                    <i class="fas fa-list-ul mr-1"></i> All Priorities
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link {% if priority_filter == 'Urgent' %}active{% endif %} priority-filter" href="#" data-priority="Urgent">
-                    <i class="fas fa-exclamation-circle text-danger mr-1"></i> Urgent
-                    <span class="badge badge-pill badge-danger ml-1">{{ priority_counts.Urgent }}</span>
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link {% if priority_filter == 'Priority' %}active{% endif %} priority-filter" href="#" data-priority="Priority">
-                    <i class="fas fa-exclamation text-warning mr-1"></i> Priority
-                    <span class="badge badge-pill badge-warning ml-1">{{ priority_counts.Priority }}</span>
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link {% if priority_filter == 'Normal' %}active{% endif %} priority-filter" href="#" data-priority="Normal">
-                    <i class="fas fa-file text-secondary mr-1"></i> Normal
-                    <span class="badge badge-pill badge-secondary ml-1">{{ priority_counts.Normal }}</span>
-                </a>
-            </li>
-        </ul>
+<!-- Change Status Modal -->
+<div class="modal fade" id="statusModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Change Document Status</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form>
+                    <input type="hidden" id="status_doc_id" name="doc_id">
+                    <div class="mb-3">
+                        <label class="form-label">New Status</label>
+                        <select class="form-select" name="status">
+                            <option value="Incoming">Incoming</option>
+                            <option value="Pending">Pending</option>
+                            <option value="Received">Received</option>
+                            <option value="Filed">Filed</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Comments</label>
+                        <textarea class="form-control" name="comments" rows="3" placeholder="Add any notes about this status change..."></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary">Update Status</button>
+            </div>
+        </div>
     </div>
 </div>
 
-<!-- Documents Table -->
-<div class="card shadow">
-    <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
-        <h5 class="mb-0 font-weight-bold text-primary">Document List</h5>
-        <div class="btn-group btn-group-sm">
-            <button type="button" class="btn btn-outline-secondary sort-btn {% if sort_by == 'date' %}active{% endif %}" data-sort="date" title="Sort by date">
-                Date 
-                {% if sort_by == 'date' %}
-                <i class="fas fa-sort-{% if sort_order == 'desc' %}down{% else %}up{% endif %}"></i>
-                {% endif %}
-            </button>
-            <button type="button" class="btn btn-outline-secondary sort-btn {% if sort_by == 'priority' %}active{% endif %}" data-sort="priority" title="Sort by priority">
-                Priority 
-                {% if sort_by == 'priority' %}
-                <i class="fas fa-sort-{% if sort_order == 'desc' %}down{% else %}up{% endif %}"></i>
-                {% endif %}
-            </button>
-            <button type="button" class="btn btn-outline-secondary sort-btn {% if sort_by == 'code' %}active{% endif %}" data-sort="code" title="Sort by code">
-                Code 
-                {% if sort_by == 'code' %}
-                <i class="fas fa-sort-{% if sort_order == 'desc' %}down{% else %}up{% endif %}"></i>
-                {% endif %}
-            </button>
-            <button type="button" class="btn btn-outline-secondary sort-btn {% if sort_by == 'action' %}active{% endif %}" data-sort="action" title="Sort by action">
-                Action 
-                {% if sort_by == 'action' %}
-                <i class="fas fa-sort-{% if sort_order == 'desc' %}down{% else %}up{% endif %}"></i>
-                {% endif %}
-            </button>
+<!-- Import Modal -->
+<div class="modal fade" id="importModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Import Documents</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form>
+                    <div class="mb-3">
+                        <label class="form-label">Import Source</label>
+                        <select class="form-select" name="import_source">
+                            <option value="csv">CSV File</option>
+                            <option value="excel">Excel Spreadsheet</option>
+                            <option value="scanned">Scanned Documents</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">File Upload</label>
+                        <input type="file" class="form-control" name="import_file">
+                        <div class="form-text">Supported formats: CSV, XLSX, PDF</div>
+                    </div>
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="overwrite_existing" name="overwrite_existing">
+                            <label class="form-check-label" for="overwrite_existing">Overwrite existing records</label>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary">Import</button>
+            </div>
         </div>
     </div>
-    <div class="card-body p-0">
-        <div class="table-responsive">
-            <table class="table table-hover mb-0">
-                <thead class="bg-light">
-                    <tr>
-                        <th style="width: 40px;">
-                            <div class="custom-control custom-checkbox">
-                                <input type="checkbox" class="custom-control-input" id="selectAll" title="Select all documents">
-                                <label class="custom-control-label" for="selectAll"><span class="sr-only">Select All</span></label>
-                            </div>
-                        </th>
-                        <th>Doc. Code</th>
-                        <th>Sender</th>
-                        <th>Details</th>
-                        <th>Required Action</th>
-                        <th>Date Received</th>
-                        <th>Priority</th>
-                        <th>Status</th>
-                        <th>Holder</th>
-                        <th style="width: 120px;">Action</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% if documents %}
-                        {% for doc in documents %}
-                        <tr class="{% if doc.priority == 'Urgent' %}table-danger{% elif doc.priority == 'Priority' %}table-warning{% endif %}">
-                            <td>
-                                <div class="custom-control custom-checkbox">
-                                    <input type="checkbox" class="custom-control-input doc-checkbox" id="doc-{{ doc.code }}" value="{{ doc.code }}" title="Select document {{ doc.code }}">
-                                    <label class="custom-control-label" for="doc-{{ doc.code }}"><span class="sr-only">Select</span></label>
-                                </div>
-                            </td>
-                            <td><a href="/document/{{ doc.code }}" class="font-weight-bold text-primary">{{ doc.code }}</a></td>
-                            <td>{{ doc.sender }}</td>
-                            <td>{{ doc.details }}</td>
-                            <td>{{ doc.required_action }}</td>
-                            <td>{{ doc.date_received if doc.date_received is string else doc.date_received.strftime('%d/%m/%Y') if doc.date_received else "N/A" }}</td>
-                            <td>
-                                {% if doc.priority == 'Urgent' %}
-                                    <span class="badge badge-danger">{{ doc.priority }}</span>
-                                {% elif doc.priority == 'Priority' %}
-                                    <span class="badge badge-warning">{{ doc.priority }}</span>
-                                {% else %}
-                                    <span class="badge badge-secondary">{{ doc.priority }}</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                <span class="badge badge-pill {% if doc.status == 'Incoming' %}badge-info{% elif doc.status == 'Pending' %}badge-warning{% elif doc.status == 'Received' %}badge-success{% else %}badge-secondary{% endif %}">
-                                    {{ doc.status }}
-                                </span>
-                            </td>
-                            <td>{{ doc.current_holder }}</td>
-                            <td>
-                                <div class="btn-group btn-group-sm">
-                                    <a href="/document/{{ doc.code }}" class="btn btn-outline-primary" data-toggle="tooltip" title="View Details">
-                                        <i class="fas fa-eye"></i>
-                                    </a>
-                                    <button type="button" class="btn btn-outline-info dropdown-toggle dropdown-toggle-split" data-toggle="dropdown" aria-expanded="false">
-                                        <span class="sr-only">Actions</span>
-                                    </button>
-                                    <div class="dropdown-menu dropdown-menu-right">
-                                        <form action="{{ url_for('update_incoming_status', doc_code=doc.code) }}" method="post">
-                                            <button type="submit" name="status" value="Pending" class="dropdown-item {% if doc.status == 'Pending' %}disabled{% endif %}">
-                                                <i class="fas fa-clock text-warning"></i> Mark as Pending
-                                            </button>
-                                            <button type="submit" name="status" value="Received" class="dropdown-item {% if doc.status == 'Received' %}disabled{% endif %}">
-                                                <i class="fas fa-check-circle text-success"></i> Mark as Received
-                                            </button>
-                                            <button type="submit" name="status" value="Outgoing" class="dropdown-item {% if doc.status == 'Outgoing' %}disabled{% endif %}">
-                                                <i class="fas fa-paper-plane text-info"></i> Move to Outgoing
-                                            </button>
-                                            <div class="dropdown-divider"></div>
-                                            <button type="submit" name="status" value="Ended" class="dropdown-item {% if doc.status == 'Ended' %}disabled{% endif %}">
-                                                <i class="fas fa-archive text-secondary"></i> Mark as Ended
-                                            </button>
-                                        </form>
-                                    </div>
-                                </div>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    {% else %}
-                        <tr>
-                            <td colspan="10" class="text-center py-4">
-                                <div class="py-5">
-                                    <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
-                                    <h5>No incoming documents found</h5>
-                                    <p class="text-muted">Start by <a href="/compose" class="text-primary">uploading a new document</a></p>
-                                </div>
-                            </td>
-                        </tr>
-                    {% endif %}
-                </tbody>
-            </table>
-        </div>
-    </div>
-
-    {% if pagination.pages > 1 %}
-    <div class="card-footer bg-white">
-        <nav aria-label="Document pagination">
-            <ul class="pagination pagination-sm justify-content-center mb-0">
-                {% if pagination.has_prev %}
-                    <li class="page-item">
-                        <a class="page-link" href="#" data-page="{{ pagination.prev_num }}" aria-label="Previous">
-                            <span aria-hidden="true">&laquo;</span>
-                        </a>
-                    </li>
-                {% else %}
-                    <li class="page-item disabled">
-                        <span class="page-link" aria-hidden="true">&laquo;</span>
-                    </li>
-                {% endif %}
-                
-                {% for page_num in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
-                    {% if page_num %}
-                        {% if page_num == pagination.page %}
-                            <li class="page-item active">
-                                <span class="page-link">{{ page_num }}</span>
-                            </li>
-                        {% else %}
-                            <li class="page-item">
-                                <a class="page-link" href="#" data-page="{{ page_num }}">{{ page_num }}</a>
-                            </li>
-                        {% endif %}
-                    {% else %}
-                        <li class="page-item disabled">
-                            <span class="page-link">…</span>
-                        </li>
-                    {% endif %}
-                {% endfor %}
-                
-                {% if pagination.has_next %}
-                    <li class="page-item">
-                        <a class="page-link" href="#" data-page="{{ pagination.next_num }}" aria-label="Next">
-                            <span aria-hidden="true">&raquo;</span>
-                        </a>
-                    </li>
-                {% else %}
-                    <li class="page-item disabled">
-                        <span class="page-link" aria-hidden="true">&raquo;</span>
-                    </li>
-                {% endif %}
-            </ul>
-        </nav>
-    </div>
-    {% endif %}
 </div>
+
+<!-- Export Modal -->
+<div class="modal fade" id="exportModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Export Documents</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form>
+                    <div class="mb-3">
+                        <label class="form-label">Export Format</label>
+                        <select class="form-select" name="export_format">
+                            <option value="csv">CSV</option>
+                            <option value="excel">Excel Spreadsheet</option>
+                            <option value="pdf">PDF Report</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Export Scope</label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="export_scope" id="export_current" value="current" checked>
+                            <label class="form-check-label" for="export_current">Current Filter/Search Results</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="export_scope" id="export_selected" value="selected">
+                            <label class="form-check-label" for="export_selected">Selected Items Only</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="export_scope" id="export_all" value="all">
+                            <label class="form-check-label" for="export_all">All Incoming Documents</label>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary">Export</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Archive Modal -->
+<div class="modal fade" id="archiveModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Archive Document</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="archive_doc_id" name="doc_id">
+                <p>Are you sure you want to archive this document? It will be moved to the archive section and removed from active documents.</p>
+                <div class="mb-3">
+                    <label class="form-label">Reason for Archiving</label>
+                    <select class="form-select" name="archive_reason">
+                        <option value="processed">Processed - No Further Action Needed</option>
+                        <option value="obsolete">Obsolete Document</option>
+                        <option value="duplicate">Duplicate Entry</option>
+                        <option value="error">Created in Error</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Comments</label>
+                    <textarea class="form-control" name="archive_comments" rows="2" placeholder="Additional comments about archiving this document..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger">Archive Document</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
 
 {% block scripts %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Status filter change
-    const statusFilter = document.getElementById('statusFilter');
-    if (statusFilter) {
-        statusFilter.addEventListener('change', function() {
-            // Reset page to 1 when changing filters
-            document.getElementById('page').value = 1;
-            document.getElementById('searchForm').submit();
+    // Handle date range selector
+    const dateRangeSelect = document.getElementById('date_range');
+    const dateRangeInputs = document.querySelector('.date-range-inputs');
+    
+    if (dateRangeSelect) {
+        dateRangeSelect.addEventListener('change', function() {
+            if (this.value === 'custom') {
+                dateRangeInputs.style.display = 'flex';
+            } else {
+                dateRangeInputs.style.display = 'none';
+            }
         });
     }
     
-    // Priority filter buttons
-    const priorityButtons = document.querySelectorAll('.priority-filter');
-    priorityButtons.forEach(button => {
-        button.addEventListener('click', function(e) {
-            e.preventDefault();
-            const priority = this.getAttribute('data-priority');
-            document.getElementById('priorityFilter').value = priority;
-            
-            // Reset page to 1 when changing filters
-            document.getElementById('page').value = 1;
-            
-            document.getElementById('searchForm').submit();
-        });
-    });
+    // Handle select all checkbox
+    const selectAllCheckbox = document.getElementById('selectAll');
+    const documentCheckboxes = document.querySelectorAll('.doc-select');
     
-    // Sorting
-    const sortButtons = document.querySelectorAll('.sort-btn');
-    sortButtons.forEach(button => {
-        button.addEventListener('click', function() {
-            const sortBy = this.getAttribute('data-sort');
-            const currentSortBy = document.getElementById('sortBy').value;
-            let sortOrder = document.getElementById('sortOrder').value;
-            
-            if (sortBy === currentSortBy) {
-                // Toggle sort order if clicking the same column
-                sortOrder = sortOrder === 'asc' ? 'desc' : 'asc';
-            } else {
-                // Default to descending for new sort column
-                sortOrder = 'desc';
-            }
-            
-            document.getElementById('sortBy').value = sortBy;
-            document.getElementById('sortOrder').value = sortOrder;
-            document.getElementById('searchForm').submit();
-        });
-    });
-    
-    // Pagination
-    const pageLinks = document.querySelectorAll('.page-link[data-page]');
-    pageLinks.forEach(link => {
-        link.addEventListener('click', function(e) {
-            e.preventDefault();
-            const page = this.getAttribute('data-page');
-            document.getElementById('page').value = page;
-            document.getElementById('searchForm').submit();
-        });
-    });
-    
-    // Select all checkbox
-    const selectAll = document.getElementById('selectAll');
-    if (selectAll) {
-        selectAll.addEventListener('change', function() {
-            const checkboxes = document.querySelectorAll('.doc-checkbox');
-            checkboxes.forEach(checkbox => {
+    if (selectAllCheckbox) {
+        selectAllCheckbox.addEventListener('change', function() {
+            documentCheckboxes.forEach(checkbox => {
                 checkbox.checked = this.checked;
             });
-            
-            updateBulkActionButton();
         });
     }
     
-    // Individual checkboxes
-    const checkboxes = document.querySelectorAll('.doc-checkbox');
-    checkboxes.forEach(checkbox => {
-        checkbox.addEventListener('change', function() {
-            updateBulkActionButton();
-            
-            // Uncheck "select all" if any checkbox is unchecked
-            if (!this.checked) {
-                selectAll.checked = false;
-            }
-            
-            // Check "select all" if all checkboxes are checked
-            if (document.querySelectorAll('.doc-checkbox:checked').length === checkboxes.length) {
-                selectAll.checked = true;
-            }
-        });
-    });
-    
-    // Bulk action buttons
-    const bulkActionButtons = document.querySelectorAll('.bulk-action-btn');
-    bulkActionButtons.forEach(button => {
-        button.addEventListener('click', function() {
-            const action = this.getAttribute('data-action');
-            document.getElementById('bulkActionType').value = action;
-            
-            // Create hidden inputs for selected documents
-            const selectedDocs = document.querySelectorAll('.doc-checkbox:checked');
-            const container = document.getElementById('selectedDocsContainer');
-            container.innerHTML = '';
-            
-            selectedDocs.forEach(checkbox => {
-                const input = document.createElement('input');
-                input.type = 'hidden';
-                input.name = 'selected_docs';
-                input.value = checkbox.value;
-                container.appendChild(input);
+    // Handle select all button
+    const selectAllBtn = document.getElementById('selectAllBtn');
+    if (selectAllBtn) {
+        selectAllBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            documentCheckboxes.forEach(checkbox => {
+                checkbox.checked = true;
             });
-            
-            document.getElementById('bulkActionForm').submit();
+            if (selectAllCheckbox) selectAllCheckbox.checked = true;
         });
-    });
-    
-    function updateBulkActionButton() {
-        const selectedCount = document.querySelectorAll('.doc-checkbox:checked').length;
-        const bulkActionsBtn = document.getElementById('bulkActionsBtn');
-        
-        if (selectedCount > 0) {
-            bulkActionsBtn.removeAttribute('disabled');
-            bulkActionsBtn.textContent = `Bulk Actions (${selectedCount})`;
-        } else {
-            bulkActionsBtn.setAttribute('disabled', 'disabled');
-            bulkActionsBtn.innerHTML = '<i class="fas fa-tasks"></i> Bulk Actions';
-        }
     }
     
-    // Initialize tooltips
-    if (typeof $ !== 'undefined' && typeof $.fn.tooltip !== 'undefined') {
-        $('[data-toggle="tooltip"]').tooltip();
+    // Handle deselect all button
+    const deselectAllBtn = document.getElementById('deselectAllBtn');
+    if (deselectAllBtn) {
+        deselectAllBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            documentCheckboxes.forEach(checkbox => {
+                checkbox.checked = false;
+            });
+            if (selectAllCheckbox) selectAllCheckbox.checked = false;
+        });
+    }
+    
+    // Update modal doc ID when opened
+    const forwardModal = document.getElementById('forwardModal');
+    if (forwardModal) {
+        forwardModal.addEventListener('show.bs.modal', function(event) {
+            const button = event.relatedTarget;
+            const docId = button.getAttribute('data-doc-id');
+            const docIdInput = forwardModal.querySelector('#forward_doc_id');
+            docIdInput.value = docId;
+        });
+    }
+    
+    const statusModal = document.getElementById('statusModal');
+    if (statusModal) {
+        statusModal.addEventListener('show.bs.modal', function(event) {
+            const button = event.relatedTarget;
+            const docId = button.getAttribute('data-doc-id');
+            const docIdInput = statusModal.querySelector('#status_doc_id');
+            docIdInput.value = docId;
+        });
+    }
+    
+    const archiveModal = document.getElementById('archiveModal');
+    if (archiveModal) {
+        archiveModal.addEventListener('show.bs.modal', function(event) {
+            const button = event.relatedTarget;
+            const docId = button.getAttribute('data-doc-id');
+            const docIdInput = archiveModal.querySelector('#archive_doc_id');
+            docIdInput.value = docId;
+        });
     }
 });
 </script>
-{% endblock %}
 {% endblock %} 

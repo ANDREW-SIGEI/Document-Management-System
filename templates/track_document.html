@@ -1,160 +1,232 @@
 {% extends 'base.html' %}
 
-{% block title %}Track Document - Document Management System{% endblock %}
+{% block title %}Track Documents - Document Management System{% endblock %}
 
 {% block content %}
-<div class="container">
-    <div class="row justify-content-center">
-        <div class="col-lg-8">
-            <div class="card shadow-lg">
+<div class="container-fluid py-4">
+    <div class="row mb-4">
+        <div class="col">
+            <h2><i class="fas fa-search-location me-2"></i>Document Tracking</h2>
+            <p class="text-muted">Search for documents and track their current status</p>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Tracking Code Search -->
+        <div class="col-md-6 mb-4">
+            <div class="card shadow-sm h-100">
                 <div class="card-header bg-primary text-white">
-                    <h4 class="mb-0">Track Document</h4>
+                    <h5 class="mb-0"><i class="fas fa-qrcode me-2"></i>Track by Tracking Code</h5>
                 </div>
                 <div class="card-body">
-                    <form id="trackDocumentForm" action="{{ url_for('track_document') }}" method="GET">
-                        <div class="form-group mb-4">
-                            <label for="documentCode">Document Code</label>
-                            <div class="input-group">
-                                <input type="text" class="form-control" id="documentCode" name="code" placeholder="Enter document code (e.g., DOC-2025-001)" value="{{ request.args.get('code', '') }}" required>
-                                <div class="input-group-append">
-                                    <button class="btn btn-primary" type="submit">
-                                        <i class="fas fa-search me-2"></i> Track
-                                    </button>
-                                </div>
-                            </div>
-                            <small class="form-text text-muted">Enter the unique document code to track its status and history</small>
+                    <p class="text-muted">Enter the document's unique tracking code to see its full history</p>
+                    
+                    <form action="{{ url_for('track_document') }}" method="POST">
+                        <div class="input-group mb-3">
+                            <input type="text" class="form-control form-control-lg" name="tracking_code" placeholder="e.g. KEMRI-20250429-1234" required>
+                            <button class="btn btn-primary" type="submit">
+                                <i class="fas fa-search me-1"></i> Track
+                            </button>
                         </div>
                     </form>
-
-                    {% if search_performed %}
-                        {% if document %}
-                            <!-- Document details -->
-                            <div class="mt-4">
-                                <div class="alert alert-success">
-                                    <div class="d-flex align-items-center">
-                                        <i class="fas fa-check-circle me-3 fa-2x"></i>
-                                        <div>
-                                            <h5 class="mb-1">Document Found</h5>
-                                            <p class="mb-0">Document details are displayed below</p>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <div class="card mb-4 mt-4 border-primary">
-                                    <div class="card-header bg-light">
-                                        <div class="d-flex justify-content-between align-items-center">
-                                            <h5 class="mb-0">{{ document.code }}</h5>
-                                            <span class="badge bg-{% if document.status == 'Incoming' %}primary{% elif document.status == 'Pending' %}warning{% elif document.status == 'Received' %}success{% elif document.status == 'Outgoing' %}info{% else %}secondary{% endif %}">
-                                                {{ document.status }}
-                                            </span>
-                                        </div>
-                                    </div>
-                                    <div class="card-body">
-                                        <h6 class="mb-3">{{ document.title }}</h6>
-                                        
-                                        <div class="row mb-3">
-                                            <div class="col-md-6">
-                                                <p class="mb-1 small text-muted">From (Sender)</p>
-                                                <p class="mb-3">{{ document.sender }}</p>
-                                                
-                                                <p class="mb-1 small text-muted">Date of Letter</p>
-                                                <p class="mb-0">{{ document.date_of_letter.strftime('%d %b %Y') }}</p>
-                                            </div>
-                                            <div class="col-md-6">
-                                                <p class="mb-1 small text-muted">To (Recipient)</p>
-                                                <p class="mb-3">{{ document.recipient }}</p>
-                                                
-                                                <p class="mb-1 small text-muted">Date Received</p>
-                                                <p class="mb-0">{{ document.date_received.strftime('%d %b %Y') }}</p>
-                                            </div>
-                                        </div>
-                                        
-                                        <div class="mb-3">
-                                            <p class="mb-1 small text-muted">Current Holder</p>
-                                            <p class="mb-0">{{ document.current_holder }}</p>
-                                        </div>
-                                        
-                                        <a href="{{ url_for('document_details', doc_code=document.code) }}" class="btn btn-sm btn-outline-primary">
-                                            <i class="fas fa-eye me-1"></i> View Full Details
-                                        </a>
-                                    </div>
-                                </div>
-                                
-                                <!-- Document History Timeline -->
-                                <h5 class="mb-3">Document History</h5>
-                                <div class="timeline mb-4">
-                                    {% for entry in history %}
-                                    <div class="timeline-item">
-                                        <div class="timeline-marker bg-{% if entry.action == 'Document Created' %}success{% elif 'Received' in entry.action %}info{% else %}primary{% endif %}"></div>
-                                        <div class="timeline-content">
-                                            <h6 class="mb-1">{{ entry.action }}</h6>
-                                            <p class="mb-0 small text-muted">{{ entry.timestamp.strftime('%d %b %Y, %H:%M') }}</p>
-                                            <p class="mb-0">{{ entry.details }}</p>
-                                            <small class="text-muted">By {{ entry.user }}</small>
-                                        </div>
-                                    </div>
-                                    {% endfor %}
-                                </div>
-                            </div>
-                        {% else %}
-                            <!-- No document found -->
-                            <div class="alert alert-warning mt-4">
-                                <div class="d-flex align-items-center">
-                                    <i class="fas fa-exclamation-triangle me-3 fa-2x"></i>
-                                    <div>
-                                        <h5 class="mb-1">Document Not Found</h5>
-                                        <p class="mb-0">No document found with the code: {{ request.args.get('code') }}</p>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="text-center my-5">
-                                <p>Please check the document code and try again</p>
-                                <p class="text-muted">If you continue to have issues, please contact support</p>
-                            </div>
-                        {% endif %}
-                    {% else %}
-                        <!-- Initial state -->
-                        <div class="text-center my-5">
-                            <i class="fas fa-search fa-4x text-muted mb-3"></i>
-                            <h5>Enter a document code to track its status</h5>
-                            <p class="text-muted">You can find the document code on the document or in your notification email</p>
+                    
+                    <div class="mt-3">
+                        <h6 class="fw-bold">Direct Tracking Link</h6>
+                        <div class="input-group">
+                            <input type="text" id="tracking_url" class="form-control" placeholder="Enter tracking code above" readonly>
+                            <button class="btn btn-outline-secondary" type="button" id="copy_tracking_url" disabled title="Copy tracking URL">
+                                <i class="fas fa-copy"></i>
+                            </button>
                         </div>
-                    {% endif %}
+                        <div class="form-text">You can also track documents directly with the format: /track/TRACKING-CODE</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Advanced Search -->
+        <div class="col-md-6 mb-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-filter me-2"></i>Advanced Document Search</h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted">Search for documents using multiple criteria</p>
+                    
+                    <form action="{{ url_for('track_document') }}" method="GET">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label for="sender" class="form-label">Sender</label>
+                                <input type="text" class="form-control" id="sender" name="sender" placeholder="Sender name or department">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="recipient" class="form-label">Recipient</label>
+                                <input type="text" class="form-control" id="recipient" name="recipient" placeholder="Recipient name or department">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="status" class="form-label">Status</label>
+                                <select class="form-select" id="status" name="status">
+                                    <option value="">All Statuses</option>
+                                    <option value="Created">Created</option>
+                                    <option value="In Progress">In Progress</option>
+                                    <option value="Pending">Pending</option>
+                                    <option value="Completed">Completed</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="date_range" class="form-label">Date Range</label>
+                                <select class="form-select" id="date_range" name="date_range">
+                                    <option value="all">All Time</option>
+                                    <option value="today">Today</option>
+                                    <option value="week">This Week</option>
+                                    <option value="month">This Month</option>
+                                    <option value="custom">Custom Range</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="d-grid mt-3">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-search me-1"></i> Search Documents
+                            </button>
+                        </div>
+                    </form>
                 </div>
             </div>
         </div>
     </div>
-</div>
 
-<style>
-/* Timeline styling */
-.timeline {
-    position: relative;
-    padding-left: 1.5rem;
-    list-style: none;
-}
-.timeline::before {
-    content: '';
-    position: absolute;
-    left: 0.5rem;
-    top: 0;
-    bottom: 0;
-    width: 2px;
-    background-color: #e0e0e0;
-}
-.timeline-item {
-    position: relative;
-    padding-bottom: 1.5rem;
-}
-.timeline-marker {
-    position: absolute;
-    left: -1.5rem;
-    width: 1rem;
-    height: 1rem;
-    border-radius: 50%;
-}
-.timeline-content {
-    padding-left: 0.5rem;
-}
-</style>
+    {% if error_message %}
+    <div class="alert alert-danger">
+        <i class="fas fa-exclamation-circle me-2"></i> {{ error_message }}
+    </div>
+    {% endif %}
+
+    {% if search_results %}
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">Search Results</h5>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Tracking Code</th>
+                        <th>Title</th>
+                        <th>Sender</th>
+                        <th>Recipient</th>
+                        <th>Status</th>
+                        <th>Date Created</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for doc in search_results %}
+                    <tr>
+                        <td>
+                            <span class="badge bg-primary">{{ doc.tracking_code }}</span>
+                        </td>
+                        <td>{{ doc.title }}</td>
+                        <td>{{ doc.sender }}</td>
+                        <td>{{ doc.recipient }}</td>
+                        <td>
+                            <span class="badge rounded-pill bg-{{ 'warning' if doc.status == 'In Progress' or doc.status == 'Pending' else 'success' if doc.status == 'Completed' else 'info' }}">
+                                {{ doc.status }}
+                            </span>
+                        </td>
+                        <td>{{ doc.date_created }}</td>
+                        <td>
+                            <a href="{{ url_for('track_by_code', tracking_code=doc.tracking_code) }}" class="btn btn-sm btn-primary">
+                                <i class="fas fa-search me-1"></i> Track
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if recent_documents %}
+    <div class="card shadow-sm">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">Recently Tracked Documents</h5>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Tracking Code</th>
+                        <th>Title</th>
+                        <th>Sender</th>
+                        <th>Recipient</th>
+                        <th>Status</th>
+                        <th>Date Created</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for doc in recent_documents %}
+                    <tr>
+                        <td>
+                            <span class="badge bg-primary">{{ doc.tracking_code }}</span>
+                        </td>
+                        <td>{{ doc.title }}</td>
+                        <td>{{ doc.sender }}</td>
+                        <td>{{ doc.recipient }}</td>
+                        <td>
+                            <span class="badge rounded-pill bg-{{ 'warning' if doc.status == 'In Progress' or doc.status == 'Pending' else 'success' if doc.status == 'Completed' else 'info' }}">
+                                {{ doc.status }}
+                            </span>
+                        </td>
+                        <td>{{ doc.date_created }}</td>
+                        <td>
+                            <a href="{{ url_for('track_by_code', tracking_code=doc.tracking_code) }}" class="btn btn-sm btn-primary">
+                                <i class="fas fa-search me-1"></i> Track
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Handle tracking code URL generation
+    const trackingCodeInput = document.querySelector('input[name="tracking_code"]');
+    const trackingUrlInput = document.getElementById('tracking_url');
+    const copyButton = document.getElementById('copy_tracking_url');
+    
+    if (trackingCodeInput && trackingUrlInput && copyButton) {
+        trackingCodeInput.addEventListener('input', function() {
+            if (this.value.trim()) {
+                const url = window.location.origin + '/track/' + this.value.trim();
+                trackingUrlInput.value = url;
+                copyButton.removeAttribute('disabled');
+            } else {
+                trackingUrlInput.value = 'Enter tracking code above';
+                copyButton.setAttribute('disabled', 'disabled');
+            }
+        });
+        
+        copyButton.addEventListener('click', function() {
+            trackingUrlInput.select();
+            document.execCommand('copy');
+            
+            // Show copy feedback
+            const originalText = this.innerHTML;
+            this.innerHTML = '<i class="fas fa-check"></i>';
+            setTimeout(() => {
+                this.innerHTML = originalText;
+            }, 2000);
+        });
+    }
+});
+</script>
 {% endblock %} 

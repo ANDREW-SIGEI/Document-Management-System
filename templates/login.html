@@ -1,354 +1,188 @@
-{% extends "base.html" %}
-
-{% block title %}Login - KEMRI Laboratory System{% endblock %}
-
-{% block styles %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - KEMRI Laboratory System</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
-        .login-container {
-            max-width: 450px;
-            margin: 80px auto;
-            padding: 35px;
-            background-color: #fff;
-            border-radius: 12px;
-            box-shadow: 0 8px 30px rgba(0,0,0,0.12);
-            transition: all 0.3s ease;
+        :root {
+            --primary-color: #2c7be5;
+            --secondary-color: #6c757d;
+            --success-color: #00d97e;
+            --info-color: #39afd1;
+            --warning-color: #f6c343;
+            --danger-color: #e63757;
+            --light-color: #f9fbfd;
+            --dark-color: #12263f;
         }
         
-        .login-container:hover {
-            box-shadow: 0 12px 40px rgba(0,0,0,0.15);
+        body {
+            background-color: #f9fbfd;
+            font-family: 'Nunito', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+        }
+        
+        .login-wrapper {
+            width: 100%;
+            padding: 2rem 1rem;
+        }
+        
+        .login-card {
+            border: none;
+            box-shadow: 0 0.75rem 1.5rem rgba(18, 38, 63, 0.1);
+            border-radius: 0.5rem;
+            overflow: hidden;
+        }
+        
+        .login-header {
+            background-color: #12263f;
+            color: white;
+            padding: 2rem 1.5rem;
+            text-align: center;
         }
         
         .login-logo {
-            text-align: center;
-            margin-bottom: 25px;
-        }
-        
-        .login-logo img {
             max-width: 180px;
-            height: auto;
-            animation: pulse 2s infinite ease-in-out;
+            margin-bottom: 1rem;
         }
         
-        @keyframes pulse {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.05); }
-            100% { transform: scale(1); }
+        .login-body {
+            padding: 2rem;
         }
         
-        .auth-form-header {
-            text-align: center;
-            margin-bottom: 30px;
-        }
-        
-        .auth-form-header h3 {
-            color: #2c3e50;
+        .btn-primary {
+            background-color: var(--primary-color);
+            border-color: var(--primary-color);
+            padding: 0.75rem 1rem;
             font-weight: 600;
-            margin-bottom: 10px;
         }
         
-        .form-floating {
-            margin-bottom: 20px;
+        .btn-primary:hover {
+            background-color: #1a68d1;
+            border-color: #1a68d1;
+        }
+        
+        .form-control {
+            padding: 0.75rem 1rem;
+            border-radius: 0.375rem;
         }
         
         .form-control:focus {
-            border-color: #3498db;
-            box-shadow: 0 0 0 0.25rem rgba(52, 152, 219, 0.25);
-        }
-        
-        .btn-login {
-            background: linear-gradient(135deg, #3498db, #2980b9);
-            border: none;
-            width: 100%;
-            padding: 12px;
-            font-weight: 500;
-            margin-top: 15px;
-            border-radius: 6px;
-            transition: all 0.3s ease;
-        }
-        
-        .btn-login:hover {
-            background: linear-gradient(135deg, #2980b9, #3498db);
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(41, 128, 185, 0.35);
-        }
-        
-        .password-toggle {
-            position: absolute;
-            right: 10px;
-            top: 50%;
-            transform: translateY(-50%);
-            cursor: pointer;
-            color: #6c757d;
-            z-index: 10;
-            transition: color 0.2s ease;
-        }
-        
-        .password-toggle:hover {
-            color: #3498db;
-        }
-        
-        .alerts-container {
-            margin-bottom: 20px;
-        }
-        
-        .form-check {
-            margin-bottom: 15px;
-        }
-        
-        .forgot-password {
-            text-align: right;
-            font-size: 0.9rem;
-        }
-        
-        .forgot-password a {
-            color: #3498db;
-            transition: color 0.2s ease;
-            text-decoration: none;
-        }
-        
-        .forgot-password a:hover {
-            color: #2980b9;
-            text-decoration: underline;
-        }
-        
-        .input-validation-icon {
-            position: absolute;
-            right: 40px;
-            top: 50%;
-            transform: translateY(-50%);
-            display: none;
-        }
-        
-        .is-valid ~ .input-validation-icon.valid-icon {
-            display: block;
-            color: #2ecc71;
-        }
-        
-        .is-invalid ~ .input-validation-icon.invalid-icon {
-            display: block;
-            color: #e74c3c;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 0.2rem rgba(44, 123, 229, 0.25);
         }
         
         .alert {
-            border-radius: 8px;
-            border-left: 4px solid;
+            border-radius: 0.375rem;
+            border: none;
         }
         
-        .alert-danger {
-            border-left-color: #e74c3c;
-            background-color: rgba(231, 76, 60, 0.1);
+        .system-name {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
         }
         
-        .alert-success {
-            border-left-color: #2ecc71;
-            background-color: rgba(46, 204, 113, 0.1);
+        .system-tagline {
+            color: rgba(255, 255, 255, 0.7);
+            margin-bottom: 0;
         }
         
-        .footer-text {
+        .login-footer {
             text-align: center;
-            margin-top: 20px;
-            font-size: 0.8rem;
-            color: #7f8c8d;
+            padding: 1rem;
+            color: #95aac9;
+            font-size: 0.875rem;
+        }
+        
+        .form-floating > label {
+            padding: 0.75rem 1rem;
+        }
+        
+        .form-floating > .form-control {
+            height: calc(3.5rem + 2px);
+            padding: 1rem 1rem;
         }
     </style>
-{% endblock %}
-
-{% block content %}
-<div class="container">
-    <div class="login-container">
-        <div class="login-logo">
-            <img src="{{ url_for('static', filename='images/kemrilogo.png') }}" alt="KEMRI Logo">
-        </div>
-        
-        <div class="auth-form-header">
-            <h3 class="mb-2">Document Management System</h3>
-            <p class="text-muted">Sign in to your account</p>
-        </div>
-        
-        <div class="alerts-container">
+</head>
+<body>
+    <div class="container login-wrapper">
+        <div class="row justify-content-center">
+            <div class="col-12 col-md-8 col-lg-6 col-xl-5">
+                <!-- Flash Messages -->
             {% with messages = get_flashed_messages(with_categories=true) %}
                 {% if messages %}
                     {% for category, message in messages %}
-                    <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-                        <i class="fa fa-{% if category == 'danger' %}exclamation-triangle{% else %}info-circle{% endif %} me-2"></i>
+                            <div class="alert alert-{{ category }} alert-dismissible fade show mb-4" role="alert">
                         {{ message }}
                         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                     </div>
                     {% endfor %}
                 {% endif %}
             {% endwith %}
+                
+                <!-- Login Card -->
+                <div class="card login-card">
+                    <div class="login-header">
+                        <img src="{{ url_for('static', filename='images/kemrilogo.png') }}" alt="KEMRI Logo" class="login-logo" onerror="this.src='https://via.placeholder.com/180x60?text=KEMRI+LOGO'">
+                        <h1 class="system-name">Laboratory Management System</h1>
+                        <p class="system-tagline">Secure login to access your dashboard</p>
         </div>
         
-        <form method="POST" action="{{ url_for('login') }}" id="loginForm" class="needs-validation" novalidate>
-            <div class="form-floating mb-3 position-relative">
+                    <div class="login-body">
+                        <form method="POST" action="{{ url_for('login') }}">
+                            <div class="form-floating mb-4">
                 <input type="text" class="form-control" id="username" name="username" placeholder="Username or Email" required>
-                <label for="username">Username or Email</label>
-                <div class="input-validation-icon valid-icon">
-                    <i class="fa fa-check-circle"></i>
-                </div>
-                <div class="input-validation-icon invalid-icon">
-                    <i class="fa fa-times-circle"></i>
-                </div>
-                <div class="invalid-feedback">Please enter your username or email</div>
+                                <label for="username"><i class="fas fa-user me-2"></i>Username or Email</label>
             </div>
             
-            <div class="form-floating position-relative mb-3">
+                            <div class="form-floating mb-4">
                 <input type="password" class="form-control" id="password" name="password" placeholder="Password" required>
-                <label for="password">Password</label>
-                <span class="password-toggle" onclick="togglePasswordVisibility()">
-                    <i class="fa fa-eye" id="togglePassword"></i>
-                </span>
-                <div class="input-validation-icon valid-icon">
-                    <i class="fa fa-check-circle"></i>
-                </div>
-                <div class="input-validation-icon invalid-icon">
-                    <i class="fa fa-times-circle"></i>
-                </div>
-                <div class="invalid-feedback">Please enter your password</div>
+                                <label for="password"><i class="fas fa-lock me-2"></i>Password</label>
             </div>
             
-            <div class="row mb-3">
-                <div class="col-6">
+                            <div class="d-flex justify-content-between align-items-center mb-4">
                     <div class="form-check">
-                        <input class="form-check-input" type="checkbox" name="remember" id="remember">
+                                    <input class="form-check-input" type="checkbox" id="remember" name="remember">
                         <label class="form-check-label" for="remember">Remember me</label>
                     </div>
-                </div>
-                <div class="col-6">
-                    <div class="forgot-password">
-                        <a href="#" data-bs-toggle="modal" data-bs-target="#resetPasswordModal">Forgot password?</a>
-                    </div>
-                </div>
+                                <a href="#" class="text-decoration-none">Forgot password?</a>
             </div>
             
-            <button type="submit" class="btn btn-primary btn-login">
-                <i class="fa fa-sign-in-alt me-2"></i>Sign In
+                            <button type="submit" class="btn btn-primary w-100 mb-3">
+                                <i class="fas fa-sign-in-alt me-2"></i>Sign In
             </button>
         </form>
         
-        <div class="footer-text mt-4">
-            &copy; {{ now().strftime('%Y') }} KEMRI Laboratory System. All rights reserved.
+        <!-- Debug Login Buttons (only for development) -->
+        <div class="mt-4 text-center">
+            <p class="text-muted">Debug Logins:</p>
+            <div class="btn-group mb-3">
+                <a href="{{ url_for('debug_login', role='Administrator') }}" class="btn btn-sm btn-outline-primary">Admin Login</a>
+                <a href="{{ url_for('debug_login', role='Registry') }}" class="btn btn-sm btn-outline-success">Registry Login</a>
+                <a href="{{ url_for('debug_login', role='User') }}" class="btn btn-sm btn-outline-info">User Login</a>
+                <a href="{{ url_for('debug_login', role='Supervisor') }}" class="btn btn-sm btn-outline-warning">Supervisor Login</a>
+            </div>
         </div>
-    </div>
 </div>
 
-<!-- Password Reset Modal -->
-<div class="modal fade" id="resetPasswordModal" tabindex="-1" aria-labelledby="resetPasswordModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="resetPasswordModalLabel">Reset Password</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <form id="resetPasswordForm">
-                    <div class="mb-3">
-                        <label for="resetEmail" class="form-label">Email address</label>
-                        <input type="email" class="form-control" id="resetEmail" name="email" required>
-                        <div class="form-text">Enter your email address to receive password reset instructions.</div>
+                    <div class="login-footer">
+                        <p class="mb-0">&copy; {{ current_year }} KEMRI Laboratory System. All rights reserved.</p>
                     </div>
-                    <div id="resetErrorMessages" class="alert alert-danger d-none"></div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" id="submitResetRequest">
-                    <i class="fa fa-paper-plane me-1"></i> Send Reset Link
-                </button>
+
+                    <div class="mt-4 text-center">
+                        <p class="text-muted">Don't have an account? <a href="#" class="text-primary">Contact Administrator</a></p>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
-</div>
-{% endblock %}
-
-{% block scripts %}
-<script>
-    // Toggle password visibility
-    function togglePasswordVisibility() {
-        const passwordInput = document.getElementById('password');
-        const toggleIcon = document.getElementById('togglePassword');
-        
-        if (passwordInput.type === 'password') {
-            passwordInput.type = 'text';
-            toggleIcon.classList.remove('fa-eye');
-            toggleIcon.classList.add('fa-eye-slash');
-        } else {
-            passwordInput.type = 'password';
-            toggleIcon.classList.remove('fa-eye-slash');
-            toggleIcon.classList.add('fa-eye');
-        }
-    }
     
-    // Live form validation
-    document.addEventListener('DOMContentLoaded', function() {
-        const usernameInput = document.getElementById('username');
-        const passwordInput = document.getElementById('password');
-        const submitButton = document.querySelector('.btn-login');
-        
-        function validateForm() {
-            let valid = true;
-            
-            if (!usernameInput.value.trim()) {
-                usernameInput.classList.add('is-invalid');
-                usernameInput.classList.remove('is-valid');
-                valid = false;
-            } else {
-                usernameInput.classList.remove('is-invalid');
-                usernameInput.classList.add('is-valid');
-            }
-            
-            if (!passwordInput.value.trim()) {
-                passwordInput.classList.add('is-invalid');
-                passwordInput.classList.remove('is-valid');
-                valid = false;
-            } else {
-                passwordInput.classList.remove('is-invalid');
-                passwordInput.classList.add('is-valid');
-            }
-            
-            submitButton.disabled = !valid;
-            return valid;
-        }
-        
-        // Add input event listeners for real-time validation
-        usernameInput.addEventListener('input', validateForm);
-        passwordInput.addEventListener('input', validateForm);
-        
-        // Form validation on submit
-        document.getElementById('loginForm').addEventListener('submit', function(event) {
-            if (!validateForm()) {
-                event.preventDefault();
-                event.stopPropagation();
-            }
-        });
-        
-        // Submit reset password form
-        document.getElementById('submitResetRequest').addEventListener('click', function() {
-            const email = document.getElementById('resetEmail').value;
-            
-            if (!email) {
-                const errorMessage = document.getElementById('resetErrorMessages');
-                errorMessage.textContent = 'Please enter your email address';
-                errorMessage.classList.remove('d-none');
-                return;
-            }
-            
-            // Close the modal
-            const modal = bootstrap.Modal.getInstance(document.getElementById('resetPasswordModal'));
-            modal.hide();
-            
-            // Show success message
-            const alertsContainer = document.querySelector('.alerts-container');
-            const alertDiv = document.createElement('div');
-            alertDiv.className = 'alert alert-info alert-dismissible fade show';
-            alertDiv.setAttribute('role', 'alert');
-            alertDiv.innerHTML = `
-                <i class="fa fa-info-circle me-2"></i>
-                Password reset instructions sent to ${email}. Please check your email.
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-            `;
-            alertsContainer.appendChild(alertDiv);
-        });
-    });
-</script>
-{% endblock %} 
+    <!-- Bootstrap JavaScript -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html> 

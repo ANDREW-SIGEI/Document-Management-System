@@ -1,0 +1,478 @@
+{% extends 'base.html' %}
+
+{% block title %}Registry Approval Queue - Document Management System{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row mb-4">
+        <div class="col">
+            <h2><i class="fas fa-clipboard-check me-2"></i>Registry Approval Queue</h2>
+            <p class="text-muted">Review and process documents pending registry approval</p>
+        </div>
+        <div class="col-auto">
+            <div class="btn-group">
+                <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#batchApproveModal" title="Batch approve selected documents">
+                    <i class="fas fa-check-double me-1"></i> Batch Approve
+                </button>
+                <button class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#batchRejectModal" title="Batch reject selected documents">
+                    <i class="fas fa-times-circle me-1"></i> Batch Reject
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Status Summary Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card border-primary mb-3">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-primary mb-1">Total Pending</h6>
+                            <h3 class="mb-0">{{ documents|length }}</h3>
+                        </div>
+                        <div class="bg-primary bg-opacity-10 rounded-circle p-3">
+                            <i class="fas fa-hourglass-half fa-2x text-primary"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-danger mb-3">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-danger mb-1">Urgent</h6>
+                            <h3 class="mb-0">{{ documents|selectattr('priority', 'equalto', 'Urgent')|list|length }}</h3>
+                        </div>
+                        <div class="bg-danger bg-opacity-10 rounded-circle p-3">
+                            <i class="fas fa-exclamation-circle fa-2x text-danger"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-warning mb-3">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-warning mb-1">Priority</h6>
+                            <h3 class="mb-0">{{ documents|selectattr('priority', 'equalto', 'Priority')|list|length }}</h3>
+                        </div>
+                        <div class="bg-warning bg-opacity-10 rounded-circle p-3">
+                            <i class="fas fa-flag fa-2x text-warning"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-success mb-3">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-success mb-1">Avg. Processing Time</h6>
+                            <h3 class="mb-0">1.2h</h3>
+                        </div>
+                        <div class="bg-success bg-opacity-10 rounded-circle p-3">
+                            <i class="fas fa-clock fa-2x text-success"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Documents Table -->
+    <div class="card shadow-sm">
+        <div class="card-header bg-white">
+            <div class="row align-items-center">
+                <div class="col">
+                    <h5 class="mb-0">Documents Awaiting Approval</h5>
+                </div>
+                <div class="col-auto">
+                    <div class="input-group">
+                        <input type="text" class="form-control" id="searchTable" placeholder="Search documents..." title="Search documents">
+                        <button class="btn btn-outline-secondary" type="button" title="Search">
+                            <i class="fas fa-search"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th style="width: 40px;">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="selectAll" title="Select all documents">
+                            </div>
+                        </th>
+                        <th>Tracking Code</th>
+                        <th>Title</th>
+                        <th>Type</th>
+                        <th>Sender</th>
+                        <th>Submitted</th>
+                        <th>Priority</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if documents %}
+                        {% for doc in documents %}
+                            <tr>
+                                <td>
+                                    <div class="form-check">
+                                        <input class="form-check-input doc-select" type="checkbox" value="{{ doc.id }}" title="Select document">
+                                    </div>
+                                </td>
+                                <td>
+                                    <span class="badge bg-primary">{{ doc.tracking_code }}</span>
+                                </td>
+                                <td>{{ doc.title }}</td>
+                                <td>{{ doc.document_type }}</td>
+                                <td>{{ doc.sender }}</td>
+                                <td>{{ doc.date_submitted }}</td>
+                                <td>
+                                    <span class="badge rounded-pill bg-{{ 'danger' if doc.priority == 'Urgent' else 'warning' if doc.priority == 'Priority' else 'info' }}">
+                                        {{ doc.priority }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <div class="btn-group">
+                                        <a href="{{ url_for('track_by_code', tracking_code=doc.tracking_code) }}" class="btn btn-sm btn-outline-primary" title="View document details">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                        <button type="button" class="btn btn-sm btn-outline-success" data-bs-toggle="modal" data-bs-target="#approveModal" data-tracking-code="{{ doc.tracking_code }}" data-title="{{ doc.title }}" title="Approve document">
+                                            <i class="fas fa-check"></i>
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#rejectModal" data-tracking-code="{{ doc.tracking_code }}" data-title="{{ doc.title }}" title="Reject document">
+                                            <i class="fas fa-times"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="8" class="text-center py-5">
+                                <div class="py-5">
+                                    <i class="fas fa-check-circle fa-3x text-muted mb-3"></i>
+                                    <h5>No documents awaiting approval</h5>
+                                    <p class="text-muted">All documents have been processed</p>
+                                </div>
+                            </td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Approve Modal -->
+<div class="modal fade" id="approveModal" tabindex="-1" aria-labelledby="approveModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title" id="approveModalLabel">Approve Document</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="approveForm" action="#" method="POST">
+                <div class="modal-body">
+                    <p>You are approving document: <strong id="approveDocTitle">Document Title</strong></p>
+                    
+                    <div class="mb-3">
+                        <label for="next_department" class="form-label">Forward to Department</label>
+                        <select class="form-select" id="next_department" name="department" required title="Select department">
+                            <option value="" selected disabled>Select destination department</option>
+                            <option value="Finance">Finance</option>
+                            <option value="Research">Research</option>
+                            <option value="Operations">Operations</option>
+                            <option value="IT">IT</option>
+                            <option value="Management">Management</option>
+                            <option value="Laboratory">Laboratory</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="approve_comments" class="form-label">Comments (Optional)</label>
+                        <textarea class="form-control" id="approve_comments" name="comments" rows="3" placeholder="Add any notes or instructions for the next department..."></textarea>
+                    </div>
+                    
+                    <input type="hidden" name="decision" value="approve">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success">Approve & Forward</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Reject Modal -->
+<div class="modal fade" id="rejectModal" tabindex="-1" aria-labelledby="rejectModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="rejectModalLabel">Reject Document</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="rejectForm" action="#" method="POST">
+                <div class="modal-body">
+                    <p>You are rejecting document: <strong id="rejectDocTitle">Document Title</strong></p>
+                    
+                    <div class="mb-3">
+                        <label for="reject_reason" class="form-label">Rejection Reason</label>
+                        <select class="form-select" id="reject_reason" name="reject_reason" required title="Select rejection reason">
+                            <option value="" selected disabled>Select reason</option>
+                            <option value="Incomplete Information">Incomplete Information</option>
+                            <option value="Wrong Format">Wrong Format</option>
+                            <option value="Missing Attachments">Missing Attachments</option>
+                            <option value="Requires Revision">Requires Revision</option>
+                            <option value="Incorrect Department">Incorrect Department</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="reject_comments" class="form-label">Comments (Required)</label>
+                        <textarea class="form-control" id="reject_comments" name="comments" rows="3" placeholder="Explain why this document is being rejected and what steps are needed to correct it..." required></textarea>
+                    </div>
+                    
+                    <input type="hidden" name="decision" value="reject">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger">Reject Document</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Batch Processing Modals -->
+<div class="modal fade" id="batchApproveModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title">Batch Approve Documents</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>You are about to approve <span id="batchApproveCount">0</span> selected documents.</p>
+                
+                <div class="mb-3">
+                    <label for="batch_next_department" class="form-label">Forward to Department</label>
+                    <select class="form-select" id="batch_next_department" name="department" required title="Select department">
+                        <option value="" selected disabled>Select destination department</option>
+                        <option value="Finance">Finance</option>
+                        <option value="Research">Research</option>
+                        <option value="Operations">Operations</option>
+                        <option value="IT">IT</option>
+                        <option value="Management">Management</option>
+                        <option value="Laboratory">Laboratory</option>
+                    </select>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="batch_approve_comments" class="form-label">Comments (Optional)</label>
+                    <textarea class="form-control" id="batch_approve_comments" name="comments" rows="2" placeholder="Add any notes or instructions..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success" id="batchApproveBtn">Approve Selected</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="batchRejectModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title">Batch Reject Documents</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>You are about to reject <span id="batchRejectCount">0</span> selected documents.</p>
+                
+                <div class="mb-3">
+                    <label for="batch_reject_reason" class="form-label">Rejection Reason</label>
+                    <select class="form-select" id="batch_reject_reason" name="reject_reason" required title="Select rejection reason">
+                        <option value="" selected disabled>Select reason</option>
+                        <option value="Incomplete Information">Incomplete Information</option>
+                        <option value="Wrong Format">Wrong Format</option>
+                        <option value="Missing Attachments">Missing Attachments</option>
+                        <option value="Requires Revision">Requires Revision</option>
+                        <option value="Incorrect Department">Incorrect Department</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="batch_reject_comments" class="form-label">Comments (Required)</label>
+                    <textarea class="form-control" id="batch_reject_comments" name="comments" rows="2" placeholder="Explain why these documents are being rejected..." required></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="batchRejectBtn">Reject Selected</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Handle approve modal
+    const approveModal = document.getElementById('approveModal');
+    if (approveModal) {
+        approveModal.addEventListener('show.bs.modal', function(event) {
+            const button = event.relatedTarget;
+            const trackingCode = button.getAttribute('data-tracking-code');
+            const title = button.getAttribute('data-title');
+            
+            const docTitle = approveModal.querySelector('#approveDocTitle');
+            const form = approveModal.querySelector('#approveForm');
+            
+            docTitle.textContent = title;
+            form.action = "/registry_decision/" + trackingCode;
+        });
+    }
+    
+    // Handle reject modal
+    const rejectModal = document.getElementById('rejectModal');
+    if (rejectModal) {
+        rejectModal.addEventListener('show.bs.modal', function(event) {
+            const button = event.relatedTarget;
+            const trackingCode = button.getAttribute('data-tracking-code');
+            const title = button.getAttribute('data-title');
+            
+            const docTitle = rejectModal.querySelector('#rejectDocTitle');
+            const form = rejectModal.querySelector('#rejectForm');
+            
+            docTitle.textContent = title;
+            form.action = "/registry_decision/" + trackingCode;
+        });
+    }
+    
+    // Handle select all checkbox
+    const selectAllCheckbox = document.getElementById('selectAll');
+    const documentCheckboxes = document.querySelectorAll('.doc-select');
+    
+    if (selectAllCheckbox) {
+        selectAllCheckbox.addEventListener('change', function() {
+            documentCheckboxes.forEach(checkbox => {
+                checkbox.checked = this.checked;
+            });
+            updateSelectedCounts();
+        });
+    }
+    
+    // Update selected counts in batch modals
+    function updateSelectedCounts() {
+        const selectedCount = document.querySelectorAll('.doc-select:checked').length;
+        
+        const batchApproveCount = document.getElementById('batchApproveCount');
+        const batchRejectCount = document.getElementById('batchRejectCount');
+        
+        if (batchApproveCount) batchApproveCount.textContent = selectedCount;
+        if (batchRejectCount) batchRejectCount.textContent = selectedCount;
+    }
+    
+    // Add change listeners to all document checkboxes
+    documentCheckboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', updateSelectedCounts);
+    });
+    
+    // Handle batch approve button
+    const batchApproveBtn = document.getElementById('batchApproveBtn');
+    if (batchApproveBtn) {
+        batchApproveBtn.addEventListener('click', function() {
+            const department = document.getElementById('batch_next_department').value;
+            const comments = document.getElementById('batch_approve_comments').value;
+            
+            if (!department) {
+                alert('Please select a destination department');
+                return;
+            }
+            
+            const selectedDocs = Array.from(document.querySelectorAll('.doc-select:checked'))
+                .map(checkbox => checkbox.value);
+                
+            if (selectedDocs.length === 0) {
+                alert('Please select at least one document');
+                return;
+            }
+            
+            // In a real implementation, make an AJAX call to process batch approval
+            alert(`Processing batch approval for ${selectedDocs.length} documents to ${department}`);
+            
+            // Close modal and reload page
+            bootstrap.Modal.getInstance(document.getElementById('batchApproveModal')).hide();
+            // window.location.reload();
+        });
+    }
+    
+    // Handle batch reject button
+    const batchRejectBtn = document.getElementById('batchRejectBtn');
+    if (batchRejectBtn) {
+        batchRejectBtn.addEventListener('click', function() {
+            const reason = document.getElementById('batch_reject_reason').value;
+            const comments = document.getElementById('batch_reject_comments').value;
+            
+            if (!reason) {
+                alert('Please select a rejection reason');
+                return;
+            }
+            
+            if (!comments) {
+                alert('Please provide rejection comments');
+                return;
+            }
+            
+            const selectedDocs = Array.from(document.querySelectorAll('.doc-select:checked'))
+                .map(checkbox => checkbox.value);
+                
+            if (selectedDocs.length === 0) {
+                alert('Please select at least one document');
+                return;
+            }
+            
+            // In a real implementation, make an AJAX call to process batch rejection
+            alert(`Processing batch rejection for ${selectedDocs.length} documents`);
+            
+            // Close modal and reload page
+            bootstrap.Modal.getInstance(document.getElementById('batchRejectModal')).hide();
+            // window.location.reload();
+        });
+    }
+    
+    // Table search functionality
+    const searchInput = document.getElementById('searchTable');
+    if (searchInput) {
+        searchInput.addEventListener('keyup', function() {
+            const searchText = this.value.toLowerCase();
+            const tableRows = document.querySelectorAll('tbody tr');
+            
+            tableRows.forEach(row => {
+                const text = row.textContent.toLowerCase();
+                if (text.includes(searchText)) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        });
+    }
+});
+</script>
+{% endblock %} 

@@ -167,6 +167,105 @@
                 </div>
             </div>
             
+            <!-- Document Location and Transfer Info -->
+            <div class="card mb-4">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0">Location & Transfer Info</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <p class="mb-1 small text-muted">Current Holder</p>
+                            <p class="mb-3 fw-bold">{{ document.current_holder }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p class="mb-1 small text-muted">Physical Location</p>
+                            <p class="mb-3">{{ document.physical_location|default('Not specified', true) }}</p>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p class="mb-1 small text-muted">Expected Return Date</p>
+                            <p class="mb-0">{{ document.expected_return_date_str }}</p>
+                        </div>
+                        {% if is_current_holder %}
+                        <div class="col-md-6 d-flex align-items-end">
+                            <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#transferDocumentModal">
+                                <i class="fas fa-exchange-alt me-1"></i> Transfer Document
+                            </button>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Document Transfer History -->
+            <div class="card mb-4">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0">Transfer History</h5>
+                </div>
+                <div class="card-body p-0">
+                    {% if transfers %}
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>From</th>
+                                        <th>To</th>
+                                        <th>Reason</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for transfer in transfers %}
+                                    <tr>
+                                        <td>{{ transfer.timestamp }}</td>
+                                        <td>
+                                            {{ transfer.from_user }}
+                                            {% if transfer.from_department %}
+                                            <small class="d-block text-muted">{{ transfer.from_department }}</small>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {{ transfer.to_user }}
+                                            {% if transfer.to_department %}
+                                            <small class="d-block text-muted">{{ transfer.to_department }}</small>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ transfer.reason|default('Not specified', true) }}</td>
+                                        <td>
+                                            {% if transfer.received %}
+                                            <span class="badge bg-success">Received</span>
+                                            <small class="d-block text-muted">{{ transfer.received_date }}</small>
+                                            {% else %}
+                                            <span class="badge bg-warning">Pending</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if not transfer.received and document.current_holder == session.get('username') %}
+                                            <form action="{{ url_for('confirm_document_receipt', document_code=document.code, transfer_id=transfer.id) }}" method="post">
+                                                <button type="submit" class="btn btn-sm btn-success">
+                                                    <i class="fas fa-check me-1"></i> Confirm Receipt
+                                                </button>
+                                            </form>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-4">
+                            <i class="fas fa-exchange-alt fa-3x text-muted mb-3"></i>
+                            <p class="mb-0">No transfer history available</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+            
             <!-- Document Attachments (placeholder) -->
             <div class="card">
                 <div class="card-header bg-white d-flex justify-content-between align-items-center">
@@ -182,13 +281,13 @@
                             <div class="list-group-item d-flex justify-content-between align-items-center">
                                 <div>
                                     <i class="fas fa-file me-2 text-muted"></i>
-                                    <span>{{ attachment.filename }}</span>
+                                    <span>{{ attachment.original_filename }}</span>
                                     <small class="text-muted ms-2">
-                                        ({{ attachment.size }})
+                                        ({{ (attachment.file_size / 1024)|round(1) }} KB)
                                     </small>
                                 </div>
                                 <div>
-                                    <a href="#" class="btn btn-sm btn-outline-primary">
+                                    <a href="{{ url_for('download_attachment', attachment_id=attachment.id) }}" class="btn btn-sm btn-outline-primary">
                                         <i class="fas fa-download me-1"></i> Download
                                     </a>
                                 </div>
@@ -256,7 +355,7 @@
 <div class="modal fade" id="addAttachmentModal" tabindex="-1" aria-labelledby="addAttachmentModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
-            <form action="{{ url_for('attach_related_document', document_code=document.code) }}" method="post" enctype="multipart/form-data">
+            <form action="{{ url_for('add_attachment', doc_code=document.code) }}" method="post" enctype="multipart/form-data">
                 <div class="modal-header">
                     <h5 class="modal-title" id="addAttachmentModalLabel">Add Attachment</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -298,6 +397,66 @@
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                 <button type="button" class="btn btn-primary" onclick="window.print();">Print Document</button>
             </div>
+        </div>
+    </div>
+</div>
+
+<!-- Transfer Document Modal -->
+<div class="modal fade" id="transferDocumentModal" tabindex="-1" aria-labelledby="transferDocumentModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <form action="{{ url_for('reassign_document', document_code=document.code) }}" method="post">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="transferDocumentModalLabel">Transfer Document</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        You are transferring document {{ document.code }} to another person. They will be notified about this transfer.
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="new_holder" class="form-label">Transfer To (Person)*</label>
+                            <input type="text" class="form-control" id="new_holder" name="new_holder" required placeholder="Full name of recipient">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="new_department" class="form-label">Department</label>
+                            <input type="text" class="form-control" id="new_department" name="new_department" placeholder="Recipient's department">
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="physical_location" class="form-label">Physical Location</label>
+                            <input type="text" class="form-control" id="physical_location" name="physical_location" placeholder="Building/Room/Office">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="expected_return_date" class="form-label">Expected Return Date</label>
+                            <input type="date" class="form-control" id="expected_return_date" name="expected_return_date">
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="transfer_reason" class="form-label">Reason for Transfer</label>
+                        <textarea class="form-control" id="transfer_reason" name="transfer_reason" rows="3" placeholder="Explain why you're transferring this document"></textarea>
+                    </div>
+                    
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" id="notify_recipient" name="notify_recipient" checked>
+                        <label class="form-check-label" for="notify_recipient">
+                            Send notification to recipient
+                        </label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-paper-plane me-1"></i> Transfer Document
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 </div>

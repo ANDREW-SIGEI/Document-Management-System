@@ -1,0 +1,421 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row">
+        <!-- Sidebar Navigation -->
+        <div class="col-md-3 col-lg-2">
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">System Maintenance</h5>
+                </div>
+                <div class="list-group list-group-flush">
+                    <a href="#dashboard" class="list-group-item list-group-item-action active" data-bs-toggle="list">
+                        <i class="fas fa-tachometer-alt me-2"></i> Dashboard
+                    </a>
+                    <a href="#storage" class="list-group-item list-group-item-action" data-bs-toggle="list">
+                        <i class="fas fa-hdd me-2"></i> Storage
+                    </a>
+                    <a href="#database" class="list-group-item list-group-item-action" data-bs-toggle="list">
+                        <i class="fas fa-database me-2"></i> Database
+                    </a>
+                    <a href="#logs" class="list-group-item list-group-item-action" data-bs-toggle="list">
+                        <i class="fas fa-list me-2"></i> Logs
+                    </a>
+                    <a href="#config" class="list-group-item list-group-item-action" data-bs-toggle="list">
+                        <i class="fas fa-cogs me-2"></i> System Config
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="col-md-9 col-lg-10">
+            <div class="tab-content">
+                <!-- Dashboard Tab -->
+                <div class="tab-pane fade show active" id="dashboard">
+                    <div class="row">
+                        <!-- System Status Cards -->
+                        <div class="col-md-6 col-lg-3 mb-4">
+                            <div class="card bg-primary text-white">
+                                <div class="card-body">
+                                    <h6 class="card-title">System Status</h6>
+                                    <h2 class="mb-0">Operational</h2>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6 col-lg-3 mb-4">
+                            <div class="card bg-success text-white">
+                                <div class="card-body">
+                                    <h6 class="card-title">Database Health</h6>
+                                    <h2 class="mb-0">Good</h2>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6 col-lg-3 mb-4">
+                            <div class="card bg-warning text-white">
+                                <div class="card-body">
+                                    <h6 class="card-title">Storage Usage</h6>
+                                    <h2 class="mb-0">65%</h2>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6 col-lg-3 mb-4">
+                            <div class="card bg-info text-white">
+                                <div class="card-body">
+                                    <h6 class="card-title">Last Backup</h6>
+                                    <h2 class="mb-0">Never</h2>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- System Statistics -->
+                    <div class="card shadow-sm mb-4">
+                        <div class="card-header">
+                            <h5 class="mb-0">System Statistics</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <ul class="list-group list-group-flush">
+                                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                                            System Uptime
+                                            <span class="badge bg-primary rounded-pill">23 days, 7 hours</span>
+                                        </li>
+                                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                                            CPU Usage
+                                            <span class="badge bg-primary rounded-pill">24%</span>
+                                        </li>
+                                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                                            Memory Usage
+                                            <span class="badge bg-primary rounded-pill">512 MB</span>
+                                        </li>
+                                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                                            Disk Usage
+                                            <span class="badge bg-primary rounded-pill">65%</span>
+                                        </li>
+                                    </ul>
+                                </div>
+                                <div class="col-md-6">
+                                    <ul class="list-group list-group-flush">
+                                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                                            Database Size
+                                            <span class="badge bg-primary rounded-pill">7.2 MB</span>
+                                        </li>
+                                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                                            Last Backup
+                                            <span class="badge bg-primary rounded-pill">Never</span>
+                                        </li>
+                                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                                            Active Users
+                                            <span class="badge bg-primary rounded-pill">14</span>
+                                        </li>
+                                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                                            Pending Tasks
+                                            <span class="badge bg-primary rounded-pill">5</span>
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Performance Metrics -->
+                    <div class="card shadow-sm mb-4">
+                        <div class="card-header">
+                            <h5 class="mb-0">Performance Metrics</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <ul class="list-group list-group-flush">
+                                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                                            Response Time
+                                            <span class="badge bg-success rounded-pill">120 ms</span>
+                                        </li>
+                                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                                            Queries per Second
+                                            <span class="badge bg-success rounded-pill">13.2</span>
+                                        </li>
+                                    </ul>
+                                </div>
+                                <div class="col-md-6">
+                                    <ul class="list-group list-group-flush">
+                                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                                            Slow Queries
+                                            <span class="badge bg-success rounded-pill">0</span>
+                                        </li>
+                                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                                            Cache Hit Ratio
+                                            <span class="badge bg-success rounded-pill">96%</span>
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Quick Actions -->
+                    <div class="card shadow-sm">
+                        <div class="card-header">
+                            <h5 class="mb-0">Quick Actions</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-4 mb-3">
+                                    <form action="{{ url_for('maintenance_action') }}" method="POST">
+                                        <input type="hidden" name="action" value="backup">
+                                        <button type="submit" class="btn btn-primary w-100">
+                                            <i class="fas fa-download me-2"></i>Backup Database
+                                        </button>
+                                    </form>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <form action="{{ url_for('maintenance_action') }}" method="POST">
+                                        <input type="hidden" name="action" value="cleanup">
+                                        <button type="submit" class="btn btn-warning w-100">
+                                            <i class="fas fa-broom me-2"></i>Clean Temporary Files
+                                        </button>
+                                    </form>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <form action="{{ url_for('maintenance_action') }}" method="POST">
+                                        <input type="hidden" name="action" value="optimize">
+                                        <button type="submit" class="btn btn-success w-100">
+                                            <i class="fas fa-tachometer-alt me-2"></i>Optimize Database
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Storage Tab -->
+                <div class="tab-pane fade" id="storage">
+                    <div class="card shadow-sm">
+                        <div class="card-header">
+                            <h5 class="mb-0">Storage Management</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h6>Storage Usage</h6>
+                                    <div class="progress mb-4">
+                                        <div class="progress-bar" role="progressbar" style="width: 65%">65%</div>
+                                    </div>
+                                    <ul class="list-group">
+                                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                                            Documents
+                                            <span class="badge bg-primary rounded-pill">2.3 GB</span>
+                                        </li>
+                                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                                            Database
+                                            <span class="badge bg-primary rounded-pill">7.2 MB</span>
+                                        </li>
+                                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                                            Logs
+                                            <span class="badge bg-primary rounded-pill">1.8 MB</span>
+                                        </li>
+                                    </ul>
+                                </div>
+                                <div class="col-md-6">
+                                    <h6>Storage Actions</h6>
+                                    <div class="list-group">
+                                        <button class="list-group-item list-group-item-action">
+                                            <i class="fas fa-trash me-2"></i>Clean Temporary Files
+                                        </button>
+                                        <button class="list-group-item list-group-item-action">
+                                            <i class="fas fa-archive me-2"></i>Archive Old Documents
+                                        </button>
+                                        <button class="list-group-item list-group-item-action">
+                                            <i class="fas fa-search me-2"></i>Scan for Duplicates
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Database Tab -->
+                <div class="tab-pane fade" id="database">
+                    <div class="card shadow-sm">
+                        <div class="card-header">
+                            <h5 class="mb-0">Database Management</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h6>Database Statistics</h6>
+                                    <ul class="list-group">
+                                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                                            Total Documents
+                                            <span class="badge bg-primary rounded-pill">127</span>
+                                        </li>
+                                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                                            Total Users
+                                            <span class="badge bg-primary rounded-pill">15</span>
+                                        </li>
+                                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                                            Total Logs
+                                            <span class="badge bg-primary rounded-pill">450</span>
+                                        </li>
+                                    </ul>
+                                </div>
+                                <div class="col-md-6">
+                                    <h6>Database Actions</h6>
+                                    <div class="list-group">
+                                        <button class="list-group-item list-group-item-action">
+                                            <i class="fas fa-download me-2"></i>Backup Database
+                                        </button>
+                                        <button class="list-group-item list-group-item-action">
+                                            <i class="fas fa-tachometer-alt me-2"></i>Optimize Database
+                                        </button>
+                                        <button class="list-group-item list-group-item-action">
+                                            <i class="fas fa-sync me-2"></i>Check Integrity
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Logs Tab -->
+                <div class="tab-pane fade" id="logs">
+                    <div class="card shadow-sm">
+                        <div class="card-header">
+                            <h5 class="mb-0">System Logs</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Timestamp</th>
+                                            <th>Action</th>
+                                            <th>User</th>
+                                            <th>Details</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for log in recent_logs %}
+                                        <tr>
+                                            <td>{{ log.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                                            <td>{{ log.action }}</td>
+                                            <td>{{ log.user }}</td>
+                                            <td>{{ log.details }}</td>
+                                            <td>
+                                                <span class="badge bg-{{ 'success' if log.log_type == 'Success' else 'warning' if log.log_type == 'Warning' else 'danger' }}">
+                                                    {{ log.log_type }}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- System Config Tab -->
+                <div class="tab-pane fade" id="config">
+                    <div class="card shadow-sm">
+                        <div class="card-header">
+                            <h5 class="mb-0">System Configuration</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h6>System Settings</h6>
+                                    <form>
+                                        <div class="mb-3">
+                                            <label class="form-label">System Name</label>
+                                            <input type="text" class="form-control" value="KEMRI Laboratory System">
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">Email Notifications</label>
+                                            <div class="form-check form-switch">
+                                                <input class="form-check-input" type="checkbox" checked>
+                                                <label class="form-check-label">Enable Email Notifications</label>
+                                            </div>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">Backup Schedule</label>
+                                            <select class="form-select">
+                                                <option>Daily</option>
+                                                <option selected>Weekly</option>
+                                                <option>Monthly</option>
+                                            </select>
+                                        </div>
+                                        <button type="submit" class="btn btn-primary">Save Changes</button>
+                                    </form>
+                                </div>
+                                <div class="col-md-6">
+                                    <h6>System Health</h6>
+                                    <div class="list-group">
+                                        <div class="list-group-item">
+                                            <div class="d-flex w-100 justify-content-between">
+                                                <h6 class="mb-1">Web Server</h6>
+                                                <span class="badge bg-success">Operational</span>
+                                            </div>
+                                            <small>Last check: 14:51</small>
+                                        </div>
+                                        <div class="list-group-item">
+                                            <div class="d-flex w-100 justify-content-between">
+                                                <h6 class="mb-1">Database Server</h6>
+                                                <span class="badge bg-success">Operational</span>
+                                            </div>
+                                            <small>Last check: 14:51</small>
+                                        </div>
+                                        <div class="list-group-item">
+                                            <div class="d-flex w-100 justify-content-between">
+                                                <h6 class="mb-1">File Storage</h6>
+                                                <span class="badge bg-success">Operational</span>
+                                            </div>
+                                            <small>Last check: 14:51</small>
+                                        </div>
+                                        <div class="list-group-item">
+                                            <div class="d-flex w-100 justify-content-between">
+                                                <h6 class="mb-1">Email Service</h6>
+                                                <span class="badge bg-warning">Degraded</span>
+                                            </div>
+                                            <small>Last check: 14:51</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize tooltips
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl)
+    });
+
+    // Handle tab navigation
+    var triggerTabList = [].slice.call(document.querySelectorAll('.list-group-item'))
+    triggerTabList.forEach(function (triggerEl) {
+        triggerEl.addEventListener('click', function (event) {
+            event.preventDefault()
+            var tabTrigger = new bootstrap.Tab(triggerEl)
+            tabTrigger.show()
+        })
+    });
+});
+</script>
+{% endblock %} 

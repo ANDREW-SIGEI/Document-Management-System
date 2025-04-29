@@ -1,318 +1,334 @@
 {% extends 'base.html' %}
 
-{% block title %}Outgoing Documents - Document Management System{% endblock %}
+{% block title %}Outgoing Documents - KEMRI Laboratory System{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap">
-    <h1 class="h2 mb-2 mb-md-0">Outgoing Documents</h1>
-    <div class="d-flex gap-2">
-        <a href="/compose" class="btn btn-primary">
-            <i class="fas fa-plus"></i> New Document
-        </a>
-        <button type="button" class="btn btn-outline-primary" id="bulkActionsBtn" disabled data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-            <i class="fas fa-tasks"></i> Bulk Actions
-        </button>
-        <div class="dropdown-menu dropdown-menu-right" aria-labelledby="bulkActionsBtn">
-            <form id="bulkActionForm" action="{{ url_for('outgoing_bulk_action') }}" method="post" aria-label="Bulk actions form">
-                <input type="hidden" name="bulk_action" id="bulkActionType" value="" title="Bulk action type">
-                <div id="selectedDocsContainer"></div>
-                <button type="button" class="dropdown-item bulk-action-btn" data-action="mark_sent">
-                    <i class="fas fa-paper-plane text-primary"></i> Mark as Sent
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap">
+        <h2 class="mb-2 mb-md-0"><i class="fas fa-paper-plane me-2"></i> Outgoing Documents</h2>
+        <div class="d-flex gap-2">
+            <a href="{{ url_for('compose') }}" class="btn btn-primary">
+                <i class="fas fa-plus me-1"></i> New Document
+            </a>
+            <div class="dropdown">
+                <button type="button" class="btn btn-outline-primary" id="bulkActionsBtn" disabled data-bs-toggle="dropdown" aria-expanded="false">
+                    <i class="fas fa-tasks me-1"></i> Bulk Actions
                 </button>
-                <button type="button" class="dropdown-item bulk-action-btn" data-action="mark_received">
-                    <i class="fas fa-check-circle text-success"></i> Mark as Received
-                </button>
-                <div class="dropdown-divider"></div>
-                <button type="button" class="dropdown-item bulk-action-btn" data-action="print">
-                    <i class="fas fa-print text-secondary"></i> Print Selected
-                </button>
-            </form>
-        </div>
-    </div>
-</div>
-
-{% with messages = get_flashed_messages(with_categories=true) %}
-  {% if messages %}
-    {% for category, message in messages %}
-      <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-        {{ message }}
-        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-          <span aria-hidden="true">&times;</span>
-        </button>
-      </div>
-    {% endfor %}
-  {% endif %}
-{% endwith %}
-
-<!-- Stats Cards -->
-<div class="row mb-4">
-    <div class="col-md-3 col-sm-6 mb-3 mb-md-0">
-        <div class="card border-left-primary shadow h-100 py-2">
-            <div class="card-body">
-                <div class="row no-gutters align-items-center">
-                    <div class="col mr-2">
-                        <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">All Documents</div>
-                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ priority_counts.Urgent + priority_counts.Priority + priority_counts.Normal }}</div>
-                    </div>
-                    <div class="col-auto">
-                        <i class="fas fa-file-alt fa-2x text-gray-300"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3 col-sm-6 mb-3 mb-md-0">
-        <div class="card border-left-danger shadow h-100 py-2">
-            <div class="card-body">
-                <div class="row no-gutters align-items-center">
-                    <div class="col mr-2">
-                        <div class="text-xs font-weight-bold text-danger text-uppercase mb-1">Urgent</div>
-                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ priority_counts.Urgent }}</div>
-                    </div>
-                    <div class="col-auto">
-                        <i class="fas fa-exclamation-circle fa-2x text-gray-300"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3 col-sm-6 mb-3 mb-md-0">
-        <div class="card border-left-warning shadow h-100 py-2">
-            <div class="card-body">
-                <div class="row no-gutters align-items-center">
-                    <div class="col mr-2">
-                        <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">Priority</div>
-                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ priority_counts.Priority }}</div>
-                    </div>
-                    <div class="col-auto">
-                        <i class="fas fa-exclamation fa-2x text-gray-300"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3 col-sm-6">
-        <div class="card border-left-secondary shadow h-100 py-2">
-            <div class="card-body">
-                <div class="row no-gutters align-items-center">
-                    <div class="col mr-2">
-                        <div class="text-xs font-weight-bold text-secondary text-uppercase mb-1">Normal</div>
-                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ priority_counts.Normal }}</div>
-                    </div>
-                    <div class="col-auto">
-                        <i class="fas fa-file fa-2x text-gray-300"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Search and Filters -->
-<div class="card mb-4">
-    <div class="card-body">
-        <form id="searchForm" action="{{ url_for('outgoing') }}" method="GET">
-            <div class="row">
-                <div class="col-lg-8 col-md-12 mb-3 mb-lg-0">
-                    <div class="input-group">
-                        <input type="text" class="form-control" name="search" value="{{ search_query }}" placeholder="Search outgoing documents...">
-                        <div class="input-group-append">
-                            <button class="btn btn-primary" type="submit" aria-label="Search">
-                                <i class="fas fa-search"></i>
+                <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="bulkActionsBtn">
+                    <form id="bulkActionForm" action="{{ url_for('outgoing_bulk_action') }}" method="post">
+                        <input type="hidden" name="bulk_action" id="bulkActionType" value="">
+                        <div id="selectedDocsContainer"></div>
+                        <li>
+                            <button type="button" class="dropdown-item bulk-action-btn" data-action="mark_sent">
+                                <i class="fas fa-paper-plane text-primary me-2"></i> Mark as Sent
                             </button>
+                        </li>
+                        <li>
+                            <button type="button" class="dropdown-item bulk-action-btn" data-action="mark_received">
+                                <i class="fas fa-check-circle text-success me-2"></i> Mark as Received
+                            </button>
+                        </li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li>
+                            <button type="button" class="dropdown-item" onclick="window.print()">
+                                <i class="fas fa-print text-secondary me-2"></i> Print Current Page
+                            </button>
+                        </li>
+                    </form>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alerts -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                    <i class="fas fa-{% if category == 'success' %}check-circle{% elif category == 'warning' %}exclamation-triangle{% elif category == 'danger' %}times-circle{% else %}info-circle{% endif %} me-2"></i>
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <!-- Stats Cards -->
+    <div class="row mb-4">
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-start border-primary border-4 shadow h-100">
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col">
+                            <div class="text-xs fw-bold text-primary text-uppercase mb-1">All Documents</div>
+                            <div class="h5 mb-0 fw-bold">{{ priority_counts.Urgent + priority_counts.Priority + priority_counts.Normal }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-file-alt fa-2x text-gray-300"></i>
                         </div>
                     </div>
                 </div>
-                <div class="col-lg-4 col-md-12">
-                    <div class="d-flex flex-wrap">
-                        <div class="btn-group btn-group-sm flex-fill" role="group">
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-start border-danger border-4 shadow h-100">
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col">
+                            <div class="text-xs fw-bold text-danger text-uppercase mb-1">Urgent</div>
+                            <div class="h5 mb-0 fw-bold">{{ priority_counts.Urgent }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-exclamation-circle fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-start border-warning border-4 shadow h-100">
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col">
+                            <div class="text-xs fw-bold text-warning text-uppercase mb-1">Priority</div>
+                            <div class="h5 mb-0 fw-bold">{{ priority_counts.Priority }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-exclamation fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-start border-secondary border-4 shadow h-100">
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col">
+                            <div class="text-xs fw-bold text-secondary text-uppercase mb-1">Normal</div>
+                            <div class="h5 mb-0 fw-bold">{{ priority_counts.Normal }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-file fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Search and Filters -->
+    <div class="card mb-4 shadow">
+        <div class="card-body">
+            <form id="searchForm" action="{{ url_for('outgoing') }}" method="GET">
+                <div class="row">
+                    <div class="col-lg-8 col-md-12 mb-3 mb-lg-0">
+                        <div class="input-group">
+                            <input type="text" class="form-control" name="search" value="{{ search_query }}" placeholder="Search outgoing documents...">
+                            <button class="btn btn-primary" type="submit" aria-label="Search" title="Search documents">
+                                <i class="fas fa-search"></i>
+                                <span class="visually-hidden">Search</span>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="col-lg-4 col-md-12">
+                        <div class="btn-group w-100" role="group">
                             <button type="button" class="btn btn-outline-primary priority-filter {% if priority_filter == 'All' %}active{% endif %}" data-priority="All">All</button>
                             <button type="button" class="btn btn-outline-warning priority-filter {% if priority_filter == 'Priority' %}active{% endif %}" data-priority="Priority">Priority</button>
                             <button type="button" class="btn btn-outline-danger priority-filter {% if priority_filter == 'Urgent' %}active{% endif %}" data-priority="Urgent">Urgent</button>
                             <button type="button" class="btn btn-outline-secondary priority-filter {% if priority_filter == 'Normal' %}active{% endif %}" data-priority="Normal">Normal</button>
                         </div>
+                        <input type="hidden" name="priority" id="priorityFilter" value="{{ priority_filter }}">
+                        <input type="hidden" name="sort_by" id="sortBy" value="{{ sort_by }}">
+                        <input type="hidden" name="sort_order" id="sortOrder" value="{{ sort_order }}">
+                        <input type="hidden" name="page" id="page" value="{{ pagination.page }}">
                     </div>
-                    <input type="hidden" name="priority" id="priorityFilter" value="{{ priority_filter }}">
-                    <input type="hidden" name="sort_by" id="sortBy" value="{{ sort_by }}">
-                    <input type="hidden" name="sort_order" id="sortOrder" value="{{ sort_order }}">
-                    <input type="hidden" name="page" id="page" value="{{ pagination.page }}">
                 </div>
-            </div>
-        </form>
-    </div>
-</div>
-
-<!-- Documents Table -->
-<div class="card">
-    <div class="card-header bg-white d-flex justify-content-between align-items-center">
-        <h5 class="mb-0">Outgoing Documents</h5>
-        <div class="btn-group btn-group-sm">
-            <button type="button" class="btn btn-outline-secondary sort-btn" data-sort="date" title="Sort by date">
-                Date 
-                {% if sort_by == 'date' %}
-                <i class="fas fa-sort-{% if sort_order == 'desc' %}down{% else %}up{% endif %}"></i>
-                {% endif %}
-            </button>
-            <button type="button" class="btn btn-outline-secondary sort-btn" data-sort="priority" title="Sort by priority">
-                Priority 
-                {% if sort_by == 'priority' %}
-                <i class="fas fa-sort-{% if sort_order == 'desc' %}down{% else %}up{% endif %}"></i>
-                {% endif %}
-            </button>
-            <button type="button" class="btn btn-outline-secondary sort-btn" data-sort="code" title="Sort by code">
-                Code 
-                {% if sort_by == 'code' %}
-                <i class="fas fa-sort-{% if sort_order == 'desc' %}down{% else %}up{% endif %}"></i>
-                {% endif %}
-            </button>
-            <button type="button" class="btn btn-outline-secondary sort-btn" data-sort="action" title="Sort by action">
-                Action 
-                {% if sort_by == 'action' %}
-                <i class="fas fa-sort-{% if sort_order == 'desc' %}down{% else %}up{% endif %}"></i>
-                {% endif %}
-            </button>
+            </form>
         </div>
     </div>
-    <div class="card-body p-0 p-md-3">
-        <div class="table-responsive">
-            <table class="table table-striped">
-                <thead>
-                    <tr>
-                        <th style="width: 40px;">
-                            <div class="custom-control custom-checkbox">
-                                <input type="checkbox" class="custom-control-input" id="selectAll" title="Select all documents">
-                                <label class="custom-control-label" for="selectAll">Select All</label>
-                            </div>
-                        </th>
-                        <th>Doc. Code</th>
-                        <th>Sender</th>
-                        <th>Details</th>
-                        <th>Required Action</th>
-                        <th>Date</th>
-                        <th>Priority</th>
-                        <th>Status</th>
-                        <th>Holder</th>
-                        <th>Action</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% if documents %}
-                        {% for doc in documents %}
-                        <tr>
-                            <td>
-                                <div class="custom-control custom-checkbox">
-                                    <input type="checkbox" class="custom-control-input doc-checkbox" id="doc-{{ doc.code }}" value="{{ doc.code }}" title="Select document {{ doc.code }}">
-                                    <label class="custom-control-label" for="doc-{{ doc.code }}">Select</label>
-                                </div>
-                            </td>
-                            <td><a href="/document/{{ doc.code }}" class="text-primary">{{ doc.code }}</a></td>
-                            <td>{{ doc.sender }}</td>
-                            <td>{{ doc.details }}</td>
-                            <td>{{ doc.required_action }}</td>
-                            <td>{{ doc.date_of_letter if doc.date_of_letter is string else doc.date_of_letter.strftime('%d/%m/%Y') if doc.date_of_letter else "N/A" }}</td>
-                            <td>
-                                {% if doc.priority == 'Urgent' %}
-                                    <span class="badge badge-danger">{{ doc.priority }}</span>
-                                {% elif doc.priority == 'Priority' %}
-                                    <span class="badge badge-warning">{{ doc.priority }}</span>
-                                {% else %}
-                                    <span class="badge badge-secondary">{{ doc.priority }}</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                <span class="badge {% if doc.status == 'Outgoing' %}badge-info{% elif doc.status == 'Sent' %}badge-success{% elif doc.status == 'Received' %}badge-primary{% else %}badge-secondary{% endif %}">
-                                    {{ doc.status }}
-                                </span>
-                            </td>
-                            <td>{{ doc.current_holder }}</td>
-                            <td>
-                                <div class="dropdown">
-                                    <button class="btn btn-sm btn-primary dropdown-toggle" type="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false" title="Document actions">
-                                        <i class="fas fa-cog"></i> <span class="sr-only">Actions</span>
-                                    </button>
-                                    <div class="dropdown-menu dropdown-menu-right">
-                                        <a href="/document/{{ doc.code }}" class="dropdown-item">
-                                            <i class="fas fa-eye text-primary"></i> View
-                                        </a>
-                                        <div class="dropdown-divider"></div>
-                                        <h6 class="dropdown-header">Update Status</h6>
-                                        <form action="{{ url_for('update_outgoing_status', doc_code=doc.code) }}" method="post" aria-label="Update document status form">
-                                            <button type="submit" name="status" value="Sent" class="dropdown-item {% if doc.status == 'Sent' %}disabled{% endif %}" title="Mark document as sent">
-                                                <i class="fas fa-paper-plane text-primary"></i> Mark as Sent
-                                            </button>
-                                            <button type="submit" name="status" value="Received" class="dropdown-item {% if doc.status == 'Received' %}disabled{% endif %}" title="Mark document as received">
-                                                <i class="fas fa-check-circle text-success"></i> Mark as Received
-                                            </button>
-                                            <button type="submit" name="status" value="Ended" class="dropdown-item {% if doc.status == 'Ended' %}disabled{% endif %}" title="Mark document as ended">
-                                                <i class="fas fa-archive text-secondary"></i> Mark as Ended
-                                            </button>
-                                        </form>
-                                    </div>
-                                </div>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    {% else %}
-                        <tr>
-                            <td colspan="10" class="text-center">No outgoing documents found. <a href="/compose">Upload a new document</a>.</td>
-                        </tr>
+
+    <!-- Documents Table -->
+    <div class="card shadow">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Outgoing Documents</h5>
+            <div class="btn-group btn-group-sm">
+                <button type="button" class="btn btn-outline-secondary sort-btn {% if sort_by == 'date' %}active{% endif %}" data-sort="date">
+                    Date 
+                    {% if sort_by == 'date' %}
+                    <i class="fas fa-sort-{% if sort_order == 'desc' %}down{% else %}up{% endif %}"></i>
                     {% endif %}
-                </tbody>
-            </table>
+                </button>
+                <button type="button" class="btn btn-outline-secondary sort-btn {% if sort_by == 'priority' %}active{% endif %}" data-sort="priority">
+                    Priority 
+                    {% if sort_by == 'priority' %}
+                    <i class="fas fa-sort-{% if sort_order == 'desc' %}down{% else %}up{% endif %}"></i>
+                    {% endif %}
+                </button>
+                <button type="button" class="btn btn-outline-secondary sort-btn {% if sort_by == 'code' %}active{% endif %}" data-sort="code">
+                    Code 
+                    {% if sort_by == 'code' %}
+                    <i class="fas fa-sort-{% if sort_order == 'desc' %}down{% else %}up{% endif %}"></i>
+                    {% endif %}
+                </button>
+            </div>
         </div>
-    </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-striped table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="width: 40px;">
+                                <div class="form-check">
+                                    <input type="checkbox" class="form-check-input" id="selectAll" aria-label="Select all documents">
+                                    <label class="form-check-label" for="selectAll">Select All</label>
+                                </div>
+                            </th>
+                            <th>Doc. Code</th>
+                            <th>Sender</th>
+                            <th>Recipient</th>
+                            <th>Details</th>
+                            <th>Date</th>
+                            <th>Priority</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if documents %}
+                            {% for doc in documents %}
+                            <tr>
+                                <td>
+                                    <div class="form-check">
+                                        <input type="checkbox" class="form-check-input doc-checkbox" value="{{ doc.code }}" id="doc-{{ doc.code }}" aria-label="Select document {{ doc.code }}">
+                                        <label class="form-check-label" for="doc-{{ doc.code }}">Select</label>
+                                    </div>
+                                </td>
+                                <td>
+                                    <strong>{{ doc.code }}</strong>
+                                </td>
+                                <td>{{ doc.sender }}</td>
+                                <td>{{ doc.recipient }}</td>
+                                <td>
+                                    <div class="text-truncate" style="max-width: 200px;">
+                                        {{ doc.details if doc.details else 'N/A' }}
+                                    </div>
+                                </td>
+                                <td>{{ doc.date_of_letter.strftime('%d-%m-%Y') }}</td>
+                                <td>
+                                    <span class="badge bg-{% if doc.priority == 'Urgent' %}danger{% elif doc.priority == 'Priority' %}warning{% else %}secondary{% endif %}">
+                                        {{ doc.priority }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="badge bg-{% if doc.status == 'Outgoing' %}primary{% elif doc.status == 'Sent' %}info{% elif doc.status == 'Received' %}success{% else %}secondary{% endif %}">
+                                        {{ doc.status }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <div class="btn-group btn-group-sm">
+                                        <a href="{{ url_for('document_details', doc_code=doc.code) }}" class="btn btn-outline-primary" aria-label="View document details">
+                                            <i class="fas fa-eye"></i><span class="visually-hidden">View</span>
+                                        </a>
+                                        <button type="button" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" aria-label="More actions">
+                                            <i class="fas fa-cog"></i><span class="visually-hidden">Actions</span>
+                                        </button>
+                                        <ul class="dropdown-menu dropdown-menu-end">
+                                            <li>
+                                                <form action="{{ url_for('update_outgoing_status', doc_code=doc.code) }}" method="post">
+                                                    <input type="hidden" name="status" value="Sent">
+                                                    <button type="submit" class="dropdown-item">
+                                                        <i class="fas fa-paper-plane text-primary me-2"></i> Mark as Sent
+                                                    </button>
+                                                </form>
+                                            </li>
+                                            <li>
+                                                <form action="{{ url_for('update_outgoing_status', doc_code=doc.code) }}" method="post">
+                                                    <input type="hidden" name="status" value="Received">
+                                                    <button type="submit" class="dropdown-item">
+                                                        <i class="fas fa-check-circle text-success me-2"></i> Mark as Received
+                                                    </button>
+                                                </form>
+                                            </li>
+                                            <li>
+                                                <form action="{{ url_for('update_outgoing_status', doc_code=doc.code) }}" method="post">
+                                                    <input type="hidden" name="status" value="Ended">
+                                                    <button type="submit" class="dropdown-item">
+                                                        <i class="fas fa-flag-checkered text-danger me-2"></i> Mark as Ended
+                                                    </button>
+                                                </form>
+                                            </li>
+                                            <li><hr class="dropdown-divider"></li>
+                                            <li>
+                                                <button type="button" class="dropdown-item" onclick="window.print()">
+                                                    <i class="fas fa-print text-secondary me-2"></i> Print
+                                                </button>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="9" class="text-center py-4">
+                                    <div class="py-5">
+                                        <i class="fas fa-file-export fa-3x text-muted mb-3"></i>
+                                        <h5>No outgoing documents found</h5>
+                                        <p class="text-muted">Create a new outgoing document to get started</p>
+                                        <a href="{{ url_for('compose') }}" class="btn btn-primary mt-2">
+                                            <i class="fas fa-plus me-1"></i> New Document
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
 
-    {% if pagination.pages > 1 %}
-    <div class="card-footer bg-white">
-        <nav aria-label="Document pagination">
-            <ul class="pagination pagination-sm justify-content-center mb-0">
-                {% if pagination.has_prev %}
-                    <li class="page-item">
+        {% if pagination.pages > 1 %}
+        <div class="card-footer bg-white">
+            <nav aria-label="Document pagination">
+                <ul class="pagination pagination-sm justify-content-center mb-0">
+                    <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
                         <a class="page-link" href="#" data-page="{{ pagination.prev_num }}" aria-label="Previous">
                             <span aria-hidden="true">&laquo;</span>
                         </a>
                     </li>
-                {% else %}
-                    <li class="page-item disabled">
-                        <span class="page-link" aria-hidden="true">&laquo;</span>
-                    </li>
-                {% endif %}
-                
-                {% for page_num in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
-                    {% if page_num %}
-                        {% if page_num == pagination.page %}
-                            <li class="page-item active">
-                                <span class="page-link">{{ page_num }}</span>
+                    
+                    {% for page_num in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+                        {% if page_num %}
+                            <li class="page-item {% if page_num == pagination.page %}active{% endif %}">
+                                {% if page_num == pagination.page %}
+                                    <span class="page-link">{{ page_num }}</span>
+                                {% else %}
+                                    <a class="page-link" href="#" data-page="{{ page_num }}">{{ page_num }}</a>
+                                {% endif %}
                             </li>
                         {% else %}
-                            <li class="page-item">
-                                <a class="page-link" href="#" data-page="{{ page_num }}">{{ page_num }}</a>
+                            <li class="page-item disabled">
+                                <span class="page-link">…</span>
                             </li>
                         {% endif %}
-                    {% else %}
-                        <li class="page-item disabled">
-                            <span class="page-link">…</span>
-                        </li>
-                    {% endif %}
-                {% endfor %}
-                
-                {% if pagination.has_next %}
-                    <li class="page-item">
+                    {% endfor %}
+                    
+                    <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
                         <a class="page-link" href="#" data-page="{{ pagination.next_num }}" aria-label="Next">
                             <span aria-hidden="true">&raquo;</span>
                         </a>
                     </li>
-                {% else %}
-                    <li class="page-item disabled">
-                        <span class="page-link" aria-hidden="true">&raquo;</span>
-                    </li>
-                {% endif %}
-            </ul>
-        </nav>
+                </ul>
+            </nav>
+        </div>
+        {% endif %}
     </div>
-    {% endif %}
 </div>
+{% endblock %}
 
+{% block scripts %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     // Priority filter buttons
@@ -329,15 +345,10 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
     
-    // Sorting - fixed to ensure proper binding and functionality
+    // Sorting
     const sortButtons = document.querySelectorAll('.sort-btn');
-    console.log('Found ' + sortButtons.length + ' sort buttons');
-    
     sortButtons.forEach(button => {
-        button.addEventListener('click', function(e) {
-            e.preventDefault();
-            console.log('Sort button clicked: ' + this.getAttribute('data-sort'));
-            
+        button.addEventListener('click', function() {
             const sortBy = this.getAttribute('data-sort');
             const currentSortBy = document.getElementById('sortBy').value;
             let sortOrder = document.getElementById('sortOrder').value;
@@ -352,12 +363,6 @@ document.addEventListener('DOMContentLoaded', function() {
             
             document.getElementById('sortBy').value = sortBy;
             document.getElementById('sortOrder').value = sortOrder;
-            
-            // Add active class to current sort button
-            sortButtons.forEach(btn => {
-                btn.classList.remove('active');
-            });
-            this.classList.add('active');
             
             // Submit the form to apply sorting
             document.getElementById('searchForm').submit();
@@ -426,20 +431,21 @@ document.addEventListener('DOMContentLoaded', function() {
                 container.appendChild(input);
             });
             
+            // Submit the form to apply bulk action
             document.getElementById('bulkActionForm').submit();
         });
     });
-    
+
     function updateBulkActionButton() {
         const selectedCount = document.querySelectorAll('.doc-checkbox:checked').length;
         const bulkActionsBtn = document.getElementById('bulkActionsBtn');
         
         if (selectedCount > 0) {
             bulkActionsBtn.removeAttribute('disabled');
-            bulkActionsBtn.textContent = `Bulk Actions (${selectedCount})`;
+            bulkActionsBtn.innerHTML = `<i class="fas fa-tasks me-1"></i> Bulk Actions (${selectedCount})`;
         } else {
             bulkActionsBtn.setAttribute('disabled', 'disabled');
-            bulkActionsBtn.innerHTML = '<i class="fas fa-tasks"></i> Bulk Actions';
+            bulkActionsBtn.innerHTML = '<i class="fas fa-tasks me-1"></i> Bulk Actions';
         }
     }
 });

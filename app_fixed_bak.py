@@ -260,7 +260,8 @@ def login():
             flash('Invalid username or password', 'danger')
     
     # GET request or failed login - show login form
-    return render_template('login.html')
+    current_year = datetime.now().year
+    return render_template('login.html', current_year=current_year)
 
 @app.route('/dashboard', methods=['GET', 'POST'])
 def dashboard():
