@@ -28,7 +28,7 @@
                         <i class="fas fa-tasks me-1"></i> Bulk Actions
             </button>
                     <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="bulkActionsBtn">
-                        <form id="bulkActionForm" action="{{ url_for('bulk_user_action') }}" method="post" aria-label="Bulk actions form">
+                        <form id="bulkActionForm" action="{{ url_for('user_management') }}" method="post" aria-label="Bulk actions form">
                             <input type="hidden" name="user_ids" id="bulkUserIds" value="" title="Selected user IDs">
                             <input type="hidden" name="action" id="bulkActionType" value="" title="Bulk action type">
                             
@@ -115,7 +115,7 @@
                                 </span>
                         </td>
                             <td>{{ user.last_login.strftime('%Y-%m-%d %H:%M') if user.last_login else 'Never' }}</td>
-                            <td>{{ user.created_at.strftime('%Y-%m-%d') if user.created_at else 'Unknown' }}</td>
+                            <td>{{ user.created_at if user.created_at else 'Unknown' }}</td>
                             <td>
                                 <div class="btn-group">
                                     <button type="button" class="btn btn-sm btn-outline-secondary edit-user-btn" 
@@ -178,43 +178,48 @@
                 <h5 class="modal-title">Add New User</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <form action="{{ url_for('add_user') }}" method="post">
-                <div class="modal-body">
+            <form action="{{ url_for('user_management') }}" method="post">
+            <div class="modal-body">
                     <div class="mb-3">
                         <label for="username" class="form-label">Username</label>
                         <input type="text" class="form-control" id="username" name="username" required>
-                    </div>
+                        </div>
                     <div class="mb-3">
                         <label for="email" class="form-label">Email</label>
                         <input type="email" class="form-control" id="email" name="email" required>
-                    </div>
+                        </div>
                     <div class="mb-3">
                         <label for="department" class="form-label">Department</label>
                         <select class="form-select" id="department" name="department" required>
                             <option value="" selected disabled>Select Department</option>
                             {% for dept in departments %}
                             <option value="{{ dept }}">{{ dept }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
+                                {% endfor %}
+                            </select>
+                        </div>
                     <div class="mb-3">
                         <label for="role" class="form-label">Role</label>
                         <select class="form-select" id="role" name="role" required>
                             <option value="" selected disabled>Select Role</option>
-                            {% for role in roles %}
-                            <option value="{{ role }}">{{ role }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
+                                {% for role in roles %}
+                                <option value="{{ role }}">{{ role }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
                     <div class="mb-3">
                         <label for="password" class="form-label">Password</label>
-                        <input type="password" class="form-control" id="password" name="password" required>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <div class="input-group">
+                            <input type="password" class="form-control" id="password" name="password" required>
+                            <button class="btn btn-outline-secondary toggle-password" type="button" data-target="password" title="Show/Hide Password">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                            </div>
+                        </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                     <button type="submit" class="btn btn-primary">Add User</button>
-                </div>
+            </div>
             </form>
         </div>
     </div>
@@ -262,8 +267,13 @@
                         </div>
                     <div class="mb-3">
                         <label for="editPassword" class="form-label">New Password (leave blank to keep current)</label>
-                        <input type="password" class="form-control" id="editPassword" name="password">
+                        <div class="input-group">
+                            <input type="password" class="form-control" id="editPassword" name="password">
+                            <button class="btn btn-outline-secondary toggle-password" type="button" data-target="editPassword" title="Show/Hide Password">
+                                <i class="fas fa-eye"></i>
+                            </button>
                             </div>
+                        </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -504,8 +514,13 @@
                         </div>
                     <div class="mb-3" id="customPasswordField" style="display: none;">
                         <label for="newPassword" class="form-label">New Password</label>
-                        <input type="password" class="form-control" id="newPassword" name="password">
+                        <div class="input-group">
+                            <input type="password" class="form-control" id="newPassword" name="password">
+                            <button class="btn btn-outline-secondary toggle-password" type="button" data-target="newPassword" title="Show/Hide Password">
+                                <i class="fas fa-eye"></i>
+                            </button>
                     </div>
+                        </div>
                     <div class="form-check mb-3">
                         <input class="form-check-input" type="checkbox" id="emailPassword" name="email_password">
                         <label class="form-check-label" for="emailPassword">Email new password to user</label>
@@ -518,7 +533,7 @@
             </form>
                         </div>
                         </div>
-                        </div>
+                    </div>
 
 <!-- Toggle Status Modal -->
 <div class="modal fade" id="toggleStatusModal" tabindex="-1" aria-hidden="true">
@@ -527,16 +542,16 @@
             <div class="modal-header">
                 <h5 class="modal-title" id="toggleStatusTitle">Change User Status</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
+                </div>
             <form id="toggleStatusForm" method="post">
                 <div class="modal-body">
                     <p id="toggleStatusMessage">Are you sure you want to change the status for this user?</p>
                     <input type="hidden" id="toggleStatusAction" name="action" value="">
-                </div>
+                        </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                     <button type="submit" class="btn btn-primary" id="confirmToggleStatusBtn">Confirm</button>
-                        </div>
+                    </div>
             </form>
                     </div>
     </div>
@@ -919,6 +934,25 @@ document.addEventListener('DOMContentLoaded', function() {
             // Submit the form
             document.getElementById('bulkActionForm').submit();
         }
+
+        // Password visibility toggle
+        document.querySelectorAll('.toggle-password').forEach(button => {
+            button.addEventListener('click', function() {
+                const targetId = this.getAttribute('data-target');
+                const passwordInput = document.getElementById(targetId);
+                
+                // Toggle password visibility
+                if (passwordInput.type === 'password') {
+                    passwordInput.type = 'text';
+                    this.innerHTML = '<i class="fas fa-eye-slash"></i>';
+                    this.setAttribute('title', 'Hide Password');
+                } else {
+                    passwordInput.type = 'password';
+                    this.innerHTML = '<i class="fas fa-eye"></i>';
+                    this.setAttribute('title', 'Show Password');
+                }
+            });
+    });
 });
 </script>
 {% endblock %} 

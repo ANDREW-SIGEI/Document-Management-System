@@ -113,17 +113,67 @@
                 </div>
                 <div class="card-body p-0">
                     <div class="list-group list-group-flush">
-                        {% for entry in history %}
-                        <div class="list-group-item">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <h6 class="mb-1">{{ entry.action }}</h6>
-                                <small class="text-muted">{{ entry.timestamp }}</small>
+                        {% if document.history %}
+                            {% for entry in document.history %}
+                            <div class="list-group-item">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <h6 class="mb-1">{{ entry.action }}</h6>
+                                    <small class="text-muted">{{ entry.timestamp }}</small>
+                                </div>
+                                <p class="mb-1">{{ entry.notes|default(entry.details, true) }}</p>
+                                <small class="text-muted">By {{ entry.user }}</small>
                             </div>
-                            <p class="mb-1">{{ entry.details }}</p>
-                            <small class="text-muted">By {{ entry.user }}</small>
-                        </div>
-                        {% endfor %}
+                            {% endfor %}
+                        {% else %}
+                            <div class="list-group-item text-center py-3">
+                                <p class="text-muted mb-0">No history available</p>
+                            </div>
+                        {% endif %}
                     </div>
+                </div>
+            </div>
+            
+            <!-- Comments Section -->
+            <div class="card mt-4">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0">Comments & Discussion</h5>
+                </div>
+                <div class="card-body">
+                    {% if comments %}
+                        <div class="comments-list mb-4">
+                            {% for comment in comments %}
+                                <div class="comment-item mb-3 p-3 border rounded">
+                                    <div class="d-flex justify-content-between">
+                                        <div class="comment-author">
+                                            <strong>{{ comment.user }}</strong> 
+                                            <span class="badge bg-secondary">{{ comment.user_role }}</span>
+                                        </div>
+                                        <small class="text-muted">{{ comment.timestamp }}</small>
+                                    </div>
+                                    <div class="comment-content mt-2">
+                                        {{ comment.text }}
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="text-center py-3 mb-3 bg-light rounded">
+                            <p class="text-muted mb-0">No comments yet</p>
+                        </div>
+                    {% endif %}
+                    
+                    <!-- Add Comment Form -->
+                    <form action="{{ url_for('add_document_comment', document_code=doc_code) }}" method="post">
+                        <div class="mb-3">
+                            <label for="comment" class="form-label">Add a Comment</label>
+                            <textarea class="form-control" id="comment" name="comment" rows="3" placeholder="Your comment..."></textarea>
+                        </div>
+                        <div class="text-end">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-comment me-1"></i> Submit Comment
+                            </button>
+                        </div>
+                    </form>
                 </div>
             </div>
         </div>
@@ -136,32 +186,32 @@
                 </div>
                 <div class="card-body">
                     <ul class="timeline">
-                        <li class="timeline-item">
-                            <div class="timeline-marker bg-success"></div>
-                            <div class="timeline-content">
-                                <h6 class="mb-1">Document Created</h6>
-                                <p class="mb-0 small text-muted">{{ document.created_at_str }}</p>
-                            </div>
-                        </li>
-                        
-                        {% if document.status != 'Incoming' %}
-                        <li class="timeline-item">
-                            <div class="timeline-marker bg-warning"></div>
-                            <div class="timeline-content">
-                                <h6 class="mb-1">Marked as {{ document.status }}</h6>
-                                <p class="mb-0 small text-muted">{{ document.updated_at_str }}</p>
-                            </div>
-                        </li>
-                        {% endif %}
-                        
-                        {% if document.status == 'Ended' %}
-                        <li class="timeline-item">
-                            <div class="timeline-marker bg-danger"></div>
-                            <div class="timeline-content">
-                                <h6 class="mb-1">Document Ended</h6>
-                                <p class="mb-0 small text-muted">{{ document.updated_at_str }}</p>
-                            </div>
-                        </li>
+                        {% if document.history %}
+                            {% for entry in document.history %}
+                                <li class="timeline-item">
+                                    <div class="timeline-marker
+                                        {% if 'Created' in entry.action %}bg-success
+                                        {% elif 'Submitted' in entry.action %}bg-primary
+                                        {% elif 'Rejected' in entry.action %}bg-danger
+                                        {% elif 'Approved' in entry.action %}bg-success
+                                        {% elif 'Pending' in entry.action %}bg-warning
+                                        {% elif 'Changed' in entry.action %}bg-info
+                                        {% else %}bg-secondary{% endif %}
+                                    "></div>
+                                    <div class="timeline-content">
+                                        <h6 class="mb-1">{{ entry.action }}</h6>
+                                        <p class="mb-0 small text-muted">{{ entry.timestamp }}</p>
+                                    </div>
+                                </li>
+                            {% endfor %}
+                        {% else %}
+                            <li class="timeline-item">
+                                <div class="timeline-marker bg-success"></div>
+                                <div class="timeline-content">
+                                    <h6 class="mb-1">Document Created</h6>
+                                    <p class="mb-0 small text-muted">{{ document.date_created|default(document.date_received, true) }}</p>
+                                </div>
+                            </li>
                         {% endif %}
                     </ul>
                 </div>
@@ -300,51 +350,6 @@
                             <p class="mb-0">No attachments yet</p>
                         </div>
                     {% endif %}
-                </div>
-            </div>
-            
-            <!-- Add Document Comments Section -->
-            <div class="card mt-4">
-                <div class="card-header bg-white">
-                    <h5 class="mb-0">Comments</h5>
-                </div>
-                <div class="card-body">
-                    {% if document.comments %}
-                        <div class="comments-list mb-4">
-                            {% for comment in document.comments %}
-                            <div class="comment-item mb-3">
-                                <div class="d-flex">
-                                    <div class="comment-avatar me-3">
-                                        <div class="avatar-circle">
-                                            {{ comment.user[:1] if comment.user else 'U' }}
-                                        </div>
-                                    </div>
-                                    <div class="comment-content">
-                                        <div class="d-flex justify-content-between">
-                                            <h6 class="mb-1">{{ comment.user }}</h6>
-                                            <small class="text-muted">{{ comment.timestamp }}</small>
-                                        </div>
-                                        <p class="mb-0">{{ comment.text }}</p>
-                                    </div>
-                                </div>
-                            </div>
-                            {% endfor %}
-                        </div>
-                    {% else %}
-                        <p class="text-muted text-center mb-4">No comments yet</p>
-                    {% endif %}
-                    
-                    <form action="{{ url_for('add_document_comment', document_code=document.code) }}" method="post">
-                        <div class="mb-3">
-                            <label for="comment" class="form-label">Add a comment</label>
-                            <textarea class="form-control" id="comment" name="comment" rows="3" placeholder="Type your comment here..."></textarea>
-                        </div>
-                        <div class="text-end">
-                            <button type="submit" class="btn btn-primary">
-                                <i class="fas fa-comment me-1"></i> Post Comment
-                            </button>
-                        </div>
-                    </form>
                 </div>
             </div>
         </div>

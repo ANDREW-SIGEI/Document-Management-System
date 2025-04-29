@@ -1,0 +1,357 @@
+{% extends 'base.html' %}
+
+{% block title %}Document Workflow Management{% endblock %}
+
+{% block styles %}
+<style>
+  .status-badge {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+  }
+  
+  .progress-sm {
+    height: 5px;
+  }
+  
+  .workflow-card {
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    transition: all 0.3s;
+  }
+  
+  .workflow-card:hover {
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    transform: translateY(-2px);
+  }
+  
+  .document-row:hover {
+    background-color: rgba(0,0,0,0.02);
+  }
+  
+  .action-buttons .btn {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.8rem;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h2 class="mb-0"><i class="fas fa-project-diagram me-2"></i>Registry Workflow</h2>
+      <p class="text-muted">Monitor and manage document workflow processes</p>
+    </div>
+    <div>
+      <button class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#filterModal">
+        <i class="fas fa-filter me-1"></i> Filter
+      </button>
+      <button class="btn btn-primary ms-2">
+        <i class="fas fa-file-export me-1"></i> Export
+      </button>
+    </div>
+  </div>
+
+  <!-- Status Cards -->
+  <div class="row mb-4">
+    <div class="col-md-3">
+      <div class="card workflow-card bg-white">
+        <div class="card-body d-flex align-items-center">
+          <div class="flex-shrink-0 bg-primary bg-opacity-10 p-3 rounded">
+            <i class="fas fa-spinner fa-2x text-primary"></i>
+          </div>
+          <div class="ms-3">
+            <h3 class="mb-0">{{ documents|selectattr('status', 'equalto', 'Pending')|list|length }}</h3>
+            <p class="text-muted mb-0">In Progress</p>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card workflow-card bg-white">
+        <div class="card-body d-flex align-items-center">
+          <div class="flex-shrink-0 bg-success bg-opacity-10 p-3 rounded">
+            <i class="fas fa-check-circle fa-2x text-success"></i>
+          </div>
+          <div class="ms-3">
+            <h3 class="mb-0">{{ documents|selectattr('status', 'equalto', 'Approved')|list|length }}</h3>
+            <p class="text-muted mb-0">Approved</p>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card workflow-card bg-white">
+        <div class="card-body d-flex align-items-center">
+          <div class="flex-shrink-0 bg-danger bg-opacity-10 p-3 rounded">
+            <i class="fas fa-times-circle fa-2x text-danger"></i>
+          </div>
+          <div class="ms-3">
+            <h3 class="mb-0">{{ documents|selectattr('status', 'equalto', 'Rejected')|list|length }}</h3>
+            <p class="text-muted mb-0">Rejected</p>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card workflow-card bg-white">
+        <div class="card-body d-flex align-items-center">
+          <div class="flex-shrink-0 bg-info bg-opacity-10 p-3 rounded">
+            <i class="fas fa-clock fa-2x text-info"></i>
+          </div>
+          <div class="ms-3">
+            <h3 class="mb-0">24.6h</h3>
+            <p class="text-muted mb-0">Avg. Process Time</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Documents Table -->
+  <div class="card workflow-card">
+    <div class="card-header bg-white">
+      <h5 class="mb-0">All Workflow Documents</h5>
+    </div>
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-hover" id="workflowTable">
+          <thead class="table-light">
+            <tr>
+              <th>Tracking Code</th>
+              <th>Document Title</th>
+              <th>Type</th>
+              <th>Submitted By</th>
+              <th>Current Department</th>
+              <th>Priority</th>
+              <th>Status</th>
+              <th>Progress</th>
+              <th>Last Activity</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for doc in documents %}
+            <tr class="document-row">
+              <td><a href="{{ url_for('document_workflow', tracking_code=doc.tracking_code) }}" class="fw-bold text-primary">{{ doc.tracking_code }}</a></td>
+              <td>{{ doc.title }}</td>
+              <td>{{ doc.type }}</td>
+              <td>{{ doc.submitted_by }}</td>
+              <td>{{ doc.current_department }}</td>
+              <td>
+                <span class="badge bg-{{ 'danger' if doc.priority == 'Urgent' else 'warning' if doc.priority == 'Priority' else 'info' }} rounded-pill status-badge">
+                  {{ doc.priority }}
+                </span>
+              </td>
+              <td>
+                <span class="badge bg-{{ 'success' if doc.status == 'Approved' else 'danger' if doc.status == 'Rejected' else 'warning' }} rounded-pill status-badge">
+                  {{ doc.status }}
+                </span>
+              </td>
+              <td style="width: 120px;">
+                <div class="d-flex align-items-center">
+                  <div class="progress progress-sm flex-grow-1 me-2">
+                    <div class="progress-bar bg-{{ 'success' if doc.status == 'Approved' else 'danger' if doc.status == 'Rejected' else 'primary' }}" 
+                         role="progressbar" 
+                         style="width: {{ (doc.steps_completed / doc.total_steps * 100)|int }}%" 
+                         aria-valuenow="{{ (doc.steps_completed / doc.total_steps * 100)|int }}" 
+                         aria-valuemin="0" 
+                         aria-valuemax="100">
+                    </div>
+                  </div>
+                  <small>{{ doc.steps_completed }}/{{ doc.total_steps }}</small>
+                </div>
+              </td>
+              <td>{{ doc.last_activity }}</td>
+              <td>
+                <div class="action-buttons">
+                  <a href="{{ url_for('document_workflow', tracking_code=doc.tracking_code) }}" class="btn btn-sm btn-outline-primary" title="View Workflow">
+                    <i class="fas fa-project-diagram"></i>
+                  </a>
+                  <a href="{{ url_for('track_by_code', tracking_code=doc.tracking_code) }}" class="btn btn-sm btn-outline-info" title="View Document">
+                    <i class="fas fa-eye"></i>
+                  </a>
+                  {% if doc.status == 'Pending' %}
+                  <button class="btn btn-sm btn-outline-success" data-bs-toggle="modal" data-bs-target="#processModal" data-tracking-code="{{ doc.tracking_code }}" data-title="{{ doc.title }}" title="Process Document">
+                    <i class="fas fa-check"></i>
+                  </button>
+                  {% endif %}
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Process Modal -->
+<div class="modal fade" id="processModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Process Document</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p>You are about to process the document: <strong id="processDocTitle"></strong></p>
+        <p>What would you like to do with this document?</p>
+        
+        <div class="d-grid gap-2 mt-3">
+          <a href="#" id="viewWorkflowBtn" class="btn btn-outline-primary">
+            <i class="fas fa-project-diagram me-1"></i> View Workflow Details
+          </a>
+          <a href="#" id="viewDocumentBtn" class="btn btn-outline-info">
+            <i class="fas fa-eye me-1"></i> View Document Details
+          </a>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Filter Modal -->
+<div class="modal fade" id="filterModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Filter Documents</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <form id="filterForm">
+          <div class="mb-3">
+            <label class="form-label">Status</label>
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="statusPending" checked>
+              <label class="form-check-label" for="statusPending">Pending</label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="statusApproved" checked>
+              <label class="form-check-label" for="statusApproved">Approved</label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="statusRejected" checked>
+              <label class="form-check-label" for="statusRejected">Rejected</label>
+            </div>
+          </div>
+          
+          <div class="mb-3">
+            <label class="form-label">Priority</label>
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="priorityUrgent" checked>
+              <label class="form-check-label" for="priorityUrgent">Urgent</label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="priorityHigh" checked>
+              <label class="form-check-label" for="priorityHigh">Priority</label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="priorityNormal" checked>
+              <label class="form-check-label" for="priorityNormal">Normal</label>
+            </div>
+          </div>
+          
+          <div class="mb-3">
+            <label for="filterDepartment" class="form-label">Department</label>
+            <select class="form-select" id="filterDepartment">
+              <option value="" selected>All Departments</option>
+              <option value="Registry">Registry</option>
+              <option value="Finance">Finance</option>
+              <option value="HR">HR</option>
+              <option value="Research">Research</option>
+              <option value="Management">Management</option>
+            </select>
+          </div>
+          
+          <div class="mb-3">
+            <label class="form-label">Date Range</label>
+            <div class="row">
+              <div class="col-md-6">
+                <label for="startDate" class="form-label small">Start Date</label>
+                <input type="date" class="form-control" id="startDate">
+              </div>
+              <div class="col-md-6">
+                <label for="endDate" class="form-label small">End Date</label>
+                <input type="date" class="form-control" id="endDate">
+              </div>
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" id="applyFilterBtn">Apply Filters</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  $(document).ready(function() {
+    // Initialize DataTable
+    $('#workflowTable').DataTable({
+      responsive: true,
+      language: {
+        search: "_INPUT_",
+        searchPlaceholder: "Search documents...",
+      },
+      dom: "<'row'<'col-sm-12 col-md-6'l><'col-sm-12 col-md-6'f>>" +
+           "<'row'<'col-sm-12'tr>>" +
+           "<'row'<'col-sm-12 col-md-5'i><'col-sm-12 col-md-7'p>>",
+      pageLength: 10
+    });
+    
+    // Process modal
+    $('#processModal').on('show.bs.modal', function(event) {
+      const button = $(event.relatedTarget);
+      const trackingCode = button.data('tracking-code');
+      const title = button.data('title');
+      
+      // Set document title in modal
+      $('#processDocTitle').text(title);
+      
+      // Update links
+      $('#viewWorkflowBtn').attr('href', '/document_workflow/' + trackingCode);
+      $('#viewDocumentBtn').attr('href', '/track/code/' + trackingCode);
+    });
+    
+    // Filter functionality (client-side filtering for demo)
+    $('#applyFilterBtn').on('click', function() {
+      const statusPending = $('#statusPending').is(':checked');
+      const statusApproved = $('#statusApproved').is(':checked');
+      const statusRejected = $('#statusRejected').is(':checked');
+      
+      const priorityUrgent = $('#priorityUrgent').is(':checked');
+      const priorityHigh = $('#priorityHigh').is(':checked');
+      const priorityNormal = $('#priorityNormal').is(':checked');
+      
+      const department = $('#filterDepartment').val();
+      const startDate = $('#startDate').val();
+      const endDate = $('#endDate').val();
+      
+      // In a real implementation, you would send this data to the server
+      // For this demo, we'll just show what would be sent
+      console.log('Filter data:', {
+        status: { pending: statusPending, approved: statusApproved, rejected: statusRejected },
+        priority: { urgent: priorityUrgent, high: priorityHigh, normal: priorityNormal },
+        department: department,
+        dateRange: { start: startDate, end: endDate }
+      });
+      
+      // Close the modal
+      $('#filterModal').modal('hide');
+      
+      // Show a toast or notification (you could add a toast component)
+      alert('Filters applied! In a real implementation, this would filter the table data.');
+    });
+  });
+</script>
+{% endblock %} 

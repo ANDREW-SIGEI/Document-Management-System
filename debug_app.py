@@ -8,6 +8,7 @@ import random
 from werkzeug.utils import secure_filename
 from permissions import requires_permission, requires_role, requires_login, has_permission, can_access_menu, log_activity, check_session_valid
 import time
+import uuid
 
 app = Flask(__name__)
 app.secret_key = 'kemri_secret_key'  # Required for flash messages
@@ -436,34 +437,133 @@ def track_document():
 
 @app.route('/document_details/<doc_code>')
 def document_details(doc_code):
+    """View document details page"""
     if 'user_id' not in session:
+        flash('Please log in to view document details', 'warning')
         return redirect(url_for('login'))
-    # In a real app, you would fetch document data from database
-    document = {
-        'code': doc_code,
-        'title': f'Document {doc_code}',
-        'filename': f'file_{doc_code}.pdf',
-                'status': 'Pending',
-        'created_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-        'sender': 'John Doe',
-        'recipient': 'Jane Smith',
-        'description': 'Sample document for testing purposes'
+    
+    # In a real app, fetch document data from database
+    # For demo purposes, create a sample document
+    document = None
+    
+    # Check if document exists in session
+    if 'composed_documents' in session:
+        for doc in session['composed_documents']:
+            if doc.get('code') == doc_code or doc.get('tracking_code') == doc_code:
+                document = doc
+                break
+    
+    # If not found in session, create a demo document
+    if not document:
+        # Create sample document based on doc_code format
+        if doc_code.startswith('KEMRI-'):
+            document = {
+                'id': 1,
+                'code': doc_code,
+                'tracking_code': doc_code,
+                'title': f'Document {doc_code}',
+                'type': 'Outgoing',
+                'sender': 'KEMRI Laboratory',
+                'recipient': 'Ministry of Health',
+                'date_created': datetime.now().strftime('%Y-%m-%d'),
+                'date_submitted': datetime.now().strftime('%Y-%m-%d'),
+                'status': 'Pending Registry Approval',
+                'priority': 'Normal',
+                'details': 'This is a sample document for demonstration purposes.',
+                'required_action': 'Review',
+                'current_department': 'Registry',
+                'attachments': [
+                    {'name': 'sample_attachment.pdf', 'size': '245 KB', 'date_uploaded': datetime.now().strftime('%Y-%m-%d')}
+                ],
+                'history': [
+                    {
+                        'action': 'Document Created',
+                        'user': 'System Administrator',
+                        'timestamp': (datetime.now() - timedelta(days=2)).strftime('%Y-%m-%d %H:%M:%S'),
+                        'notes': 'Document initialized in the system'
+                    },
+                    {
+                        'action': 'Document Submitted',
+                        'user': 'System Administrator',
+                        'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                        'notes': 'Document submitted for processing'
+                    }
+                ]
+            }
+        else:
+            document = {
+                'id': 1,
+                'code': doc_code,
+                'title': f'Sample Document {doc_code}',
+                'type': 'Incoming',
+                'sender': 'External Organization',
+                'recipient': 'KEMRI Laboratory',
+                'date_received': datetime.now().strftime('%Y-%m-%d'),
+                'status': 'Incoming',
+                'priority': 'Normal',
+                'details': 'This is a sample document for demonstration purposes.',
+                'current_holder': 'Registry Department',
+                'attachments': [
+                    {'name': 'sample_document.pdf', 'size': '1.2 MB', 'date_uploaded': datetime.now().strftime('%Y-%m-%d')}
+                ],
+                'history': [
+                    {
+                        'action': 'Document Received',
+                        'user': 'Registry Officer',
+                        'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                        'notes': 'Document received and entered into the system'
+                    }
+                ]
+            }
+    
+    # Get comments from session if they exist
+    comments = []
+    if 'document_comments' in session and doc_code in session['document_comments']:
+        comments = session['document_comments'][doc_code]
+    
+    return render_template('document_details.html', 
+                          document=document,
+                          comments=comments,
+                          doc_code=doc_code,
+                          active_page='documents')
+
+@app.route('/add_document_comment/<document_code>', methods=['POST'])
+def add_document_comment(document_code):
+    """Add a comment to a document"""
+    if 'username' not in session:
+        flash('You must be logged in to add comments', 'warning')
+        return redirect(url_for('login'))
+    
+    comment_text = request.form.get('comment')
+    if not comment_text:
+        flash('Comment cannot be empty', 'warning')
+        return redirect(url_for('document_details', doc_code=document_code))
+    
+    # Get current user information
+    username = session.get('username', 'Anonymous')
+    user_role = session.get('role', 'User')
+    
+    # Create the comment object
+    new_comment = {
+        'user': username,
+        'user_role': user_role,
+        'text': comment_text,
+        'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     }
-    history = [
-        {
-            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-            'action': 'Document Created',
-            'user': 'System Admin',
-            'details': f'Document {doc_code} was created'
-        },
-        {
-            'timestamp': (datetime.now() - timedelta(hours=2)).strftime('%Y-%m-%d %H:%M:%S'),
-            'action': 'Status Changed',
-            'user': 'John Doe',
-            'details': 'Document status updated to Pending'
-        }
-    ]
-    return render_template('document_details.html', document=document, history=history, active_page='track_document')
+    
+    # In a real app, this would be stored in the database
+    # For demo purposes, we'll store it in session
+    if 'document_comments' not in session:
+        session['document_comments'] = {}
+    
+    if document_code not in session['document_comments']:
+        session['document_comments'][document_code] = []
+    
+    session['document_comments'][document_code].append(new_comment)
+    session.modified = True
+    
+    flash('Comment added successfully', 'success')
+    return redirect(url_for('document_details', doc_code=document_code))
 
 @app.route('/track_document_details/<document_code>')
 def track_document_details(document_code):
@@ -700,102 +800,133 @@ def incoming():
         'Normal': 12
     }
     
-    # Generate sample documents for display
+    # Initialize documents list
     documents = []
-    total_items = 23  # Total number of documents (for pagination)
     
-    # Date logic for filtering
-    today = datetime.now().date()
-    week_start = today - timedelta(days=today.weekday())
-    month_start = datetime.now().replace(day=1).date()
+    # Get composed incoming documents from session if available
+    if 'composed_documents' in session:
+        for doc in session['composed_documents']:
+            # Only include incoming documents
+            if doc.get('type') == 'Incoming' or doc.get('document_type') == 'Incoming':
+                # Format the document for the incoming view
+                incoming_doc = {
+                    'id': doc.get('id', len(documents) + 1),
+                    'code': doc.get('code', doc.get('tracking_code', f"DOC-{datetime.now().strftime('%Y')}-{len(documents)+1:03d}")),
+                    'title': doc.get('title', 'Untitled Document'),
+                    'sender': doc.get('sender', 'Unknown Sender'),
+                    'recipient': doc.get('recipient', 'KEMRI Laboratory'),
+                    'details': doc.get('details', ''),
+                    'required_action': doc.get('required_action', 'Review'),
+                    'date_received': doc.get('date_created', doc.get('date_submitted', datetime.now().strftime('%Y-%m-%d %H:%M:%S'))),
+                    'date_received_obj': datetime.strptime(
+                        doc.get('date_created', doc.get('date_submitted', datetime.now().strftime('%Y-%m-%d'))), 
+                        '%Y-%m-%d' if len(doc.get('date_created', doc.get('date_submitted', datetime.now().strftime('%Y-%m-%d')))) <= 10 else '%Y-%m-%d %H:%M:%S'
+                    ),
+                    'status': doc.get('status', 'Incoming'),
+                    'priority': doc.get('priority', 'Normal'),
+                    'current_holder': doc.get('current_holder', 'Registry')
+                }
+                documents.append(incoming_doc)
     
-    # Generate sample documents
-    for i in range(1, 15):
-        # Create a sample date, biased toward more recent dates
-        days_ago = i if i < 5 else i * 2
-        doc_date = datetime.now() - timedelta(days=days_ago)
-        doc_date_str = doc_date.strftime('%Y-%m-%d %H:%M:%S')
+    # Generate additional sample documents if needed
+    if not documents:
+        total_items = 23  # Total number of documents (for pagination)
         
-        # Determine status in rotation
-        if i % 3 == 0:
-            status = 'Incoming'
-        elif i % 3 == 1:
-            status = 'Pending'
-        else:
-            status = 'Received'
+        # Date logic for filtering
+        today = datetime.now().date()
+        week_start = today - timedelta(days=today.weekday())
+        month_start = datetime.now().replace(day=1).date()
         
-        # Determine priority in rotation
-        if i % 5 == 0:
-            priority = 'Urgent'
-        elif i % 5 == 2 or i % 5 == 4:
-            priority = 'Priority'
-        else:
-            priority = 'Normal'
-        
-        document = {
-            'id': i,
-            'code': f'DOC-{2025}-{i:03d}',
-            'title': f'Sample Document {i}',
-            'sender': f'Department {i % 5 + 1}',
-            'recipient': 'KEMRI Laboratory',
-            'details': f'This is a sample document {i} for testing purposes.',
-            'required_action': ['Review', 'Approve', 'Forward', 'File', 'Comment'][i % 5],
-            'date_received': doc_date_str,
-            'date_received_obj': doc_date,
-            'status': status,
-            'priority': priority,
-            'current_holder': f'User {i % 3 + 1}'
-        }
-        
-        # Apply filters
-        include_document = True
-        
+        # Generate sample documents
+        for i in range(1, 15):
+            # Create a sample date, biased toward more recent dates
+            days_ago = i if i < 5 else i * 2
+            doc_date = datetime.now() - timedelta(days=days_ago)
+            doc_date_str = doc_date.strftime('%Y-%m-%d %H:%M:%S')
+            
+            # Determine status in rotation
+            if i % 3 == 0:
+                status = 'Incoming'
+            elif i % 3 == 1:
+                status = 'Pending'
+            else:
+                status = 'Received'
+            
+            # Determine priority in rotation
+            if i % 5 == 0:
+                priority = 'Urgent'
+            elif i % 5 == 2 or i % 5 == 4:
+                priority = 'Priority'
+            else:
+                priority = 'Normal'
+            
+            document = {
+                'id': i,
+                'code': f'DOC-{2025}-{i:03d}',
+                'title': f'Sample Document {i}',
+                'sender': f'Department {i % 5 + 1}',
+                'recipient': 'KEMRI Laboratory',
+                'details': f'This is a sample document {i} for testing purposes.',
+                'required_action': ['Review', 'Approve', 'Forward', 'File', 'Comment'][i % 5],
+                'date_received': doc_date_str,
+                'date_received_obj': doc_date,
+                'status': status,
+                'priority': priority,
+                'current_holder': f'User {i % 3 + 1}'
+            }
+            
+            documents.append(document)
+    
+    filtered_documents = []
+    
+    # Apply filters to all documents
+    for document in documents:
         # Status filter
         if status_filter != 'all' and document['status'] != status_filter:
-            include_document = False
+            continue
             
         # Priority filter
         if priority_filter != 'All' and document['priority'] != priority_filter:
-            include_document = False
+            continue
             
         # Search query
-        if search_query and search_query.lower() not in document['title'].lower() and search_query.lower() not in document['sender'].lower():
-            include_document = False
+        if search_query and search_query.lower() not in document.get('title', '').lower() and search_query.lower() not in document.get('sender', '').lower():
+            continue
             
         # Date range filter
-        doc_date = document['date_received_obj'].date()
+        doc_date = document.get('date_received_obj', datetime.now()).date() if isinstance(document.get('date_received_obj'), datetime) else datetime.now().date()
+        
         if date_range == 'today' and doc_date != today:
-            include_document = False
+            continue
         elif date_range == 'week' and doc_date < week_start:
-            include_document = False
+            continue
         elif date_range == 'month' and doc_date < month_start:
-            include_document = False
+            continue
         elif date_range == 'custom' and start_date and end_date:
             start = datetime.strptime(start_date, '%Y-%m-%d').date()
             end = datetime.strptime(end_date, '%Y-%m-%d').date()
             if doc_date < start or doc_date > end:
-                include_document = False
+                continue
         
-        if include_document:
-            documents.append(document)
+        filtered_documents.append(document)
     
     # Sort documents
     if sort_by == 'date':
-        documents.sort(key=lambda x: x['date_received_obj'], reverse=(sort_order == 'desc'))
+        filtered_documents.sort(key=lambda x: x.get('date_received_obj', datetime.now()), reverse=(sort_order == 'desc'))
     elif sort_by == 'priority':
         priority_order = {'Urgent': 0, 'Priority': 1, 'Normal': 2}
-        documents.sort(key=lambda x: priority_order[x['priority']], reverse=(sort_order != 'desc'))
+        filtered_documents.sort(key=lambda x: priority_order.get(x.get('priority', 'Normal'), 3), reverse=(sort_order != 'desc'))
     elif sort_by == 'sender':
-        documents.sort(key=lambda x: x['sender'], reverse=(sort_order == 'desc'))
+        filtered_documents.sort(key=lambda x: x.get('sender', ''), reverse=(sort_order == 'desc'))
     
     # Create pagination object
     per_page = 10
-    total_filtered = len(documents)
+    total_filtered = len(filtered_documents)
     
     # Get the documents for the current page
     start_idx = (page - 1) * per_page
     end_idx = min(start_idx + per_page, total_filtered)
-    page_documents = documents[start_idx:end_idx] if documents else []
+    page_documents = filtered_documents[start_idx:end_idx] if filtered_documents else []
     
     # Create Pagination instance
     pagination = Pagination(page=page, per_page=per_page, total_items=total_filtered)
@@ -1095,11 +1226,85 @@ def maintenance_action():
 
 @app.route('/incoming_bulk_action', methods=['POST'])
 def incoming_bulk_action():
+    """Handle bulk actions on incoming documents"""
     if 'user_id' not in session:
+        flash('Please log in to perform bulk actions', 'warning')
         return redirect(url_for('login'))
     
-    # In debug mode, just flash a message and redirect back
-    flash('Bulk action performed on incoming documents', 'success')
+    # Get form data
+    bulk_action = request.form.get('bulk_action', '')
+    selected_docs = request.form.getlist('selected_docs')
+    
+    if not bulk_action:
+        flash('No action specified', 'danger')
+        return redirect(url_for('incoming'))
+        
+    if not selected_docs:
+        flash('No documents selected', 'warning')
+        return redirect(url_for('incoming'))
+    
+    # Initialize counters
+    success_count = 0
+    fail_count = 0
+    
+    # Process actions on session documents
+    if 'composed_documents' in session:
+        for doc in session['composed_documents']:
+            # Check if document is selected and is an incoming document
+            if ((doc.get('code') in selected_docs or doc.get('tracking_code') in selected_docs) and
+                (doc.get('type') == 'Incoming' or doc.get('document_type') == 'Incoming')):
+                
+                try:
+                    # Apply the bulk action
+                    if bulk_action == 'mark_received':
+                        doc['status'] = 'Received'
+                    elif bulk_action == 'mark_pending':
+                        doc['status'] = 'Pending'
+                    elif bulk_action == 'delete':
+                        # Mark for deletion (we'll remove them after the loop)
+                        doc['_marked_for_deletion'] = True
+                    elif bulk_action == 'export':
+                        # No change needed for export, just count it
+                        pass
+                    elif bulk_action == 'archive':
+                        doc['status'] = 'Archived'
+                    
+                    # Add to history if available
+                    if 'history' not in doc:
+                        doc['history'] = []
+                    
+                    doc['history'].append({
+                        'action': f"Bulk Action: {bulk_action.replace('_', ' ').title()}",
+                        'user': session.get('username', 'User'),
+                        'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                    })
+                    
+                    success_count += 1
+                except Exception as e:
+                    # Log any errors
+                    fail_count += 1
+                    print(f"Error processing document {doc.get('code', doc.get('tracking_code', 'unknown'))}: {str(e)}")
+        
+        # Delete documents marked for deletion
+        if bulk_action == 'delete':
+            session['composed_documents'] = [doc for doc in session['composed_documents'] 
+                                            if not doc.get('_marked_for_deletion', False)]
+        
+        # Mark session as modified to save changes
+        session.modified = True
+    
+    # Show result message
+    if success_count > 0:
+        action_text = bulk_action.replace('_', ' ').title()
+        flash(f'Successfully {action_text}ed {success_count} document(s)', 'success')
+    
+    if fail_count > 0:
+        flash(f'Failed to process {fail_count} document(s)', 'danger')
+    
+    # Handle special case for export action
+    if bulk_action == 'export' and success_count > 0:
+        flash('Export functionality would generate a file download in a real application', 'info')
+    
     return redirect(url_for('incoming'))
 
 @app.route('/outgoing_bulk_action', methods=['POST'])
@@ -1817,18 +2022,48 @@ def update_incoming_status(doc_code):
         flash('Please log in to update document status', 'warning')
         return redirect(url_for('login'))
     
-    if request.method == 'POST':
-        new_status = request.form.get('status')
-        
-        # In a real app, update the database with the new status
-        # For demo purposes, just flash a message
-        flash(f'Document {doc_code} status updated to {new_status}', 'success')
-        
-        # Log the status change in the document history
-        # This would be done in a real implementation
-        
-        return redirect(url_for('document_details', doc_code=doc_code))
+    # Get the new status from the form
+    new_status = request.form.get('status', '')
     
+    if not new_status:
+        flash('No status provided', 'danger')
+        return redirect(url_for('incoming'))
+    
+    # In a real app, update the document status in the database
+    # For demo, update in the session if the document exists there
+    if 'composed_documents' in session:
+        found = False
+        for doc in session['composed_documents']:
+            # Check both code and tracking_code for incoming documents
+            if ((doc.get('code') == doc_code or doc.get('tracking_code') == doc_code) and 
+                (doc.get('type') == 'Incoming' or doc.get('document_type') == 'Incoming')):
+                doc['status'] = new_status
+                doc['last_updated'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                
+                # Add to history if available
+                if 'history' not in doc:
+                    doc['history'] = []
+                
+                doc['history'].append({
+                    'action': f"Status Updated to {new_status}",
+                    'user': session.get('username', 'User'),
+                    'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                    'status': new_status
+                })
+                
+                # Mark session as modified
+                session.modified = True
+                found = True
+                break
+        
+        if found:
+            flash(f'Document {doc_code} status updated to {new_status}', 'success')
+        else:
+            flash(f'Document {doc_code} not found', 'warning')
+    else:
+        flash('No documents in session', 'warning')
+    
+    # Redirect back to the incoming documents page
     return redirect(url_for('incoming'))
 
 @app.route('/update_outgoing_status/<doc_code>', methods=['POST'])

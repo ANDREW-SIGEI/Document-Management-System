@@ -8,8 +8,8 @@
         <div class="col">
             <h2><i class="fas fa-download me-2"></i>Incoming Documents</h2>
             <p class="text-muted">Manage and track all documents received by your organization</p>
-        </div>
     </div>
+</div>
 
     <!-- Status Cards -->
     <div class="row mb-4">
@@ -20,7 +20,7 @@
                         <div>
                             <h6 class="text-primary mb-1">All Incoming</h6>
                             <h3 class="mb-0">{{ status_counts.Incoming + status_counts.Pending + status_counts.Received }}</h3>
-                        </div>
+      </div>
                         <div class="bg-primary bg-opacity-10 rounded-circle p-3">
                             <i class="fas fa-inbox fa-2x text-primary"></i>
                         </div>
@@ -35,14 +35,14 @@
                         <div>
                             <h6 class="text-warning mb-1">Pending</h6>
                             <h3 class="mb-0">{{ status_counts.Pending }}</h3>
-                        </div>
+                            </div>
                         <div class="bg-warning bg-opacity-10 rounded-circle p-3">
                             <i class="fas fa-clock fa-2x text-warning"></i>
                         </div>
                     </div>
                 </div>
             </div>
-        </div>
+    </div>
         <div class="col-md-3">
             <div class="card border-success mb-3">
                 <div class="card-body">
@@ -50,10 +50,10 @@
                         <div>
                             <h6 class="text-success mb-1">Received</h6>
                             <h3 class="mb-0">{{ status_counts.Received }}</h3>
-                        </div>
+</div>
                         <div class="bg-success bg-opacity-10 rounded-circle p-3">
                             <i class="fas fa-check-circle fa-2x text-success"></i>
-                        </div>
+                    </div>
                     </div>
                 </div>
             </div>
@@ -65,10 +65,10 @@
                         <div>
                             <h6 class="text-danger mb-1">Urgent</h6>
                             <h3 class="mb-0">{{ priority_counts.Urgent }}</h3>
-                        </div>
+    </div>
                         <div class="bg-danger bg-opacity-10 rounded-circle p-3">
                             <i class="fas fa-exclamation-circle fa-2x text-danger"></i>
-                        </div>
+                    </div>
                     </div>
                 </div>
             </div>
@@ -147,9 +147,9 @@
                         </button>
                     </div>
                 </form>
-            </div>
         </div>
     </div>
+</div>
 
     <!-- Documents Table with Batch Actions -->
     <div class="card shadow-sm">
@@ -169,48 +169,48 @@
                         <li><hr class="dropdown-divider"></li>
                         <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#exportModal"><i class="fas fa-file-export me-2"></i>Export</a></li>
                         <li><a class="dropdown-item" href="#" onclick="window.print()"><i class="fas fa-print me-2"></i>Print</a></li>
-                    </ul>
-                </div>
-            </div>
+        </ul>
+    </div>
+</div>
         </div>
         <form action="{{ url_for('incoming_bulk_action') }}" method="POST" id="bulkActionForm">
-            <div class="card-body p-0">
-                <div class="table-responsive">
+    <div class="card-body p-0">
+        <div class="table-responsive">
                     <table class="table table-hover align-middle mb-0">
                         <thead class="table-light">
-                            <tr>
-                                <th style="width: 40px;">
+                    <tr>
+                        <th style="width: 40px;">
                                     <div class="form-check">
                                         <input class="form-check-input" type="checkbox" id="selectAll" title="Select all documents">
-                                    </div>
-                                </th>
+                            </div>
+                        </th>
                                 <th>Document ID</th>
                                 <th>Title</th>
-                                <th>Sender</th>
-                                <th>Date Received</th>
+                        <th>Sender</th>
+                        <th>Date Received</th>
                                 <th>Status</th>
-                                <th>Priority</th>
+                        <th>Priority</th>
                                 <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% if documents %}
-                                {% for doc in documents %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if documents %}
+                        {% for doc in documents %}
                                 <tr>
-                                    <td>
+                            <td>
                                         <div class="form-check">
                                             <input class="form-check-input doc-select" type="checkbox" name="selected_docs[]" value="{{ doc.id }}" title="Select document">
-                                        </div>
-                                    </td>
+                                </div>
+                            </td>
                                     <td><a href="{{ url_for('document_details', doc_code=doc.code) }}" class="text-primary">{{ doc.code }}</a></td>
                                     <td>{{ doc.title }}</td>
-                                    <td>{{ doc.sender }}</td>
+                            <td>{{ doc.sender }}</td>
                                     <td>{{ doc.date_received }}</td>
                                     <td>
                                         <span class="badge rounded-pill bg-{{ 'primary' if doc.status == 'Incoming' else 'warning' if doc.status == 'Pending' else 'success' }}">
-                                            {{ doc.status }}
-                                        </span>
-                                    </td>
+                                    {{ doc.status }}
+                                </span>
+                            </td>
                                     <td>
                                         <span class="badge rounded-pill bg-{{ 'danger' if doc.priority == 'Urgent' else 'warning' if doc.priority == 'Priority' else 'info' }}">
                                             {{ doc.priority }}
@@ -219,8 +219,8 @@
                                     <td>
                                         <div class="btn-group">
                                             <a href="{{ url_for('document_details', doc_code=doc.code) }}" class="btn btn-sm btn-outline-primary">
-                                                <i class="fas fa-eye"></i>
-                                            </a>
+                                        <i class="fas fa-eye"></i>
+                                    </a>
                                             <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown">
                                                 <span class="visually-hidden">Toggle Dropdown</span>
                                             </button>
@@ -230,26 +230,26 @@
                                                 <li><hr class="dropdown-divider"></li>
                                                 <li><a class="dropdown-item text-danger" href="#" data-bs-toggle="modal" data-bs-target="#archiveModal" data-doc-id="{{ doc.id }}"><i class="fas fa-archive me-2"></i>Archive</a></li>
                                             </ul>
-                                        </div>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            {% else %}
-                                <tr>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
                                     <td colspan="8" class="text-center py-4">
-                                        <div class="py-5">
-                                            <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
-                                            <h5>No incoming documents found</h5>
+                                <div class="py-5">
+                                    <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                                    <h5>No incoming documents found</h5>
                                             <p class="text-muted">Try adjusting your search or filter criteria</p>
-                                        </div>
-                                    </td>
-                                </tr>
-                            {% endif %}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-            
+                                </div>
+                            </td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
             {% if documents %}
             <div class="card-footer bg-white d-flex justify-content-between align-items-center">
                 <div class="bulk-actions">
@@ -284,28 +284,28 @@
                                 {% else %}
                                     <li class="page-item active">
                                         <a class="page-link" href="#">{{ page_num }}</a>
-                                    </li>
-                                {% endif %}
-                            {% else %}
-                                <li class="page-item disabled">
-                                    <a class="page-link" href="#">...</a>
-                                </li>
-                            {% endif %}
-                        {% endfor %}
-                        
-                        {% if pagination.has_next %}
-                            <li class="page-item">
-                                <a class="page-link" href="{{ url_for('incoming', page=pagination.next_num, search=search_query, priority=priority_filter, sort_by=sort_by, sort_order=sort_order) }}">Next</a>
-                            </li>
-                        {% else %}
-                            <li class="page-item disabled">
-                                <a class="page-link" href="#">Next</a>
                             </li>
                         {% endif %}
-                    </ul>
-                </nav>
-            </div>
-            {% endif %}
+                    {% else %}
+                        <li class="page-item disabled">
+                                    <a class="page-link" href="#">...</a>
+                        </li>
+                    {% endif %}
+                {% endfor %}
+                
+                {% if pagination.has_next %}
+                    <li class="page-item">
+                                <a class="page-link" href="{{ url_for('incoming', page=pagination.next_num, search=search_query, priority=priority_filter, sort_by=sort_by, sort_order=sort_order) }}">Next</a>
+                    </li>
+                {% else %}
+                    <li class="page-item disabled">
+                                <a class="page-link" href="#">Next</a>
+                    </li>
+                {% endif %}
+            </ul>
+        </nav>
+    </div>
+    {% endif %}
         </form>
     </div>
 </div>

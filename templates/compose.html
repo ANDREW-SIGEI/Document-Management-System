@@ -72,13 +72,103 @@
                             <div class="col-md-6">
                                 <div class="form-group">
                                     <label for="sender" class="form-label">From (Sender) <span class="text-danger">*</span></label>
-                                    <input type="text" class="form-control" id="sender" name="sender" placeholder="Department or individual name" value="{{ form_data.sender if form_data else '' }}" required>
+                                    <div class="input-group">
+                                        <input type="text" class="form-control" id="sender" name="sender" placeholder="Department or individual name" value="{{ form_data.sender if form_data else '' }}" required>
+                                        <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Select Department">
+                                            <i class="fas fa-building"></i>
+                                        </button>
+                                        <ul class="dropdown-menu dropdown-menu-end">
+                                            <li><a class="dropdown-item" href="#" data-sender="Administration">Administration</a></li>
+                                            <li><a class="dropdown-item" href="#" data-sender="Finance Department">Finance Department</a></li>
+                                            <li><a class="dropdown-item" href="#" data-sender="Human Resources">Human Resources</a></li>
+                                            <li><a class="dropdown-item" href="#" data-sender="IT Department">IT Department</a></li>
+                                            <li><a class="dropdown-item" href="#" data-sender="Laboratory">Laboratory</a></li>
+                                            <li><a class="dropdown-item" href="#" data-sender="Legal Department">Legal Department</a></li>
+                                            <li><a class="dropdown-item" href="#" data-sender="Operations">Operations</a></li>
+                                            <li><a class="dropdown-item" href="#" data-sender="Procurement">Procurement</a></li>
+                                            <li><a class="dropdown-item" href="#" data-sender="Registry">Registry</a></li>
+                                            <li><a class="dropdown-item" href="#" data-sender="Research">Research</a></li>
+                                            <li><a class="dropdown-item" href="#" data-sender="Virology">Virology</a></li>
+                                        </ul>
+                                    </div>
                                 </div>
                             </div>
                             <div class="col-md-6">
                                 <div class="form-group">
                                     <label for="recipient" class="form-label">To (Recipient) <span class="text-danger">*</span></label>
-                                    <input type="text" class="form-control" id="recipient" name="recipient" placeholder="Department or individual name" value="{{ form_data.recipient if form_data else '' }}" required>
+                                    <div class="input-group">
+                                        <span class="input-group-text"><i class="fas fa-search"></i></span>
+                                        <input type="text" class="form-control" id="recipient" name="recipient" placeholder="Search recipient by name or department" value="{{ form_data.recipient if form_data else '' }}" required list="recipients-list">
+                                        <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Browse Recipients">
+                                            <i class="fas fa-users"></i>
+                                        </button>
+                                        <ul class="dropdown-menu dropdown-menu-end">
+                                            <li><h6 class="dropdown-header">Departments</h6></li>
+                                            <li><a class="dropdown-item" href="#" data-recipient="Administration">Administration</a></li>
+                                            <li><a class="dropdown-item" href="#" data-recipient="Finance Department">Finance Department</a></li>
+                                            <li><a class="dropdown-item" href="#" data-recipient="Human Resources">Human Resources</a></li>
+                                            <li><a class="dropdown-item" href="#" data-recipient="IT Department">IT Department</a></li>
+                                            <li><a class="dropdown-item" href="#" data-recipient="Laboratory">Laboratory</a></li>
+                                            <li><a class="dropdown-item" href="#" data-recipient="Operations">Operations</a></li>
+                                            <li><a class="dropdown-item" href="#" data-recipient="Procurement">Procurement</a></li>
+                                            <li><hr class="dropdown-divider"></li>
+                                            <li><h6 class="dropdown-header">Registry Users</h6></li>
+                                            <li><a class="dropdown-item" href="#" data-recipient="Jane Smith (Registry)">Jane Smith (Registry)</a></li>
+                                            <li><a class="dropdown-item" href="#" data-recipient="John Doe (Registry)">John Doe (Registry)</a></li>
+                                            <li><a class="dropdown-item" href="#" data-recipient="Alice Johnson (Registry)">Alice Johnson (Registry)</a></li>
+                                        </ul>
+                                    </div>
+                                    <datalist id="recipients-list">
+                                        <!-- Departments -->
+                                        <option value="Administration">
+                                        <option value="Finance Department">
+                                        <option value="Human Resources">
+                                        <option value="IT Department">
+                                        <option value="Laboratory">
+                                        <option value="Operations">
+                                        <option value="Procurement">
+                                        <option value="Registry">
+                                        <option value="Research">
+                                        <option value="Virology">
+                                        <!-- Registry Users -->
+                                        <option value="Jane Smith (Registry)">
+                                        <option value="John Doe (Registry)">
+                                        <option value="Alice Johnson (Registry)">
+                                        <option value="Michael Brown (Registry)">
+                                        <option value="Sarah Wilson (Registry)">
+                                    </datalist>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Registry Routing (only show when Registry is selected) -->
+                        <div class="mb-4 registry-routing-section" style="display: none;">
+                            <div class="card bg-light">
+                                <div class="card-body">
+                                    <h5 class="card-title mb-3">
+                                        <i class="fas fa-route me-2"></i>Registry Routing Options
+                                    </h5>
+                                    <div class="row g-3">
+                                        <div class="col-md-6">
+                                            <div class="form-group">
+                                                <label for="registry_officer" class="form-label">Assign to Specific Registry Officer</label>
+                                                <select class="form-select" id="registry_officer" name="registry_officer">
+                                                    <option value="">-- Select Registry Officer --</option>
+                                                    <option value="Jane Smith">Jane Smith</option>
+                                                    <option value="John Doe">John Doe</option>
+                                                    <option value="Alice Johnson">Alice Johnson</option>
+                                                    <option value="Michael Brown">Michael Brown</option>
+                                                    <option value="Sarah Wilson">Sarah Wilson</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="form-group">
+                                                <label for="registry_notes" class="form-label">Registry Processing Notes</label>
+                                                <textarea class="form-control" id="registry_notes" name="registry_notes" rows="1" placeholder="Special handling instructions for registry"></textarea>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -151,6 +241,62 @@
         
         typeIncoming.addEventListener('change', updateFormForType);
         typeOutgoing.addEventListener('change', updateFormForType);
+        
+        // Handle department selection from dropdown
+        document.querySelectorAll('[data-sender]').forEach(item => {
+            item.addEventListener('click', function() {
+                document.getElementById('sender').value = this.getAttribute('data-sender');
+            });
+        });
+        
+        document.querySelectorAll('[data-recipient]').forEach(item => {
+            item.addEventListener('click', function() {
+                const recipientValue = this.getAttribute('data-recipient');
+                document.getElementById('recipient').value = recipientValue;
+                
+                // Show registry routing options if Registry is selected
+                const registryRoutingSection = document.querySelector('.registry-routing-section');
+                if (recipientValue.toLowerCase().includes('registry')) {
+                    registryRoutingSection.style.display = 'block';
+                } else {
+                    registryRoutingSection.style.display = 'none';
+                }
+            });
+        });
+        
+        // Check recipient on input change as well
+        document.getElementById('recipient').addEventListener('input', function() {
+            const recipientValue = this.value;
+            const registryRoutingSection = document.querySelector('.registry-routing-section');
+            
+            if (recipientValue.toLowerCase().includes('registry')) {
+                registryRoutingSection.style.display = 'block';
+            } else {
+                registryRoutingSection.style.display = 'none';
+            }
+        });
+        
+        // Initialize registry routing visibility
+        if (document.getElementById('recipient').value.toLowerCase().includes('registry')) {
+            document.querySelector('.registry-routing-section').style.display = 'block';
+        }
+        
+        // Add recipient search filtering
+        const recipient = document.getElementById('recipient');
+        recipient.addEventListener('keyup', function() {
+            const filter = this.value.toLowerCase();
+            const datalist = document.getElementById('recipients-list');
+            const options = datalist.querySelectorAll('option');
+            
+            options.forEach(option => {
+                const text = option.value.toLowerCase();
+                if (text.indexOf(filter) > -1) {
+                    option.style.display = "";
+                } else {
+                    option.style.display = "none";
+                }
+            });
+        });
     });
 </script>
 {% endblock %} 

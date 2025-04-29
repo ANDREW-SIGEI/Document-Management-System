@@ -1,0 +1,54 @@
+{% extends 'base.html' %}
+
+{% block title %}Access Denied - KEMRI Document Management System{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card border-danger shadow-sm">
+                <div class="card-header bg-danger text-white">
+                    <h4 class="mb-0"><i class="fas fa-exclamation-triangle me-2"></i>Access Denied</h4>
+                </div>
+                <div class="card-body">
+                    <div class="text-center mb-4">
+                        <i class="fas fa-lock text-danger" style="font-size: 5rem;"></i>
+                    </div>
+                    
+                    <h5 class="text-center mb-3">You don't have permission to access this page</h5>
+                    
+                    <p class="text-center mb-4">
+                        Your user role <strong>{{ session.get('role', 'Unknown') }}</strong> does not have the necessary permissions to access <strong>{{ request.path }}</strong>.
+                    </p>
+                    
+                    <div class="alert alert-info">
+                        <h6 class="mb-2"><i class="fas fa-info-circle me-2"></i>Why am I seeing this?</h6>
+                        <p class="mb-0">
+                            Each feature in our system requires specific permissions. If you need access to this feature for your work, please contact your system administrator to request the appropriate permissions.
+                        </p>
+                    </div>
+                    
+                    {% if missing_permission %}
+                    <div class="alert alert-secondary">
+                        <p class="mb-0">
+                            <small>
+                                Technical information: Missing permission <code>{{ missing_permission }}</code>
+                            </small>
+                        </p>
+                    </div>
+                    {% endif %}
+                    
+                    <div class="d-flex justify-content-center mt-4">
+                        <a href="{{ url_for('dashboard') }}" class="btn btn-primary me-2">
+                            <i class="fas fa-home me-1"></i> Return to Dashboard
+                        </a>
+                        <a href="{{ previous_url|default(url_for('dashboard')) }}" class="btn btn-outline-secondary">
+                            <i class="fas fa-arrow-left me-1"></i> Go Back
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 
