@@ -1,0 +1,102 @@
+<!-- Sidebar menu -->
+<div class="sidebar" id="sidebar">
+    <div class="sidebar-logo">
+        <img src="{{ url_for('static', filename='images/kemri-logo.png') }}" alt="KEMRI Logo" class="img-fluid">
+        <h4>KEMRI Lab System</h4>
+    </div>
+    <hr class="sidebar-divider">
+    <ul class="nav flex-column">
+        <li class="nav-item">
+            <a class="nav-link {{ 'active' if request.endpoint == 'dashboard' else '' }}" href="{{ url_for('dashboard') }}">
+                <i class="fas fa-tachometer-alt"></i> Dashboard
+            </a>
+        </li>
+        
+        {% if can_access_menu('document_management') %}
+        <li class="nav-item">
+            <a class="nav-link {{ 'active' if 'document' in request.endpoint else '' }}" 
+               data-bs-toggle="collapse" href="#documentMenu" role="button" 
+               aria-expanded="{{ 'true' if 'document' in request.endpoint else 'false' }}" 
+               aria-controls="documentMenu">
+                <i class="fas fa-file-alt"></i> Documents <i class="fas fa-chevron-down float-end"></i>
+            </a>
+            <div class="collapse {{ 'show' if 'document' in request.endpoint else '' }}" id="documentMenu">
+                <ul class="nav flex-column sub-menu">
+                    <li class="nav-item">
+                        <a class="nav-link {{ 'active' if request.endpoint == 'incoming' else '' }}" href="{{ url_for('incoming') }}">
+                            <i class="fas fa-inbox"></i> Incoming
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {{ 'active' if request.endpoint == 'pending' else '' }}" href="{{ url_for('pending') }}">
+                            <i class="fas fa-clock"></i> Pending
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {{ 'active' if request.endpoint == 'outgoing' else '' }}" href="{{ url_for('outgoing') }}">
+                            <i class="fas fa-paper-plane"></i> Outgoing
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {{ 'active' if request.endpoint == 'document_workflow' else '' }}" href="{{ url_for('document_workflow') }}">
+                            <i class="fas fa-project-diagram"></i> Workflow
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </li>
+        {% endif %}
+        
+        {% if can_access_menu('admin') %}
+        <li class="nav-item">
+            <a class="nav-link {{ 'active' if 'admin' in request.endpoint or request.endpoint == 'user_management' else '' }}" 
+               data-bs-toggle="collapse" href="#adminMenu" role="button" 
+               aria-expanded="{{ 'true' if 'admin' in request.endpoint or request.endpoint == 'user_management' else 'false' }}" 
+               aria-controls="adminMenu">
+                <i class="fas fa-cogs"></i> Administration <i class="fas fa-chevron-down float-end"></i>
+            </a>
+            <div class="collapse {{ 'show' if 'admin' in request.endpoint or request.endpoint == 'user_management' else '' }}" id="adminMenu">
+                <ul class="nav flex-column sub-menu">
+                    <li class="nav-item">
+                        <a class="nav-link {{ 'active' if request.endpoint == 'user_management' else '' }}" href="{{ url_for('user_management') }}">
+                            <i class="fas fa-users"></i> User Management
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {{ 'active' if request.endpoint == 'user_management_enhanced' else '' }}" href="{{ url_for('user_management_enhanced') }}">
+                            <i class="fas fa-users-cog"></i> Enhanced User Management
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {{ 'active' if request.endpoint == 'admin_settings' else '' }}" href="{{ url_for('admin_settings') }}">
+                            <i class="fas fa-cog"></i> Settings
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {{ 'active' if request.endpoint == 'admin_logs' else '' }}" href="{{ url_for('admin_logs') }}">
+                            <i class="fas fa-clipboard-list"></i> System Logs
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </li>
+        {% endif %}
+        
+        <li class="nav-item">
+            <a class="nav-link {{ 'active' if request.endpoint == 'my_account' else '' }}" href="{{ url_for('my_account') }}">
+                <i class="fas fa-user-circle"></i> My Account
+            </a>
+        </li>
+        
+        <li class="nav-item">
+            <a class="nav-link" href="{{ url_for('logout') }}">
+                <i class="fas fa-sign-out-alt"></i> Logout
+            </a>
+        </li>
+    </ul>
+    
+    <div class="sidebar-footer">
+        <p>&copy; {{ now().year }} KEMRI</p>
+        <p>Version 1.0.0</p>
+    </div>
+</div> 
