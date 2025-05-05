@@ -1,1 +1,488 @@
- 
+{% extends 'base.html' %}
+
+{% block title %}Registry Dashboard{% endblock %}
+
+{% block styles %}
+<style>
+    /* Dashboard specific styles */
+    .metric-card {
+        border-radius: 10px;
+        transition: transform 0.3s ease;
+        height: 100%;
+    }
+    .metric-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+    }
+    .trend-indicator {
+        font-size: 0.8rem;
+        display: flex;
+        align-items: center;
+    }
+    .trend-indicator i {
+        margin-right: 5px;
+    }
+    .trend-positive {
+        color: #28a745;
+    }
+    .trend-negative {
+        color: #dc3545;
+    }
+    .trend-neutral {
+        color: #6c757d;
+    }
+    .dashboard-section {
+        margin-bottom: 2rem;
+    }
+    .activity-item {
+        padding: 0.75rem 1rem;
+        border-left: 3px solid #007bff;
+        background-color: rgba(0,123,255,0.05);
+        margin-bottom: 0.5rem;
+        border-radius: 0 5px 5px 0;
+    }
+    .activity-item:nth-child(2n) {
+        border-left-color: #28a745;
+        background-color: rgba(40,167,69,0.05);
+    }
+    .activity-item:nth-child(3n) {
+        border-left-color: #fd7e14;
+        background-color: rgba(253,126,20,0.05);
+    }
+    .activity-item:nth-child(4n) {
+        border-left-color: #6f42c1;
+        background-color: rgba(111,66,193,0.05);
+    }
+    .document-table th, .document-table td {
+        vertical-align: middle;
+    }
+    .dashboard-chart-container {
+        height: 250px;
+        margin-bottom: 1rem;
+    }
+    .high-priority-badge {
+        display: inline-block;
+        padding: 0.25rem 0.5rem;
+        font-size: 0.75rem;
+        font-weight: 700;
+        line-height: 1;
+        text-align: center;
+        white-space: nowrap;
+        vertical-align: baseline;
+        border-radius: 0.25rem;
+        background-color: #dc3545;
+        color: white;
+    }
+    .progress {
+        height: 0.5rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="h3 mb-0">Registry Dashboard</h2>
+            <p class="text-muted">Document workflow analytics and metrics</p>
+        </div>
+        <div class="d-flex gap-2">
+            <div class="dropdown">
+                <button class="btn btn-outline-secondary dropdown-toggle" type="button" id="dateRangeDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                    {{ date_range|title|replace('-', ' ') }}
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="dateRangeDropdown">
+                    <li><a class="dropdown-item" href="?date_range=today">Today</a></li>
+                    <li><a class="dropdown-item" href="?date_range=yesterday">Yesterday</a></li>
+                    <li><a class="dropdown-item" href="?date_range=last-7-days">Last 7 days</a></li>
+                    <li><a class="dropdown-item" href="?date_range=last-30-days">Last 30 days</a></li>
+                    <li><a class="dropdown-item" href="?date_range=this-month">This month</a></li>
+                    <li><a class="dropdown-item" href="?date_range=last-month">Last month</a></li>
+                </ul>
+            </div>
+            <button class="btn btn-primary" onclick="window.print()">
+                <i class="fas fa-print me-1"></i> Print Report
+            </button>
+        </div>
+    </div>
+    
+    <!-- Key Metrics -->
+    <div class="row dashboard-section">
+        <div class="col-xl-3 col-lg-6 mb-4">
+            <div class="card metric-card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <div>
+                            <h6 class="text-muted text-uppercase mb-1">Pending Documents</h6>
+                            <h3 class="font-weight-bold mb-0">{{ overall_metrics.pending_documents }}</h3>
+                        </div>
+                        <div class="bg-light rounded p-2">
+                            <i class="fas fa-file-alt fa-2x text-primary"></i>
+                        </div>
+                    </div>
+                    <div class="trend-indicator {% if overall_metrics.pending_trend > 0 %}trend-negative{% elif overall_metrics.pending_trend < 0 %}trend-positive{% else %}trend-neutral{% endif %}">
+                        {% if overall_metrics.pending_trend > 0 %}
+                            <i class="fas fa-arrow-up"></i>
+                        {% elif overall_metrics.pending_trend < 0 %}
+                            <i class="fas fa-arrow-down"></i>
+                        {% else %}
+                            <i class="fas fa-minus"></i>
+                        {% endif %}
+                        {{ overall_metrics.pending_trend|abs }}% from last period
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-xl-3 col-lg-6 mb-4">
+            <div class="card metric-card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <div>
+                            <h6 class="text-muted text-uppercase mb-1">Avg. Processing Time</h6>
+                            <h3 class="font-weight-bold mb-0">{{ overall_metrics.avg_processing_days }} days</h3>
+                        </div>
+                        <div class="bg-light rounded p-2">
+                            <i class="fas fa-clock fa-2x text-warning"></i>
+                        </div>
+                    </div>
+                    <div class="trend-indicator {% if overall_metrics.processing_trend > 0 %}trend-negative{% elif overall_metrics.processing_trend < 0 %}trend-positive{% else %}trend-neutral{% endif %}">
+                        {% if overall_metrics.processing_trend > 0 %}
+                            <i class="fas fa-arrow-up"></i>
+                        {% elif overall_metrics.processing_trend < 0 %}
+                            <i class="fas fa-arrow-down"></i>
+                        {% else %}
+                            <i class="fas fa-minus"></i>
+                        {% endif %}
+                        {{ overall_metrics.processing_trend|abs }}% from last period
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-xl-3 col-lg-6 mb-4">
+            <div class="card metric-card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <div>
+                            <h6 class="text-muted text-uppercase mb-1">Documents Processed</h6>
+                            <h3 class="font-weight-bold mb-0">{{ overall_metrics.processed_documents }}</h3>
+                        </div>
+                        <div class="bg-light rounded p-2">
+                            <i class="fas fa-check-circle fa-2x text-success"></i>
+                        </div>
+                    </div>
+                    <div class="trend-indicator {% if overall_metrics.processed_trend > 0 %}trend-positive{% elif overall_metrics.processed_trend < 0 %}trend-negative{% else %}trend-neutral{% endif %}">
+                        {% if overall_metrics.processed_trend > 0 %}
+                            <i class="fas fa-arrow-up"></i>
+                        {% elif overall_metrics.processed_trend < 0 %}
+                            <i class="fas fa-arrow-down"></i>
+                        {% else %}
+                            <i class="fas fa-minus"></i>
+                        {% endif %}
+                        {{ overall_metrics.processed_trend|abs }}% from last period
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-xl-3 col-lg-6 mb-4">
+            <div class="card metric-card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <div>
+                            <h6 class="text-muted text-uppercase mb-1">SLA Compliance</h6>
+                            <h3 class="font-weight-bold mb-0">{{ overall_metrics.sla_compliance }}%</h3>
+                        </div>
+                        <div class="bg-light rounded p-2">
+                            <i class="fas fa-award fa-2x text-info"></i>
+                        </div>
+                    </div>
+                    <div class="trend-indicator {% if overall_metrics.sla_trend > 0 %}trend-positive{% elif overall_metrics.sla_trend < 0 %}trend-negative{% else %}trend-neutral{% endif %}">
+                        {% if overall_metrics.sla_trend > 0 %}
+                            <i class="fas fa-arrow-up"></i>
+                        {% elif overall_metrics.sla_trend < 0 %}
+                            <i class="fas fa-arrow-down"></i>
+                        {% else %}
+                            <i class="fas fa-minus"></i>
+                        {% endif %}
+                        {{ overall_metrics.sla_trend|abs }}% from last period
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Document Processing Trends & Status Distribution -->
+    <div class="row dashboard-section">
+        <div class="col-lg-8 mb-4">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0">Document Processing Trends</h5>
+                </div>
+                <div class="card-body">
+                    <div class="dashboard-chart-container">
+                        <canvas id="documentTrendsChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4 mb-4">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0">Status Distribution</h5>
+                </div>
+                <div class="card-body">
+                    <div class="dashboard-chart-container">
+                        <canvas id="statusDistributionChart"></canvas>
+                    </div>
+                    <div class="mt-3">
+                        {% for status in status_distribution %}
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <div>
+                                <span class="badge" style="background-color: {{ status.color }};">&nbsp;</span>
+                                <span>{{ status.status }}</span>
+                            </div>
+                            <span class="fw-bold">{{ status.count }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Urgent Items & Department Metrics -->
+    <div class="row dashboard-section">
+        <div class="col-lg-6 mb-4">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Urgent Items</h5>
+                    <span class="badge bg-danger">{{ urgent_documents|length }} Items</span>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Document</th>
+                                    <th>Status</th>
+                                    <th>Days</th>
+                                    <th>Due Date</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for doc in urgent_documents %}
+                                <tr {% if doc.is_overdue %}class="table-danger"{% endif %}>
+                                    <td>
+                                        <a href="{{ url_for('document_details', doc_code=doc.tracking_code) }}">{{ doc.title }}</a>
+                                        <small class="d-block text-muted">{{ doc.tracking_code }}</small>
+                                    </td>
+                                    <td><span class="badge {% if doc.status == 'Pending' %}bg-warning{% elif doc.status == 'In Review' %}bg-info{% else %}bg-secondary{% endif %}">{{ doc.status }}</span></td>
+                                    <td>{{ doc.days_in_stage }} days</td>
+                                    <td>{{ doc.due_date }}</td>
+                                    <td>
+                                        <div class="btn-group">
+                                            <button type="button" class="btn btn-sm btn-outline-primary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                                                Action
+                                            </button>
+                                            <ul class="dropdown-menu">
+                                                <li><a class="dropdown-item" href="{{ url_for('document_details', doc_code=doc.tracking_code) }}">View Details</a></li>
+                                                <li><a class="dropdown-item" href="#">Process Now</a></li>
+                                                <li><a class="dropdown-item" href="#">Escalate</a></li>
+                                            </ul>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-6 mb-4">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0">Department Metrics</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Department</th>
+                                    <th>Pending</th>
+                                    <th>Avg. Time</th>
+                                    <th>Performance</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for dept in department_metrics %}
+                                <tr>
+                                    <td>{{ dept.name }}</td>
+                                    <td>{{ dept.pending }}</td>
+                                    <td>{{ dept.avg_time }} days</td>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <div class="progress flex-grow-1 me-2">
+                                                <div class="progress-bar {% if dept.performance >= 90 %}bg-success{% elif dept.performance >= 70 %}bg-warning{% else %}bg-danger{% endif %}" role="progressbar" style="width: {{ dept.performance }}%" aria-valuenow="{{ dept.performance }}" aria-valuemin="0" aria-valuemax="100"></div>
+                                            </div>
+                                            <span>{{ dept.performance }}%</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Recent Activity Timeline -->
+    <div class="row dashboard-section">
+        <div class="col-lg-12 mb-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0">Recent Activity</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-12">
+                            {% for activity in recent_activity %}
+                            <div class="activity-item">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <h6 class="mb-1">{{ activity.action }}</h6>
+                                    <small class="text-muted">{{ activity.timestamp }}</small>
+                                </div>
+                                <p class="mb-1">{{ activity.details }}</p>
+                                <small class="text-muted">By {{ activity.user }}</small>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Document Trends Chart
+    const trendsCtx = document.getElementById('documentTrendsChart').getContext('2d');
+    const documentTrendsChart = new Chart(trendsCtx, {
+        type: 'line',
+        data: {
+            labels: ['6 days ago', '5 days ago', '4 days ago', '3 days ago', '2 days ago', 'Yesterday', 'Today'],
+            datasets: [
+                {
+                    label: 'Documents Processed',
+                    data: {{ trends.document_volume }},
+                    borderColor: '#007bff',
+                    backgroundColor: 'rgba(0, 123, 255, 0.1)',
+                    fill: true,
+                    tension: 0.4
+                },
+                {
+                    label: 'Avg. Processing Time (days)',
+                    data: {{ trends.processing_time }},
+                    borderColor: '#fd7e14',
+                    backgroundColor: 'rgba(253, 126, 20, 0.1)',
+                    fill: true,
+                    tension: 0.4,
+                    yAxisID: 'y1'
+                },
+                {
+                    label: 'SLA Compliance (%)',
+                    data: {{ trends.sla_compliance }},
+                    borderColor: '#28a745',
+                    backgroundColor: 'rgba(40, 167, 69, 0.1)',
+                    fill: true,
+                    tension: 0.4,
+                    yAxisID: 'y2'
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Documents'
+                    }
+                },
+                y1: {
+                    beginAtZero: true,
+                    position: 'right',
+                    title: {
+                        display: true,
+                        text: 'Days'
+                    },
+                    grid: {
+                        drawOnChartArea: false
+                    }
+                },
+                y2: {
+                    beginAtZero: true,
+                    min: 0,
+                    max: 100,
+                    position: 'right',
+                    title: {
+                        display: true,
+                        text: 'Percentage'
+                    },
+                    grid: {
+                        drawOnChartArea: false
+                    }
+                }
+            }
+        }
+    });
+    
+    // Status Distribution Chart
+    const statusCtx = document.getElementById('statusDistributionChart').getContext('2d');
+    const statusData = [
+        {% for status in status_distribution %}
+            {
+                label: '{{ status.status }}',
+                data: {{ status.count }},
+                backgroundColor: '{{ status.color }}'
+            },
+        {% endfor %}
+    ];
+    
+    const statusDistributionChart = new Chart(statusCtx, {
+        type: 'doughnut',
+        data: {
+            labels: statusData.map(item => item.label),
+            datasets: [{
+                data: statusData.map(item => item.data),
+                backgroundColor: statusData.map(item => item.backgroundColor),
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'right'
+                }
+            }
+        }
+    });
+});
+</script>
+{% endblock %} 

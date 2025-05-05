@@ -12,7 +12,7 @@ db = SQLAlchemy(app)
 
 def create_backup():
     """Create a backup of the database before making changes"""
-    db_path = 'instance/kemri.db'
+    db_path = 'app.db'
     backup_path = 'instance/kemri_backup.db'
     
     if not os.path.exists(db_path):
@@ -21,6 +21,7 @@ def create_backup():
     
     try:
         # Create backup
+        os.makedirs('instance', exist_ok=True)
         shutil.copy2(db_path, backup_path)
         print(f"Database backup created at {backup_path}")
         return True
@@ -32,7 +33,7 @@ def add_is_active_column():
     """Add is_active column to User table if it doesn't exist"""
     try:
         # Connect to database
-        conn = sqlite3.connect('instance/kemri.db')
+        conn = sqlite3.connect('app.db')
         cursor = conn.cursor()
         
         # Check if column exists
