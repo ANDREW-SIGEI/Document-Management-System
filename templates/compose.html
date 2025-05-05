@@ -102,40 +102,28 @@
                                         <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Browse Recipients">
                                             <i class="fas fa-users"></i>
                                         </button>
-                                        <ul class="dropdown-menu dropdown-menu-end">
-                                            <li><h6 class="dropdown-header">Departments</h6></li>
-                                            <li><a class="dropdown-item" href="#" data-recipient="Administration">Administration</a></li>
-                                            <li><a class="dropdown-item" href="#" data-recipient="Finance Department">Finance Department</a></li>
-                                            <li><a class="dropdown-item" href="#" data-recipient="Human Resources">Human Resources</a></li>
-                                            <li><a class="dropdown-item" href="#" data-recipient="IT Department">IT Department</a></li>
-                                            <li><a class="dropdown-item" href="#" data-recipient="Laboratory">Laboratory</a></li>
-                                            <li><a class="dropdown-item" href="#" data-recipient="Operations">Operations</a></li>
-                                            <li><a class="dropdown-item" href="#" data-recipient="Procurement">Procurement</a></li>
+                                        <ul class="dropdown-menu dropdown-menu-end" style="max-height: 300px; overflow-y: auto;">
+                                            <li><h6 class="dropdown-header">Registered Users</h6></li>
+                                            {% for user in users %}
+                                            <li><a class="dropdown-item" href="#" data-recipient="{{ user[0] }}">{{ user[0] }} ({{ user[1] }} - {{ user[2] }})</a></li>
+                                            {% endfor %}
                                             <li><hr class="dropdown-divider"></li>
-                                            <li><h6 class="dropdown-header">Registry Users</h6></li>
-                                            <li><a class="dropdown-item" href="#" data-recipient="Jane Smith (Registry)">Jane Smith (Registry)</a></li>
-                                            <li><a class="dropdown-item" href="#" data-recipient="John Doe (Registry)">John Doe (Registry)</a></li>
-                                            <li><a class="dropdown-item" href="#" data-recipient="Alice Johnson (Registry)">Alice Johnson (Registry)</a></li>
+                                            <li><h6 class="dropdown-header">Departments</h6></li>
+                                            {% for dept in departments %}
+                                            <li><a class="dropdown-item" href="#" data-recipient="{{ dept }}">{{ dept }}</a></li>
+                                            {% endfor %}
                                         </ul>
                                     </div>
                                     <datalist id="recipients-list">
+                                        <!-- Users -->
+                                        {% for user in users %}
+                                        <option value="{{ user[0] }}">{{ user[0] }} ({{ user[1] }} - {{ user[2] }})</option>
+                                        {% endfor %}
+                                        
                                         <!-- Departments -->
-                                        <option value="Administration">
-                                        <option value="Finance Department">
-                                        <option value="Human Resources">
-                                        <option value="IT Department">
-                                        <option value="Laboratory">
-                                        <option value="Operations">
-                                        <option value="Procurement">
-                                        <option value="Registry">
-                                        <option value="Research">
-                                        <option value="Virology">
-                                        <!-- Registry Users -->
-                                        <option value="Jane Smith (Registry)">
-                                        <option value="John Doe (Registry)">
-                                        <option value="Alice Johnson (Registry)">
-                                        <option value="Michael Brown (Registry)">
-                                        <option value="Sarah Wilson (Registry)">
+                                        {% for dept in departments %}
+                                        <option value="{{ dept }}">{{ dept }}</option>
+                                        {% endfor %}
                                     </datalist>
                                 </div>
                             </div>

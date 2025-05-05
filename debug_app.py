@@ -773,145 +773,142 @@ def track_document_details(document_code):
 
 @app.route('/compose', methods=['GET', 'POST'])
 def compose():
-    if 'user_id' not in session:
-        flash('Please log in to compose documents', 'warning')
-        return redirect(url_for('login'))
+    """Document composition page"""
+    # Log this action
+    log_activity(session.get('user_id'), 'view_compose', {'request': 'view'})
     
-    # Initialize errors dictionary to store validation errors
-    errors = {}
-    form_data = {}
+    # Default to Outgoing document type
+    doc_type = request.args.get('type', 'Outgoing')
+    
+    # Get all users for recipient selection
+    conn = get_db_connection()
+    users = conn.execute('SELECT username, department, role FROM user WHERE is_active = 1 ORDER BY username').fetchall()
+    departments = ['Administration', 'Finance Department', 'Human Resources', 'IT Department', 
+                  'Laboratory', 'Legal Department', 'Operations', 'Procurement', 
+                  'Registry', 'Research', 'Virology']
+    conn.close()
     
     if request.method == 'POST':
-        # Extract form data
-        doc_type = request.form.get('doc_type', 'Outgoing')
-        title = request.form.get('title', '').strip()
-        date_of_letter = request.form.get('date_of_letter', '').strip()
-        sender = request.form.get('sender', '').strip()
-        recipient = request.form.get('recipient', '').strip()
-        details = request.form.get('details', '').strip()
-        required_action = request.form.get('required_action', '').strip()
+        # Process form submission
+        doc_type = request.form.get('doc_type')
+        title = request.form.get('title')
+        sender = request.form.get('sender')
+        recipient = request.form.get('recipient')
+        details = request.form.get('details', '')
         priority = request.form.get('priority', 'Normal')
+        required_action = request.form.get('required_action', '')
+        date_of_letter = request.form.get('date_of_letter', '')
         
-        # Store form data for redisplaying the form in case of errors
-        form_data = {
-            'doc_type': doc_type,
-            'title': title,
-            'date_of_letter': date_of_letter,
-            'sender': sender,
-            'recipient': recipient,
-            'details': details,
-            'required_action': required_action,
-            'priority': priority
-        }
+        # Validate document details
+        if not title or not sender or not recipient:
+            flash('Please fill in all required fields', 'danger')
+            # Return to form with previously entered data
+            form_data = {
+                'title': title,
+                'sender': sender,
+                'recipient': recipient,
+                'details': details,
+                'priority': priority,
+                'required_action': required_action,
+                'date_of_letter': date_of_letter
+            }
+            return render_template('compose.html', 
+                                  doc_type=doc_type, 
+                                  form_data=form_data,
+                                  users=users,
+                                  departments=departments)
         
-        # Validate required fields
-        if not title:
-            errors['title'] = 'Document title is required'
-            
-        if not sender:
-            errors['sender'] = 'Sender is required'
-            
-        if not recipient:
-            errors['recipient'] = 'Recipient is required'
-            
-        # Validate date format if provided
-        if date_of_letter:
-            try:
-                datetime.strptime(date_of_letter, '%Y-%m-%d')
-            except ValueError:
-                errors['date_of_letter'] = 'Invalid date format. Please use YYYY-MM-DD'
+        # Process the file upload if present
+        file_path = ''
+        if 'document_file' in request.files:
+            file = request.files['document_file']
+            if file and file.filename and allowed_file(file.filename):
+                filename = secure_filename(file.filename)
+                file_path = handle_file_upload(file)
         
-        # Validate document type
-        if doc_type not in ['Incoming', 'Outgoing', 'Internal']:
-            errors['doc_type'] = 'Invalid document type'
-            
-        # Validate priority
-        if priority not in ['Urgent', 'Priority', 'Normal']:
-            errors['priority'] = 'Invalid priority'
+        # Generate a unique tracking code
+        tracking_code = generate_tracking_code()
         
-        # Handle file upload if present
-        file = request.files.get('document_file')
-        uploaded_file_info = None
+        # Save to database
+        conn = get_db_connection()
+        status = 'Pending Registry Approval'
         
-        if file and file.filename:
-            # Check if file extension is allowed
-            if not allowed_file(file.filename):
-                allowed_ext_list = ', '.join(app.config['ALLOWED_EXTENSIONS'])
-                errors['document_file'] = f'Invalid file type. Allowed types: {allowed_ext_list}'
+        try:
+            # Check if document_type column exists
+            column_check = conn.execute("PRAGMA table_info(document)").fetchall()
+            columns = [col[1] for col in column_check]
             
-            # Check file size
-            if request.content_length and request.content_length > app.config['MAX_CONTENT_LENGTH']:
-                max_size_readable = get_human_readable_size(app.config['MAX_CONTENT_LENGTH'])
-                errors['document_file'] = f'File size exceeds maximum limit of {max_size_readable}'
-        
-        # Process if no validation errors
-        if not errors:
-            # Generate a unique tracking code
-            # Format: KEMRI-YYYYMMDD-XXXX where XXXX is a random 4-digit number
-            today = datetime.now().strftime('%Y%m%d')
-            random_digits = random.randint(1000, 9999)
-            tracking_code = f"KEMRI-{today}-{random_digits}"
+            if 'document_type' in columns:
+                # Use document_type column if it exists
+                conn.execute(
+                    'INSERT INTO document (code, title, sender, recipient, details, status, priority, created_at, date_of_letter, required_action, document_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                    (tracking_code, title, sender, recipient, details, status, priority, datetime.now().strftime('%Y-%m-%d %H:%M:%S'), date_of_letter, required_action, doc_type)
+                )
+            else:
+                # Use the standard columns
+                conn.execute(
+                    'INSERT INTO document (code, title, sender, recipient, details, status, priority, created_at, date_of_letter, required_action) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                    (tracking_code, title, sender, recipient, details, status, priority, datetime.now().strftime('%Y-%m-%d %H:%M:%S'), date_of_letter, required_action)
+                )
             
-            # Handle file upload after generating tracking code
-            if file and file.filename:
-                uploaded_file_info = handle_file_upload(file, tracking_code)
-                if not uploaded_file_info:
-                    flash('File upload failed', 'danger')
-                    return render_template('compose.html', active_page='compose', errors=errors, form_data=form_data)
+            conn.commit()
             
-            # In a real app, save document data to database including file info
-            
-            # Set initial status to "Pending Registry Approval"
-            initial_status = "Pending Registry Approval"
-            
-            # Store the document in a session list for demo purposes
+            # Store document info in session for immediate display
             if 'composed_documents' not in session:
                 session['composed_documents'] = []
                 
-            # Create a document object
+            # Add to session for immediate display
             document = {
+                'id': len(session['composed_documents']) + 1,
+                'code': tracking_code,
                 'tracking_code': tracking_code,
                 'title': title,
-                'type': doc_type,
-                'document_type': doc_type,  # For compatibility with both naming conventions
-                'submitted_by': sender,
-                'sender': sender,  # For compatibility with both naming conventions
+                'sender': sender,
                 'recipient': recipient,
-                'date_created': datetime.now().strftime('%Y-%m-%d'),
-                'date_submitted': datetime.now().strftime('%Y-%m-%d'),  # For compatibility
-                'current_department': 'Registry',
-                'status': initial_status,
-                'priority': priority,
-                'steps_completed': 1,
-                'total_steps': 6,
-                'last_activity': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                 'details': details,
-                'required_action': required_action
+                'status': status,
+                'priority': priority,
+                'date_created': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                'required_action': required_action,
+                'document_type': doc_type
             }
             
-            # Add the document to the session
             session['composed_documents'].append(document)
             session.modified = True
             
-            # For demo purposes, flash success messages
-            flash(f'Document "{title}" successfully submitted with tracking code: {tracking_code}', 'success')
-            flash(f'Document is now awaiting Registry approval', 'info')
+        except Exception as e:
+            print(f"Error saving document: {e}")
+            flash(f"Error saving document: {str(e)}", "danger")
+            conn.close()
+            return redirect(url_for('compose'))
             
-            if uploaded_file_info:
-                file_name = uploaded_file_info['original_filename']
-                file_size = get_human_readable_size(uploaded_file_info['file_size'])
-                flash(f'File "{file_name}" ({file_size}) uploaded successfully', 'success')
-            
-            # Store tracking code in session for immediate use
-            session['last_tracking_code'] = tracking_code
-            
-            # Always redirect to dashboard after document submission
-            return redirect(url_for('dashboard'))
+        conn.close()
+        
+        # Log this action with document details
+        log_activity(session.get('user_id'), 'create_document', {
+            'tracking_code': tracking_code,
+            'title': title,
+            'sender': sender,
+            'recipient': recipient,
+            'document_type': doc_type
+        })
+        
+        conn.close()
+        
+        # Show success message and redirect to document details
+        flash(f'Document created successfully with tracking code: {tracking_code}', 'success')
+        
+        if doc_type == 'Incoming':
+            return redirect(url_for('incoming'))
         else:
-            # If there are validation errors, flash a message
-            flash('Please correct the errors in the form', 'danger')
+            return redirect(url_for('outgoing'))
     
-    return render_template('compose.html', active_page='compose', errors=errors, form_data=form_data)
+    # Render the form template
+    return render_template('compose.html', 
+                          doc_type=doc_type, 
+                          form_data=None,
+                          users=users,
+                          departments=departments)
 
 @app.route('/my_account')
 def my_account():
@@ -1127,47 +1124,110 @@ def outgoing():
     if 'user_id' not in session:
         return redirect(url_for('login'))
         
-    # Add dummy data for priority counts to fix the template error
+    # Add dummy data for priority counts
     priority_counts = {
         'Urgent': 2,
         'Priority': 5,
         'Normal': 10
     }
     
-    # Add other variables needed by the template
-    documents = []
-    
-    # Get documents from session if available
-    if 'composed_documents' in session:
-        documents = session['composed_documents']
-        
-        # Check for any status updates from registry decisions
-        for doc in documents:
-            # Make sure tracking code is used as code for outgoing page
-            if 'code' not in doc and 'tracking_code' in doc:
-                doc['code'] = doc['tracking_code']
-            
-            # Ensure status is preserved
-            if 'status' not in doc:
-                doc['status'] = 'Pending Registry Approval'
-    
+    # Get filter parameters
     search_query = request.args.get('search', '')
     priority_filter = request.args.get('priority', 'All')
     sort_by = request.args.get('sort_by', 'date')
     sort_order = request.args.get('sort_order', 'desc')
     page = request.args.get('page', 1, type=int)
     
-    # Filter documents based on priority if filter is set
-    if priority_filter != 'All':
-        documents = [doc for doc in documents if doc.get('priority') == priority_filter]
+    # Get documents from database
+    conn = get_db_connection()
+    
+    try:
+        # Count documents by priority
+        normal = conn.execute('SELECT COUNT(*) FROM document WHERE priority = ?', ('Normal',)).fetchone()[0]
+        priority = conn.execute('SELECT COUNT(*) FROM document WHERE priority = ?', ('Priority',)).fetchone()[0]
+        urgent = conn.execute('SELECT COUNT(*) FROM document WHERE priority = ?', ('Urgent',)).fetchone()[0]
+        
+        priority_counts = {
+            'Normal': normal,
+            'Priority': priority,
+            'Urgent': urgent
+        }
+        
+        # Build the query based on filters
+        query = 'SELECT * FROM document'
+        
+        # Apply filters
+        conditions = []
+        params = []
+        
+        if priority_filter != 'All':
+            conditions.append('priority = ?')
+            params.append(priority_filter)
+            
+        if search_query:
+            conditions.append('(title LIKE ? OR sender LIKE ? OR recipient LIKE ?)')
+            search_term = f'%{search_query}%'
+            params.extend([search_term, search_term, search_term])
+        
+        # Apply conditions if any
+        if conditions:
+            query += ' WHERE ' + ' AND '.join(conditions)
+            
+        # Apply sorting
+        if sort_by == 'date':
+            query += ' ORDER BY created_at'
+        elif sort_by == 'priority':
+            query += ' ORDER BY priority'
+        elif sort_by == 'status':
+            query += ' ORDER BY status'
+        else:
+            query += ' ORDER BY created_at'
+            
+        # Apply sort order
+        if sort_order == 'desc':
+            query += ' DESC'
+        else:
+            query += ' ASC'
+            
+        # Fetch documents
+        docs = conn.execute(query, params).fetchall()
+        
+        # Convert to dictionary for easier template rendering
+        documents = []
+        for doc in docs:
+            documents.append({
+                'id': doc['id'],
+                'code': doc['code'],
+                'title': doc['title'],
+                'sender': doc['sender'],
+                'recipient': doc['recipient'],
+                'details': doc['details'],
+                'status': doc['status'] if doc['status'] else 'Pending Registry Approval',
+                'priority': doc['priority'],
+                'date': doc['created_at'],
+                'required_action': doc['required_action']
+            })
+            
+    except Exception as e:
+        print(f"Error retrieving documents: {e}")
+        documents = []
+    
+    finally:
+        conn.close()
     
     # Create pagination object with proper iter_pages method
-    pagination = Pagination(page=page, per_page=10, total_items=len(documents) or 17)
+    total_docs = len(documents)
+    pagination = Pagination(page=page, per_page=10, total_items=total_docs or 17)
+    
+    # Apply pagination manually
+    start_idx = (page - 1) * 10
+    end_idx = start_idx + 10
+    paged_documents = documents[start_idx:end_idx] if documents else []
     
     return render_template('outgoing.html', 
                           active_page='outgoing',
                           priority_counts=priority_counts,
-                          documents=documents,
+                          documents=paged_documents,
                           search_query=search_query,
                           priority_filter=priority_filter,
                           sort_by=sort_by,
@@ -1927,196 +1987,151 @@ def registry_approval():
     sort_by = request.args.get('sort_by', 'date')
     sort_order = request.args.get('sort_order', 'desc')
     
-    # Enhanced sample documents for registry approval
-    documents = [
-        {
-            'id': 1,
-            'tracking_code': 'KEMRI-20250428-1001',
-            'title': 'Research Grant Application',
-            'sender': 'Dr. Jane Smith',
-            'department': 'Research',
-            'received_date': '2025-04-28',
-            'date_submitted': '2025-04-28',
-            'status': 'pending',
-            'priority': 'High',
-            'notes': 'Awaiting approval to proceed to director',
-            'document_type': 'Grant Application',
-            'workflow_stage': 'Initial Review',
-            'days_in_stage': 2
-        },
-        {
-            'id': 2,
-            'tracking_code': 'KEMRI-20250427-1002',
-            'title': 'Laboratory Equipment Request',
-            'sender': 'Dr. Michael Johnson',
-            'department': 'Laboratory',
-            'received_date': '2025-04-27',
-            'date_submitted': '2025-04-27',
-            'status': 'pending',
-            'priority': 'Medium',
-            'notes': 'Request for new PCR equipment',
-            'document_type': 'Equipment Request',
-            'workflow_stage': 'Initial Review',
-            'days_in_stage': 3
-        },
-        {
-            'id': 3,
-            'tracking_code': 'KEMRI-20250426-1003',
-            'title': 'Annual Department Budget',
-            'sender': 'Finance Department',
-            'department': 'Finance',
-            'received_date': '2025-04-26',
-            'date_submitted': '2025-04-26',
-            'status': 'approved',
-            'priority': 'High',
-            'notes': 'Approved on 2025-04-28',
-            'document_type': 'Budget Document',
-            'workflow_stage': 'Completed',
-            'days_in_stage': 0
-        },
-        {
-            'id': 4,
-            'tracking_code': 'KEMRI-20250425-1004',
-            'title': 'Staff Training Program',
-            'sender': 'HR Department',
-            'department': 'HR',
-            'received_date': '2025-04-25',
-            'date_submitted': '2025-04-25',
-            'status': 'rejected',
-            'priority': 'Medium',
-            'notes': 'Rejected due to budget constraints',
-            'document_type': 'Training Program',
-            'workflow_stage': 'Completed',
-            'days_in_stage': 0
-        },
-        {
-            'id': 5,
-            'tracking_code': 'KEMRI-20250424-1005',
-            'title': 'Research Ethics Application',
-            'sender': 'Dr. Sarah Williams',
-            'department': 'Research',
-            'received_date': '2025-04-24',
-            'date_submitted': '2025-04-24',
-            'status': 'in_review',
-            'priority': 'Urgent',
-            'notes': 'Under review by Ethics Committee',
-            'document_type': 'Ethics Application',
-            'workflow_stage': 'Ethics Review',
-            'days_in_stage': 5
-        },
-        {
-            'id': 6,
-            'tracking_code': 'KEMRI-20250423-1006',
-            'title': 'COVID-19 Research Proposal',
-            'sender': 'Dr. James Lee',
-            'department': 'Virology',
-            'received_date': '2025-04-23',
-            'date_submitted': '2025-04-23',
-            'status': 'pending',
-            'priority': 'Urgent',
-            'notes': 'Urgent review requested due to funding deadline',
-            'document_type': 'Research Proposal',
-            'workflow_stage': 'Initial Review',
-            'days_in_stage': 6
-        }
-    ]
+    # Fetch documents from database
+    documents = []
+    conn = get_db_connection()
     
-    # Add composed documents from session to the documents list
-    if 'composed_documents' in session:
-        for composed_doc in session['composed_documents']:
-            # Convert document to match the expected format for approval
-            approval_doc = {
-                'id': len(documents) + 1,
-                'tracking_code': composed_doc['tracking_code'],
-                'title': composed_doc['title'],
-                'sender': composed_doc.get('sender', composed_doc.get('submitted_by', '')),
-                'department': composed_doc.get('sender_department', 'Unknown'),
-                'received_date': composed_doc.get('date_created', datetime.now().strftime('%Y-%m-%d')),
-                'date_submitted': composed_doc.get('date_submitted', datetime.now().strftime('%Y-%m-%d')),
-                'status': 'pending',
-                'priority': composed_doc.get('priority', 'Normal'),
-                'notes': composed_doc.get('details', 'Document awaiting initial review'),
-                'document_type': composed_doc.get('type', composed_doc.get('document_type', 'Unknown')),
-                'workflow_stage': 'Initial Review',
-                'days_in_stage': 0
-            }
-            
-            # Check if document is already in the list
-            if not any(doc['tracking_code'] == approval_doc['tracking_code'] for doc in documents):
-                documents.append(approval_doc)
-    
-    # Filter documents based on query parameters
-    filtered_documents = []
-    for doc in documents:
-        # Status filter
-        if status_filter != 'all' and doc['status'] != status_filter:
-            continue
-            
-        # Department filter
-        if department_filter != 'all' and doc['department'] != department_filter:
-            continue
-            
-        # Priority filter
-        if priority_filter != 'all' and doc['priority'] != priority_filter:
-            continue
-            
-        # Search query
-        if search_query and search_query.lower() not in doc['title'].lower() and search_query.lower() not in doc['tracking_code'].lower():
-            continue
-            
-        # Date filtering
-        if date_filter == 'today':
-            if doc['received_date'] != datetime.now().strftime('%Y-%m-%d'):
-                continue
-        elif date_filter == 'week':
-            # Simple approximation for demo
-            today = datetime.now().date()
-            doc_date = datetime.strptime(doc['received_date'], '%Y-%m-%d').date()
-            if (today - doc_date).days > 7:
-                continue
+    try:
+        # Build the query based on filters
+        query = 'SELECT * FROM document'
         
-        filtered_documents.append(doc)
+        # Apply status filter - pending means "Pending Registry Approval"
+        conditions = []
+        params = []
+        
+        if status_filter == 'pending':
+            conditions.append("status = 'Pending Registry Approval'")
+        elif status_filter == 'approved':
+            conditions.append("status = 'Approved'")
+        elif status_filter == 'rejected':
+            conditions.append("status = 'Rejected'")
+        
+        # Department filter
+        if department_filter != 'all':
+            conditions.append("sender LIKE ?")
+            params.append(f"%{department_filter}%")
+        
+        # Search query
+        if search_query:
+            conditions.append("(title LIKE ? OR sender LIKE ? OR recipient LIKE ? OR code LIKE ?)")
+            search_term = f"%{search_query}%"
+            params.extend([search_term, search_term, search_term, search_term])
+        
+        # Priority filter
+        if priority_filter != 'all':
+            conditions.append("priority = ?")
+            params.append(priority_filter)
+        
+        # Apply conditions if any
+        if conditions:
+            query += ' WHERE ' + ' AND '.join(conditions)
+        
+        # Apply sorting
+        if sort_by == 'date':
+            query += ' ORDER BY created_at'
+        elif sort_by == 'priority':
+            query += ' ORDER BY priority'
+        else:
+            query += ' ORDER BY created_at'
+        
+        # Apply sort order
+        if sort_order == 'desc':
+            query += ' DESC'
+        else:
+            query += ' ASC'
+        
+        # Execute query
+        rows = conn.execute(query, params).fetchall()
+        
+        # Convert to dictionary for template
+        for row in rows:
+            created_date = datetime.strptime(row['created_at'], '%Y-%m-%d %H:%M:%S') if row['created_at'] else datetime.now()
+            days_in_stage = (datetime.now() - created_date).days
+            
+            documents.append({
+                'id': row['id'],
+                'tracking_code': row['code'],
+                'title': row['title'],
+                'sender': row['sender'],
+                'department': row['sender'].split(' - ')[0] if ' - ' in row['sender'] else row['sender'],
+                'received_date': row['created_at'],
+                'date_submitted': row['created_at'],
+                'status': 'pending' if row['status'] == 'Pending Registry Approval' else row['status'].lower(),
+                'priority': row['priority'],
+                'notes': row['details'],
+                'document_type': 'Document',
+                'workflow_stage': 'Initial Review',
+                'days_in_stage': days_in_stage
+            })
+    except Exception as e:
+        print(f"Error fetching documents: {e}")
+        # If database fails, fall back to sample documents
+        documents = [
+            {
+                'id': 1,
+                'tracking_code': 'KEMRI-20250428-1001',
+                'title': 'Research Grant Application',
+                'sender': 'Dr. Jane Smith',
+                'department': 'Research',
+                'received_date': '2025-04-28',
+                'date_submitted': '2025-04-28',
+                'status': 'pending',
+                'priority': 'High',
+                'notes': 'Awaiting approval to proceed to director',
+                'document_type': 'Grant Application',
+                'workflow_stage': 'Initial Review',
+                'days_in_stage': 2
+            },
+            # Additional sample documents if needed...
+        ]
+    finally:
+        conn.close()
     
-    # Sort documents
-    if sort_by == 'date':
-        filtered_documents.sort(key=lambda x: x['received_date'], reverse=(sort_order == 'desc'))
-    elif sort_by == 'priority':
-        # Define priority order for sorting (Urgent > High > Medium > Low)
-        priority_order = {'Urgent': 0, 'High': 1, 'Medium': 2, 'Low': 3}
-        filtered_documents.sort(key=lambda x: priority_order.get(x['priority'], 4), reverse=(sort_order != 'desc'))
-    elif sort_by == 'title':
-        filtered_documents.sort(key=lambda x: x['title'], reverse=(sort_order == 'desc'))
+    # Add documents from session if available (for demo purposes)
+    if 'composed_documents' in session:
+        for doc in session['composed_documents']:
+            if doc.get('status') == 'Pending Registry Approval':
+                # Only add if not already in list (avoid duplicates)
+                if not any(d.get('tracking_code') == doc.get('tracking_code') for d in documents):
+                    created_date = datetime.strptime(doc.get('date_created'), '%Y-%m-%d %H:%M:%S') if 'date_created' in doc else datetime.now()
+                    days_in_stage = (datetime.now() - created_date).days
+                    
+                    documents.append({
+                        'id': doc.get('id', len(documents) + 1),
+                        'tracking_code': doc.get('tracking_code', doc.get('code')),
+                        'title': doc.get('title', 'Untitled Document'),
+                        'sender': doc.get('sender', 'Unknown'),
+                        'department': doc.get('sender', 'Unknown').split(' - ')[0] if ' - ' in doc.get('sender', 'Unknown') else doc.get('sender', 'Unknown'),
+                        'received_date': doc.get('date_created', datetime.now().strftime('%Y-%m-%d')),
+                        'date_submitted': doc.get('date_created', datetime.now().strftime('%Y-%m-%d')),
+                        'status': 'pending',
+                        'priority': doc.get('priority', 'Normal'),
+                        'notes': doc.get('details', ''),
+                        'document_type': doc.get('document_type', 'Document'),
+                        'workflow_stage': 'Initial Review',
+                        'days_in_stage': days_in_stage
+                    })
     
-    # Calculate stats for the dashboard
+    # Statistics for the dashboard
     stats = {
-        'total_pending': sum(1 for doc in documents if doc['status'] == 'pending'),
-        'urgent_count': sum(1 for doc in documents if doc['priority'] == 'Urgent'),
-        'priority_count': sum(1 for doc in documents if doc['priority'] == 'Priority' or doc['priority'] == 'High'),
-        'avg_processing_time': '1.2h',  # This would be calculated from actual data in a real app
-        'completed_today': sum(1 for doc in documents if doc['status'] in ['approved', 'rejected'] and doc['received_date'] == datetime.now().strftime('%Y-%m-%d')),
+        'total': len(documents),
+        'pending': len([d for d in documents if d.get('status') == 'pending']),
+        'approved': len([d for d in documents if d.get('status') == 'approved']),
+        'rejected': len([d for d in documents if d.get('status') == 'rejected']),
+        'high_priority': len([d for d in documents if d.get('priority').lower() == 'high']),
+        'older_than_7_days': len([d for d in documents if d.get('days_in_stage', 0) > 7])
     }
     
-    # Get department list for filter dropdown
-    departments = list(set(doc['department'] for doc in documents))
-    departments.sort()
-    
-    # Get document types for filter dropdown
-    document_types = list(set(doc.get('document_type', '') for doc in documents if doc.get('document_type')))
-    document_types.sort()
-    
-    return render_template('registry_approval.html', 
-                          documents=filtered_documents,
+    return render_template('registry_approval.html',
+                          documents=documents,
                           stats=stats,
-                          departments=departments,
-                          document_types=document_types,
                           status_filter=status_filter,
                           department_filter=department_filter,
-                          priority_filter=priority_filter,
                           date_filter=date_filter,
+                          priority_filter=priority_filter,
                           search_query=search_query,
                           sort_by=sort_by,
-                          sort_order=sort_order,
-                          active_page='registry_workflow')
+                          sort_order=sort_order)
 
 @app.route('/registry_decision/<tracking_code>', methods=['POST'])
 def registry_decision(tracking_code):
@@ -3141,6 +3156,26 @@ def admin_logs():
     return render_template('admin_logs.html', 
                           logs=logs,
                           active_page='admin_logs')
+
+def generate_tracking_code():
+    """Generate a unique tracking code in the format KEMRI-YYYYMMDD-XXXX"""
+    import random
+    # Format: KEMRI-YYYYMMDD-XXXX where XXXX is a random 4-digit number
+    today = datetime.now().strftime('%Y%m%d')
+    random_digits = random.randint(1000, 9999)
+    tracking_code = f"KEMRI-{today}-{random_digits}"
+    
+    # Check if code already exists in database
+    conn = get_db_connection()
+    exists = conn.execute('SELECT COUNT(*) FROM document WHERE code = ?', 
+                         (tracking_code,)).fetchone()[0] > 0
+    conn.close()
+    
+    # If code exists, try again recursively
+    if exists:
+        return generate_tracking_code()
+    
+    return tracking_code
 
 if __name__ == '__main__':
     # Ensure the database exists
