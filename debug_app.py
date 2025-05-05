@@ -2828,95 +2828,182 @@ def workflow_notification():
 @app.route('/registry_workflow')
 @requires_permission('registry_approval')
 def registry_workflow():
-    if 'user' not in session:
-        flash('Please log in to continue.', 'warning')
-        return redirect(url_for('login'))
+    """Show a list of documents waiting for registry workflow actions"""
+    # Apply filters
+    filter_status = request.args.get('status', 'Pending Registry Approval')
+    filter_priority = request.args.get('priority', '')
+    filter_date = request.args.get('date', '')
     
-    # Start with demo data
-    documents = [
-        {
-            'tracking_code': 'KMR-2023-001',
-            'title': 'Annual Financial Report 2023',
-            'type': 'Financial Report',
-            'submitted_by': 'John Smith',
-            'date_created': '2023-10-15',
-            'current_department': 'Registry',
-            'status': 'Pending',
-            'priority': 'Urgent',
-            'steps_completed': 2,
-            'total_steps': 6,
-            'last_activity': '2023-10-15 10:20 AM'
-        },
-        {
-            'tracking_code': 'KMR-2023-002',
-            'title': 'Research Grant Application',
-            'type': 'Grant Application',
-            'submitted_by': 'Emily Johnson',
-            'date_created': '2023-10-15',
-            'current_department': 'Registry',
-            'status': 'Pending',
-            'priority': 'Priority',
-            'steps_completed': 2,
-            'total_steps': 6,
-            'last_activity': '2023-10-15 02:00 PM'
-        },
-        {
-            'tracking_code': 'KMR-2023-003',
-            'title': 'Equipment Requisition Request',
-            'type': 'Procurement',
-            'submitted_by': 'Robert Chen',
-            'date_created': '2023-10-16',
-            'current_department': 'Registry',
-            'status': 'Pending',
-            'priority': 'Normal',
-            'steps_completed': 2,
-            'total_steps': 5,
-            'last_activity': '2023-10-16 09:15 AM'
-        },
-        {
-            'tracking_code': 'KMR-2023-004',
-            'title': 'Staff Training Program Proposal',
-            'type': 'HR',
-            'submitted_by': 'Sarah Williams',
-            'date_created': '2023-10-17',
-            'current_department': 'HR',
-            'status': 'Approved',
-            'priority': 'Priority',
-            'steps_completed': 3,
-            'total_steps': 5,
-            'last_activity': '2023-10-17 03:45 PM'
-        },
-        {
-            'tracking_code': 'KMR-2023-005',
-            'title': 'Laboratory Equipment Maintenance Report',
-            'type': 'Technical',
-            'submitted_by': 'Michael Lee',
-            'date_created': '2023-10-18',
-            'current_department': 'Finance',
-            'status': 'Rejected',
-            'priority': 'Normal',
-            'steps_completed': 2,
-            'total_steps': 4,
-            'last_activity': '2023-10-18 11:30 AM'
-        }
-    ]
-    
-    # Add any documents from the session
-    if 'composed_documents' in session:
-        # Add each composed document that's not already in the list
-        existing_tracking_codes = [doc['tracking_code'] for doc in documents]
-        for doc in session['composed_documents']:
-            if doc['tracking_code'] not in existing_tracking_codes:
-                # Make sure the document has the required fields
-                if 'last_activity' not in doc:
-                    doc['last_activity'] = datetime.now().strftime('%Y-%m-%d %H:%M')
-                if 'steps_completed' not in doc:
-                    doc['steps_completed'] = 1
-                if 'total_steps' not in doc:
-                    doc['total_steps'] = 6
-                documents.append(doc)
+    # In a real app, these would be fetched from the database with filters
+    # For demo purposes, we'll use JSON sample data with client-side filtering
+    documents = get_sample_documents(25, status=filter_status, priority=filter_priority, date=filter_date)
     
     return render_template('registry_workflow_list.html', documents=documents)
+
+@app.route('/add_attachment/<doc_code>', methods=['POST'])
+def add_attachment(doc_code):
+    """Add an attachment to a document"""
+    if 'user_id' not in session:
+        flash('You must be logged in to add attachments', 'warning')
+        return redirect(url_for('login'))
+    
+    if 'attachment_file' not in request.files:
+        flash('No file selected', 'warning')
+        return redirect(url_for('document_details', doc_code=doc_code))
+    
+    attachment_file = request.files['attachment_file']
+    
+    if attachment_file.filename == '':
+        flash('No file selected', 'warning')
+        return redirect(url_for('document_details', doc_code=doc_code))
+    
+    if attachment_file:
+        # Get the current document from the session
+        document = None
+        if 'composed_documents' in session:
+            for doc in session['composed_documents']:
+                if doc.get('tracking_code') == doc_code:
+                    document = doc
+                    break
+        
+        if not document:
+            flash('Document not found', 'warning')
+            return redirect(url_for('document_details', doc_code=doc_code))
+        
+        # Generate a unique filename for the attachment
+        original_filename = attachment_file.filename
+        filename = secure_filename(original_filename)
+        file_parts = os.path.splitext(filename)
+        unique_filename = f"{file_parts[0]}_{doc_code}_{datetime.now().strftime('%Y%m%d%H%M%S')}{file_parts[1]}"
+        
+        # In a real app, this would save the file to a dedicated location
+        # For the demo version, we'll just store the attachment info in the session
+        
+        # If the document doesn't have an attachments field, add it
+        if 'attachments' not in document:
+            document['attachments'] = []
+        
+        # Add the attachment info to the document
+        attachment_id = len(document['attachments']) + 1
+        attachment_info = {
+            'id': attachment_id,
+            'filename': unique_filename,
+            'original_filename': original_filename,
+            'file_size': len(attachment_file.read()), # Get file size
+            'uploaded_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'uploaded_by': session.get('username', 'Unknown')
+        }
+        
+        document['attachments'].append(attachment_info)
+        session.modified = True
+        
+        flash('Attachment added successfully', 'success')
+    
+    return redirect(url_for('document_details', doc_code=doc_code))
+
+@app.route('/download_attachment/<attachment_id>')
+def download_attachment(attachment_id):
+    """Download a document attachment"""
+    if 'user_id' not in session:
+        flash('You must be logged in to download attachments', 'warning')
+        return redirect(url_for('login'))
+    
+    # In a real app, this would retrieve the attachment from storage and send the file
+    # For the demo version, we'll just return a placeholder response
+    
+    return "This is a placeholder for downloading an attachment. In a real application, this would send the actual file."
+
+@app.route('/reassign_document/<document_code>', methods=['POST'])
+def reassign_document(document_code):
+    """Reassign a document to another user/department"""
+    if 'user_id' not in session:
+        flash('You must be logged in to reassign documents', 'warning')
+        return redirect(url_for('login'))
+    
+    try:
+        new_holder = request.form.get('new_holder')
+        new_department = request.form.get('new_department', '')
+        transfer_reason = request.form.get('transfer_reason', '')
+        location = request.form.get('physical_location', '')
+        expected_return_date_str = request.form.get('expected_return_date', '')
+        
+        if not new_holder:
+            flash('New holder is required', 'warning')
+            return redirect(url_for('document_details', doc_code=document_code))
+        
+        # Get current user information
+        current_user_name = session.get('username', 'System')
+        current_dept = session.get('department', 'Unknown')
+        
+        # Find document in session
+        document = None
+        if 'composed_documents' in session:
+            for doc in session['composed_documents']:
+                if doc.get('tracking_code') == document_code:
+                    document = doc
+                    break
+        
+        if document:
+            # Save the old holder for logging
+            old_holder = document.get('current_holder', 'Registry')
+            
+            # Update document in session
+            document['current_holder'] = new_holder
+            document['current_department'] = new_department if new_department else document.get('current_department', '')
+            document['physical_location'] = location if location else document.get('physical_location', '')
+            
+            # Add expected return date if provided
+            if expected_return_date_str:
+                document['expected_return_date'] = expected_return_date_str
+            
+            # Create action record if not exists
+            if 'actions' not in document:
+                document['actions'] = []
+            
+            # Add new action
+            action = {
+                'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                'user': current_user_name,
+                'action': 'Document Reassigned',
+                'notes': f'Document reassigned from {old_holder} to {new_holder}' + 
+                        (f' in {new_department}' if new_department else '') +
+                        (f'. Location: {location}' if location else '') +
+                        (f'. Expected return: {expected_return_date_str}' if expected_return_date_str else ''),
+                'status_before': document.get('status', ''),
+                'status_after': document.get('status', '')
+            }
+            
+            document['actions'].append(action)
+            
+            # Create transfer record if not exists
+            if 'transfers' not in document:
+                document['transfers'] = []
+            
+            # Add new transfer
+            transfer = {
+                'id': len(document['transfers']) + 1,
+                'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                'from_user': old_holder,
+                'to_user': new_holder,
+                'from_department': current_dept,
+                'to_department': new_department,
+                'reason': transfer_reason,
+                'received': False,
+                'ip_address': request.remote_addr
+            }
+            
+            document['transfers'].append(transfer)
+            session.modified = True
+            
+            flash(f'Document reassigned to {new_holder}', 'success')
+        else:
+            flash('Document not found', 'warning')
+        
+        return redirect(url_for('document_details', doc_code=document_code))
+        
+    except Exception as e:
+        flash(f'Error reassigning document: {str(e)}', 'danger')
+        return redirect(url_for('document_details', doc_code=document_code))
 
 if __name__ == '__main__':
     # Ensure the database exists

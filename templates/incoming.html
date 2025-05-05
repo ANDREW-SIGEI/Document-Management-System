@@ -196,18 +196,18 @@
                 <tbody>
                     {% if documents %}
                         {% for doc in documents %}
-                                <tr>
-                            <td>
+                                <tr class="document-row" data-document-id="{{ doc.id }}" style="cursor: pointer;">
+                            <td onclick="event.stopPropagation()">
                                         <div class="form-check">
                                             <input class="form-check-input doc-select" type="checkbox" name="selected_docs[]" value="{{ doc.id }}" title="Select document">
                                 </div>
                             </td>
-                                    <td><a href="{{ url_for('document_details', doc_code=doc.code) }}" class="text-primary">{{ doc.code }}</a></td>
+                                    <td><a href="{{ url_for('document_details', doc_code=doc.code) }}" class="text-primary fw-medium">{{ doc.code }}</a></td>
                                     <td>{{ doc.title }}</td>
                             <td>{{ doc.sender }}</td>
-                                    <td>{{ doc.date_received }}</td>
+                                    <td>{{ doc.date_received|default(doc.date_created, true) }}</td>
                                     <td>
-                                        <span class="badge rounded-pill bg-{{ 'primary' if doc.status == 'Incoming' else 'warning' if doc.status == 'Pending' else 'success' }}">
+                                        <span class="badge rounded-pill bg-{{ 'primary' if doc.status == 'Incoming' else 'warning' if doc.status == 'Pending' else 'success' if doc.status == 'Received' else 'secondary' }}">
                                     {{ doc.status }}
                                 </span>
                             </td>
@@ -216,7 +216,7 @@
                                             {{ doc.priority }}
                                         </span>
                                     </td>
-                                    <td>
+                                    <td onclick="event.stopPropagation()">
                                         <div class="btn-group">
                                             <a href="{{ url_for('document_details', doc_code=doc.code) }}" class="btn btn-sm btn-outline-primary">
                                         <i class="fas fa-eye"></i>
@@ -225,10 +225,23 @@
                                                 <span class="visually-hidden">Toggle Dropdown</span>
                                             </button>
                                             <ul class="dropdown-menu dropdown-menu-end">
-                                                <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#forwardModal" data-doc-id="{{ doc.id }}"><i class="fas fa-share me-2"></i>Forward</a></li>
-                                                <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#statusModal" data-doc-id="{{ doc.id }}"><i class="fas fa-exchange-alt me-2"></i>Change Status</a></li>
+                                                <li>
+                                                    <form action="{{ url_for('update_incoming_status', doc_code=doc.code) }}" method="post" class="dropdown-item-form">
+                                                        <button type="submit" name="status" value="Received" class="dropdown-item">
+                                                            <i class="fas fa-check-circle text-success me-2"></i>Mark as Received
+                                                        </button>
+                                                    </form>
+                                                </li>
+                                                <li>
+                                                    <form action="{{ url_for('update_incoming_status', doc_code=doc.code) }}" method="post" class="dropdown-item-form">
+                                                        <button type="submit" name="status" value="Pending" class="dropdown-item">
+                                                            <i class="fas fa-clock text-warning me-2"></i>Mark as Pending
+                                                        </button>
+                                                    </form>
+                                                </li>
+                                                <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#forwardModal" data-doc-id="{{ doc.id }}" data-doc-code="{{ doc.code }}"><i class="fas fa-share me-2"></i>Forward</a></li>
                                                 <li><hr class="dropdown-divider"></li>
-                                                <li><a class="dropdown-item text-danger" href="#" data-bs-toggle="modal" data-bs-target="#archiveModal" data-doc-id="{{ doc.id }}"><i class="fas fa-archive me-2"></i>Archive</a></li>
+                                                <li><a class="dropdown-item text-danger" href="#" data-bs-toggle="modal" data-bs-target="#archiveModal" data-doc-id="{{ doc.id }}" data-doc-code="{{ doc.code }}"><i class="fas fa-archive me-2"></i>Archive</a></li>
                                             </ul>
                                 </div>
                             </td>
@@ -508,13 +521,55 @@
 {% endblock %}
 
 {% block scripts %}
+<style>
+    /* Highlight row on hover */
+    .document-row:hover {
+        background-color: rgba(44, 123, 229, 0.05);
+    }
+    
+    /* Style for document status */
+    .badge.rounded-pill {
+        font-weight: 500;
+        padding: 0.4em 0.8em;
+    }
+    
+    /* Make dropdown items with forms work correctly */
+    .dropdown-item-form {
+        margin: 0;
+        padding: 0;
+    }
+    
+    .dropdown-item-form button {
+        width: 100%;
+        text-align: left;
+        background: none;
+        border: none;
+    }
+    
+    /* Table responsive styles */
+    @media (max-width: 992px) {
+        .table-responsive {
+            overflow-x: auto;
+        }
+    }
+</style>
+
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Handle date range selector
+    // Make entire row clickable to view document details
+    const documentRows = document.querySelectorAll('.document-row');
+    documentRows.forEach(row => {
+        row.addEventListener('click', function() {
+            const docCode = this.querySelector('td:nth-child(2) a').textContent;
+            window.location.href = `/document/${docCode}`;
+        });
+    });
+    
+    // Show/hide date range inputs based on selection
     const dateRangeSelect = document.getElementById('date_range');
     const dateRangeInputs = document.querySelector('.date-range-inputs');
     
-    if (dateRangeSelect) {
+    if (dateRangeSelect && dateRangeInputs) {
         dateRangeSelect.addEventListener('change', function() {
             if (this.value === 'custom') {
                 dateRangeInputs.style.display = 'flex';
@@ -524,7 +579,41 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Handle select all checkbox
+    // Forward modal document ID population
+    const forwardModal = document.getElementById('forwardModal');
+    if (forwardModal) {
+        forwardModal.addEventListener('show.bs.modal', function(event) {
+            const button = event.relatedTarget;
+            const docId = button.getAttribute('data-doc-id');
+            const docCode = button.getAttribute('data-doc-code');
+            document.getElementById('forward_doc_id').value = docId;
+            
+            // Set modal title to include document code
+            if (docCode) {
+                const modalTitle = forwardModal.querySelector('.modal-title');
+                modalTitle.textContent = `Forward Document ${docCode}`;
+            }
+        });
+    }
+    
+    // Status modal document ID population
+    const statusModal = document.getElementById('statusModal');
+    if (statusModal) {
+        statusModal.addEventListener('show.bs.modal', function(event) {
+            const button = event.relatedTarget;
+            const docId = button.getAttribute('data-doc-id');
+            const docCode = button.getAttribute('data-doc-code');
+            document.getElementById('status_doc_id').value = docId;
+            
+            // Set modal title to include document code
+            if (docCode) {
+                const modalTitle = statusModal.querySelector('.modal-title');
+                modalTitle.textContent = `Change Status for Document ${docCode}`;
+            }
+        });
+    }
+    
+    // Select all checkboxes functionality
     const selectAllCheckbox = document.getElementById('selectAll');
     const documentCheckboxes = document.querySelectorAll('.doc-select');
     
@@ -536,7 +625,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Handle select all button
+    // Select all button
     const selectAllBtn = document.getElementById('selectAllBtn');
     if (selectAllBtn) {
         selectAllBtn.addEventListener('click', function(e) {
@@ -544,11 +633,13 @@ document.addEventListener('DOMContentLoaded', function() {
             documentCheckboxes.forEach(checkbox => {
                 checkbox.checked = true;
             });
-            if (selectAllCheckbox) selectAllCheckbox.checked = true;
+            if (selectAllCheckbox) {
+                selectAllCheckbox.checked = true;
+            }
         });
     }
     
-    // Handle deselect all button
+    // Deselect all button
     const deselectAllBtn = document.getElementById('deselectAllBtn');
     if (deselectAllBtn) {
         deselectAllBtn.addEventListener('click', function(e) {
@@ -556,38 +647,9 @@ document.addEventListener('DOMContentLoaded', function() {
             documentCheckboxes.forEach(checkbox => {
                 checkbox.checked = false;
             });
-            if (selectAllCheckbox) selectAllCheckbox.checked = false;
-        });
-    }
-    
-    // Update modal doc ID when opened
-    const forwardModal = document.getElementById('forwardModal');
-    if (forwardModal) {
-        forwardModal.addEventListener('show.bs.modal', function(event) {
-            const button = event.relatedTarget;
-            const docId = button.getAttribute('data-doc-id');
-            const docIdInput = forwardModal.querySelector('#forward_doc_id');
-            docIdInput.value = docId;
-        });
-    }
-    
-    const statusModal = document.getElementById('statusModal');
-    if (statusModal) {
-        statusModal.addEventListener('show.bs.modal', function(event) {
-            const button = event.relatedTarget;
-            const docId = button.getAttribute('data-doc-id');
-            const docIdInput = statusModal.querySelector('#status_doc_id');
-            docIdInput.value = docId;
-        });
-    }
-    
-    const archiveModal = document.getElementById('archiveModal');
-    if (archiveModal) {
-        archiveModal.addEventListener('show.bs.modal', function(event) {
-            const button = event.relatedTarget;
-            const docId = button.getAttribute('data-doc-id');
-            const docIdInput = archiveModal.querySelector('#archive_doc_id');
-            docIdInput.value = docId;
+            if (selectAllCheckbox) {
+                selectAllCheckbox.checked = false;
+            }
         });
     }
 });

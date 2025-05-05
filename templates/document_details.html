@@ -331,15 +331,27 @@
                             <div class="list-group-item d-flex justify-content-between align-items-center">
                                 <div>
                                     <i class="fas fa-file me-2 text-muted"></i>
-                                    <span>{{ attachment.original_filename }}</span>
+                                    <span>{{ attachment.original_filename|default(attachment.name|default('Unnamed File')) }}</span>
                                     <small class="text-muted ms-2">
-                                        ({{ (attachment.file_size / 1024)|round(1) }} KB)
+                                        {% if attachment.file_size|default(none) %}
+                                            ({{ (attachment.file_size / 1024)|round(1) }} KB)
+                                        {% elif attachment.size|default(none) %}
+                                            ({{ attachment.size }})
+                                        {% else %}
+                                            (File size unknown)
+                                        {% endif %}
                                     </small>
                                 </div>
                                 <div>
-                                    <a href="{{ url_for('download_attachment', attachment_id=attachment.id) }}" class="btn btn-sm btn-outline-primary">
-                                        <i class="fas fa-download me-1"></i> Download
-                                    </a>
+                                    {% if attachment.id|default(none) %}
+                                        <a href="{{ url_for('download_attachment', attachment_id=attachment.id) }}" class="btn btn-sm btn-outline-primary">
+                                            <i class="fas fa-download me-1"></i> Download
+                                        </a>
+                                    {% else %}
+                                        <button class="btn btn-sm btn-outline-secondary" disabled>
+                                            <i class="fas fa-download me-1"></i> Download
+                                        </button>
+                                    {% endif %}
                                 </div>
                             </div>
                             {% endfor %}
