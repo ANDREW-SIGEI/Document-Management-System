@@ -698,16 +698,9 @@ def track_document():
         # Handle tracking code search
         tracking_code = request.form.get('tracking_code')
         if tracking_code:
-            # In a real app, search the database for this tracking code
-            # For demonstration, return a redirect to a details page with sample data
+            # Redirect to the tracking page for this specific code
+            return redirect(url_for('track_by_code', tracking_code=tracking_code))
             
-            # Simulate tracking code validation
-            if tracking_code.startswith('KMR-'):
-                # Valid tracking code format
-                return redirect(url_for('track_by_code', tracking_code=tracking_code))
-            else:
-                error_message = f"Invalid tracking code format: {tracking_code}. Please use format KMR-YYYY-XXX."
-                
     elif request.method == 'GET':
         # Handle advanced search by fields
         if any(field in request.args for field in ['sender', 'recipient', 'status', 'date_range']):
@@ -716,51 +709,131 @@ def track_document():
             status = request.args.get('status', '')
             date_range = request.args.get('date_range', '')
             
-            # In a real app, search the database using these parameters
-            # For demonstration, return sample results
-            search_results = [
-                {
-                    'tracking_code': 'KMR-2023-001',
-                    'title': 'Research Proposal: Malaria Prevention Study',
-                    'sender': 'Dr. Jane Smith',
-                    'recipient': 'Ethics Committee', 
-                    'status': 'Processing',
-                    'date_created': 'March 15, 2023',
-                    'priority': 'Priority'
-                },
-                {
-                    'tracking_code': 'KMR-2023-002',
-                    'title': 'Annual Budget Report 2023',
-                    'sender': 'Finance Department',
-                    'recipient': 'Board of Directors',
-                    'status': 'Awaiting Approval',
-                    'date_created': 'February 10, 2023',
-                    'priority': 'Urgent'
-                }
-            ]
+            # Build the query based on search parameters
+            try:
+                conn = get_db_connection()
+                
+                # Start building the SQL query with placeholders for parameters
+                query = "SELECT * FROM document WHERE 1=1"
+                params = []
+                
+                if sender:
+                    query += " AND sender LIKE ?"
+                    params.append(f"%{sender}%")
+                    
+                if recipient:
+                    query += " AND recipient LIKE ?"
+                    params.append(f"%{recipient}%")
+                    
+                if status:
+                    query += " AND status LIKE ?"
+                    params.append(f"%{status}%")
+                
+                # Add date filtering if specified
+                if date_range:
+                    today = datetime.now().date()
+                    if date_range == 'today':
+                        query += " AND DATE(created_at) = DATE(?)"
+                        params.append(today.strftime('%Y-%m-%d'))
+                    elif date_range == 'week':
+                        week_start = today - timedelta(days=today.weekday())
+                        query += " AND DATE(created_at) >= DATE(?)"
+                        params.append(week_start.strftime('%Y-%m-%d'))
+                    elif date_range == 'month':
+                        month_start = today.replace(day=1)
+                        query += " AND DATE(created_at) >= DATE(?)"
+                        params.append(month_start.strftime('%Y-%m-%d'))
+                
+                # Add sorting by creation date (newest first)
+                query += " ORDER BY created_at DESC LIMIT 20"
+                
+                # Execute the query with parameters
+                rows = conn.execute(query, params).fetchall()
+                
+                # Process the results
+                search_results = []
+                for row in rows:
+                    doc_dict = dict(row)
+                    # Format for display
+                    created_date = datetime.strptime(doc_dict.get('created_at', ''), '%Y-%m-%d %H:%M:%S') if doc_dict.get('created_at') else datetime.now()
+                    
+                    search_results.append({
+                        'tracking_code': doc_dict.get('tracking_code', ''),
+                        'title': doc_dict.get('title', 'Untitled Document'),
+                        'sender': doc_dict.get('sender', 'Unknown'),
+                        'recipient': doc_dict.get('recipient', 'Unknown'),
+                        'status': doc_dict.get('status', 'Unknown'),
+                        'date_created': created_date.strftime('%B %d, %Y'),
+                        'priority': doc_dict.get('priority', 'Normal')
+                    })
+                
+                conn.close()
+            except Exception as e:
+                print(f"Error searching documents: {e}")
+                if 'conn' in locals():
+                    conn.close()
+                error_message = f"Error searching for documents: {str(e)}"
     
-    # For initial page load, show recent documents
+    # For initial page load or if no search results, show recent documents
     if not search_results and not error_message:
-        # In a real app, get recent documents from database
-        # For demonstration, return sample data
-        recent_documents = []
-        for i in range(1, 6):
-            doc_date = datetime.now() - timedelta(days=i)
-            doc = {
-                'tracking_code': f'KMR-2023-00{i}',
-                'title': f'Sample Document {i}',
-                'sender': f'Department {i}',
-                'recipient': f'Recipient {i}',
-                'status': ['Received', 'Processing', 'Completed', 'Pending', 'Awaiting Approval'][i-1],
-                'date_created': doc_date.strftime('%B %d, %Y'),
-                'priority': ['Normal', 'Priority', 'Urgent'][i % 3]
-            }
-            recent_documents.append(doc)
+        try:
+            conn = get_db_connection()
+            
+            # Get recently created documents
+            recent_docs_query = '''
+                SELECT * FROM document 
+                ORDER BY created_at DESC 
+                LIMIT 10
+            '''
+            
+            rows = conn.execute(recent_docs_query).fetchall()
+            
+            # Process the results
+            recent_documents = []
+            for row in rows:
+                doc_dict = dict(row)
+                # Format for display
+                created_date = datetime.strptime(doc_dict.get('created_at', ''), '%Y-%m-%d %H:%M:%S') if doc_dict.get('created_at') else datetime.now()
+                
+                recent_documents.append({
+                    'tracking_code': doc_dict.get('tracking_code', ''),
+                    'title': doc_dict.get('title', 'Untitled Document'),
+                    'sender': doc_dict.get('sender', 'Unknown'),
+                    'recipient': doc_dict.get('recipient', 'Unknown'),
+                    'status': doc_dict.get('status', 'Unknown'),
+                    'date_created': created_date.strftime('%B %d, %Y'),
+                    'priority': doc_dict.get('priority', 'Normal')
+                })
+            
+            conn.close()
+        except Exception as e:
+            print(f"Error fetching recent documents: {e}")
+            if 'conn' in locals():
+                conn.close()
+            error_message = f"Error fetching recent documents: {str(e)}"
+            
+            # Fall back to session data if available
+            if 'composed_documents' in session:
+                recent_documents = []
+                for doc in session['composed_documents'][-10:]:  # Get the 10 most recent
+                    created_date = datetime.strptime(doc.get('date_created', datetime.now().strftime('%Y-%m-%d %H:%M:%S')), 
+                                                 '%Y-%m-%d %H:%M:%S') if isinstance(doc.get('date_created'), str) else datetime.now()
+                    
+                    recent_documents.append({
+                        'tracking_code': doc.get('tracking_code', ''),
+                        'title': doc.get('title', 'Untitled Document'),
+                        'sender': doc.get('sender', 'Unknown'),
+                        'recipient': doc.get('recipient', 'Unknown'),
+                        'status': doc.get('status', 'Unknown'),
+                        'date_created': created_date.strftime('%B %d, %Y'),
+                        'priority': doc.get('priority', 'Normal')
+                    })
     
     return render_template('track_document.html',
                           search_results=search_results,
                           recent_documents=recent_documents,
-                          error_message=error_message)
+                          error_message=error_message,
+                          active_page='track_document')
 
 @app.route('/document_details/<doc_code>')
 def document_details(doc_code):
@@ -1175,6 +1248,17 @@ def incoming():
     if 'user_id' not in session:
         return redirect(url_for('login'))
     
+    # Get the current user's department
+    user_department = None
+    try:
+        conn = get_db_connection()
+        user = conn.execute('SELECT * FROM user WHERE id = ?', (session.get('user_id'),)).fetchone()
+        if user:
+            user_department = user['department']
+        conn.close()
+    except Exception as e:
+        print(f"Error getting user department: {e}")
+    
     # Get filter parameters
     search_query = request.args.get('search', '')
     status_filter = request.args.get('status', 'all')
@@ -1186,18 +1270,18 @@ def incoming():
     start_date = request.args.get('start_date', '')
     end_date = request.args.get('end_date', '')
     
-    # Add dummy data for status counts
+    # Initialize status counts
     status_counts = {
-        'Incoming': 5,
-        'Pending': 3, 
-        'Received': 15
+        'Incoming': 0,
+        'Pending': 0, 
+        'Received': 0
     }
     
-    # Add dummy data for priority counts
+    # Initialize priority counts
     priority_counts = {
-        'Urgent': 3,
-        'Priority': 8,
-        'Normal': 12
+        'Urgent': 0,
+        'Priority': 0,
+        'Normal': 0
     }
     
     # Initialize documents list
@@ -1207,13 +1291,15 @@ def incoming():
     try:
         conn = get_db_connection()
         
-        # First, get documents with type "Incoming" or document_type "Incoming"
+        # Get documents with type "Incoming" that match the user's department
+        # This is the key change - filter by recipient matching user's department
         query = '''SELECT * FROM document 
-                  WHERE document_type = 'Incoming' 
-                  OR document_type LIKE '%incoming%'
+                  WHERE (document_type = 'Incoming' OR document_type LIKE '%incoming%')
+                  AND (recipient = ? OR recipient LIKE ?)
                   ORDER BY created_at DESC'''
                   
-        rows = conn.execute(query).fetchall()
+        params = (user_department, f"%{user_department}%")
+        rows = conn.execute(query, params).fetchall()
         
         # Convert rows to dictionaries
         for row in rows:
@@ -1237,6 +1323,13 @@ def incoming():
                     'current_holder': 'Registry'
                 }
                 documents.append(incoming_doc)
+                
+                # Update counts
+                if incoming_doc['status'] in status_counts:
+                    status_counts[incoming_doc['status']] += 1
+                if incoming_doc['priority'] in priority_counts:
+                    priority_counts[incoming_doc['priority']] += 1
+                    
             except Exception as e:
                 print(f"Error processing row: {e}")
                 continue
@@ -1250,8 +1343,11 @@ def incoming():
     # Get composed incoming documents from session if available (as fallback)
     if 'composed_documents' in session:
         for doc in session['composed_documents']:
-            # Only include incoming documents
-            if doc.get('type') == 'Incoming' or doc.get('document_type') == 'Incoming':
+            # Only include incoming documents for the user's department
+            if ((doc.get('type') == 'Incoming' or doc.get('document_type') == 'Incoming') and 
+                (doc.get('recipient') == user_department or 
+                 (isinstance(doc.get('recipient'), str) and user_department in doc.get('recipient')))):
+                
                 # Check if this document is already in our list by tracking code
                 if not any(d.get('code') == doc.get('code', doc.get('tracking_code')) for d in documents):
                     # Format the document for the incoming view
@@ -1278,55 +1374,12 @@ def incoming():
                         'current_holder': doc.get('current_holder', 'Registry')
                     }
                     documents.append(incoming_doc)
-    
-    # Generate additional sample documents if needed
-    if not documents:
-        total_items = 23  # Total number of documents (for pagination)
-        
-        # Date logic for filtering
-        today = datetime.now().date()
-        week_start = today - timedelta(days=today.weekday())
-        month_start = datetime.now().replace(day=1).date()
-        
-        # Generate sample documents
-        for i in range(1, 15):
-            # Create a sample date, biased toward more recent dates
-            days_ago = i if i < 5 else i * 2
-            doc_date = datetime.now() - timedelta(days=days_ago)
-            doc_date_str = doc_date.strftime('%Y-%m-%d %H:%M:%S')
-            
-            # Determine status in rotation
-            if i % 3 == 0:
-                status = 'Incoming'
-            elif i % 3 == 1:
-                status = 'Pending'
-            else:
-                status = 'Received'
-            
-            # Determine priority in rotation
-            if i % 5 == 0:
-                priority = 'Urgent'
-            elif i % 5 == 2 or i % 5 == 4:
-                priority = 'Priority'
-            else:
-                priority = 'Normal'
-            
-            document = {
-                'id': i,
-                'code': f'DOC-{datetime.now().year}-{i:03d}',
-                'title': f'Sample Document {i}',
-                'sender': f'Department {i % 5 + 1}',
-                'recipient': 'KEMRI Laboratory',
-                'details': f'This is a sample document {i} for testing purposes.',
-                'required_action': ['Review', 'Approve', 'Forward', 'File', 'Comment'][i % 5],
-                'date_received': doc_date_str,
-                'date_received_obj': doc_date,
-                'status': status,
-                'priority': priority,
-                'current_holder': f'User {i % 3 + 1}'
-            }
-            
-            documents.append(document)
+                    
+                    # Update counts
+                    if incoming_doc['status'] in status_counts:
+                        status_counts[incoming_doc['status']] += 1
+                    if incoming_doc['priority'] in priority_counts:
+                        priority_counts[incoming_doc['priority']] += 1
     
     filtered_documents = []
     
@@ -2349,199 +2402,152 @@ def track_by_code(tracking_code):
     document = None
     error_message = None
     
-    # Sample data for demo purposes
-    if tracking_code == 'KMR-2023-001':
-        document = {
-            'tracking_code': 'KMR-2023-001',
-            'title': 'Research Proposal: Malaria Prevention Study',
-            'document_type': 'Research Proposal',
-            'status': 'Processing',
-            'date_created': 'March 15, 2023',
-            'last_updated': 'April 2, 2023',
-            'sender': 'Dr. Jane Smith',
-            'sender_department': 'Research',
-            'recipient': 'Ethics Committee',
-            'recipient_department': 'Administration',
-            'current_department': 'Ethics Review',
-            'process_time': '18 days',
-            'priority': 'Priority',
-            'confidentiality': 'Confidential',
-            'timeline': [
-                {
-                    'title': 'Document Created',
-                    'time': 'March 15, 2023 - 09:30 AM',
-                    'user': 'Dr. Jane Smith',
+    # First, try to find the document in the database
+    try:
+        conn = get_db_connection()
+        
+        # Fetch the document from the database
+        db_document = conn.execute('SELECT * FROM document WHERE tracking_code = ?', 
+                                 (tracking_code,)).fetchone()
+        
+        # If found in database, format it for display
+        if db_document:
+            doc_dict = dict(db_document)
+            
+            # Format dates for display
+            created_date = datetime.strptime(doc_dict.get('created_at', datetime.now().strftime('%Y-%m-%d %H:%M:%S')), 
+                                          '%Y-%m-%d %H:%M:%S') if doc_dict.get('created_at') else datetime.now()
+            updated_date = datetime.strptime(doc_dict.get('updated_at', datetime.now().strftime('%Y-%m-%d %H:%M:%S')), 
+                                          '%Y-%m-%d %H:%M:%S') if doc_dict.get('updated_at') else datetime.now()
+            
+            # Calculate process time
+            process_days = (datetime.now() - created_date).days
+            process_time = f"{process_days} days"
+            
+            # Get document history
+            history = conn.execute('''
+                SELECT * FROM document_history 
+                WHERE document_id = ? 
+                ORDER BY timestamp DESC''', (doc_dict['id'],)).fetchall()
+            
+            # Format timeline from history
+            timeline = []
+            for event in history:
+                event_dict = dict(event)
+                
+                # Format the timestamp
+                event_time = datetime.strptime(event_dict.get('timestamp', datetime.now().strftime('%Y-%m-%d %H:%M:%S')), 
+                                             '%Y-%m-%d %H:%M:%S') if event_dict.get('timestamp') else datetime.now()
+                event_time_str = event_time.strftime('%B %d, %Y - %I:%M %p')
+                
+                # Get user name
+                user_id = event_dict.get('user_id')
+                user_name = "System"
+                if user_id:
+                    user = conn.execute('SELECT username FROM user WHERE id = ?', (user_id,)).fetchone()
+                    if user:
+                        user_name = user['username']
+                
+                timeline_item = {
+                    'title': event_dict.get('action', 'Action'),
+                    'time': event_time_str,
+                    'user': user_name,
                     'status': 'Completed',
-                    'description': 'Research proposal document was created and submitted for review.'
-                },
-                {
-                    'title': 'Received by Registry',
-                    'time': 'March 16, 2023 - 10:15 AM',
-                    'user': 'John Doe',
-                    'status': 'Completed',
-                    'description': 'Document received and validated by registry department.'
-                },
-                {
-                    'title': 'Sent to Ethics Review',
-                    'time': 'March 20, 2023 - 02:45 PM',
-                    'user': 'John Doe',
-                    'status': 'Completed',
-                    'description': 'Document forwarded to Ethics Committee for review and approval.',
-                    'comments': 'Priority review requested due to funding deadlines.'
-                },
-                {
-                    'title': 'Under Review',
-                    'time': 'April 2, 2023 - 11:30 AM',
-                    'user': 'Ethics Committee',
-                    'status': 'Processing',
-                    'description': 'Document is currently being reviewed by the Ethics Committee.'
+                    'description': event_dict.get('details', 'No details provided')
                 }
-            ],
-            'attachments': [
-                {
-                    'name': 'Research_Proposal_v1.pdf',
-                    'type': 'pdf',
-                    'size': '2.4 MB',
-                    'date': 'March 15, 2023'
-                },
-                {
-                    'name': 'Budget_Breakdown.xlsx',
-                    'type': 'xlsx',
-                    'size': '1.2 MB',
-                    'date': 'March 15, 2023'
-                },
-                {
-                    'name': 'Participant_Consent_Form.docx',
-                    'type': 'docx',
-                    'size': '350 KB',
-                    'date': 'March 17, 2023'
+                timeline.append(timeline_item)
+            
+            # Format document for display
+            document = {
+                'tracking_code': doc_dict.get('tracking_code', ''),
+                'title': doc_dict.get('title', 'Untitled'),
+                'document_type': doc_dict.get('document_type', 'Document'),
+                'status': doc_dict.get('status', 'Unknown'),
+                'date_created': created_date.strftime('%B %d, %Y'),
+                'last_updated': updated_date.strftime('%B %d, %Y'),
+                'sender': doc_dict.get('sender', 'Unknown'),
+                'sender_department': doc_dict.get('sender', 'Unknown Department'),
+                'recipient': doc_dict.get('recipient', 'Unknown'),
+                'recipient_department': doc_dict.get('recipient', 'Unknown Department'),
+                'current_department': doc_dict.get('recipient', 'Unknown Department'),
+                'process_time': process_time,
+                'priority': doc_dict.get('priority', 'Normal'),
+                'confidentiality': 'Confidential',
+                'timeline': timeline,
+                'attachments': [],  # Would need to fetch attachments from a related table
+                'comments': []  # Would need to fetch comments from a related table
+            }
+        
+        # Close the database connection
+        conn.close()
+    except Exception as e:
+        print(f"Database error in track_by_code: {e}")
+        if 'conn' in locals():
+            conn.close()
+    
+    # If not found in database, check if it's in the session
+    if not document and 'composed_documents' in session:
+        for doc in session['composed_documents']:
+            if doc.get('tracking_code') == tracking_code:
+                # Format the document from session data
+                created_date = datetime.strptime(doc.get('date_created', datetime.now().strftime('%Y-%m-%d %H:%M:%S')), 
+                                             '%Y-%m-%d %H:%M:%S') if isinstance(doc.get('date_created'), str) else datetime.now()
+                
+                # Calculate process time
+                process_days = (datetime.now() - created_date).days
+                process_time = f"{process_days} days"
+                
+                # Format timeline from history if available
+                timeline = []
+                if 'history' in doc:
+                    for event in doc['history']:
+                        timeline_item = {
+                            'title': event.get('action', 'Action'),
+                            'time': event.get('timestamp', datetime.now().strftime('%Y-%m-%d %H:%M:%S')),
+                            'user': event.get('user', 'Unknown'),
+                            'status': 'Completed',
+                            'description': event.get('comments', 'No details provided')
+                        }
+                        timeline.append(timeline_item)
+                else:
+                    # Create a basic timeline if none exists
+                    timeline = [{
+                        'title': 'Document Created',
+                        'time': doc.get('date_created', datetime.now().strftime('%Y-%m-%d %H:%M:%S')),
+                        'user': session.get('username', 'User'),
+                        'status': 'Completed',
+                        'description': 'Document created in the system'
+                    }]
+                
+                document = {
+                    'tracking_code': doc.get('tracking_code', ''),
+                    'title': doc.get('title', 'Untitled'),
+                    'document_type': doc.get('document_type', 'Document'),
+                    'status': doc.get('status', 'Pending'),
+                    'date_created': created_date.strftime('%B %d, %Y'),
+                    'last_updated': datetime.now().strftime('%B %d, %Y'),
+                    'sender': doc.get('sender', 'Unknown'),
+                    'sender_department': doc.get('sender', 'Unknown Department'),
+                    'recipient': doc.get('recipient', 'Unknown'),
+                    'recipient_department': doc.get('recipient', 'Unknown Department'),
+                    'current_department': doc.get('current_department', 'Registry'),
+                    'process_time': process_time,
+                    'priority': doc.get('priority', 'Normal'),
+                    'confidentiality': 'Confidential',
+                    'timeline': timeline,
+                    'attachments': [],  # Would need attachment data
+                    'comments': []  # Would need comment data
                 }
-            ],
-            'comments': [
-                {
-                    'user': 'Dr. Jane Smith',
-                    'date': 'March 15, 2023',
-                    'content': 'Initial submission of the research proposal for review.'
-                },
-                {
-                    'user': 'John Doe',
-                    'date': 'March 16, 2023',
-                    'content': 'Document received and processed. Forwarded to management for initial review.'
-                },
-                {
-                    'user': 'Robert Johnson',
-                    'date': 'March 20, 2023',
-                    'content': 'Please prioritize this review as there are funding deadlines approaching.'
-                }
-            ]
-        }
-    elif tracking_code == 'KMR-2023-002':
-        document = {
-            'tracking_code': 'KMR-2023-002',
-            'title': 'Annual Budget Report 2023',
-            'document_type': 'Financial Report',
-            'status': 'Awaiting Approval',
-            'date_created': 'February 10, 2023',
-            'last_updated': 'March 25, 2023',
-            'sender': 'Finance Department',
-            'sender_department': 'Finance',
-            'recipient': 'Board of Directors',
-            'recipient_department': 'Management',
-            'current_department': 'Management',
-            'process_time': '43 days',
-            'priority': 'Urgent',
-            'confidentiality': 'Strictly Confidential',
-            'timeline': [
-                {
-                    'title': 'Document Created',
-                    'time': 'February 10, 2023 - 11:45 AM',
-                    'user': 'Finance Team',
-                    'status': 'Completed',
-                    'description': 'Annual budget report was compiled and submitted.'
-                },
-                {
-                    'title': 'Initial Review',
-                    'time': 'February 15, 2023 - 09:30 AM',
-                    'user': 'CFO Office',
-                    'status': 'Completed',
-                    'description': 'Initial review completed by the CFO office.',
-                    'comments': 'Some revisions needed in Q3 projections.'
-                },
-                {
-                    'title': 'Revisions Made',
-                    'time': 'March 5, 2023 - 02:15 PM',
-                    'user': 'Finance Team',
-                    'status': 'Completed',
-                    'description': 'Revisions completed based on CFO recommendations.'
-                },
-                {
-                    'title': 'Forwarded to Board',
-                    'time': 'March 10, 2023 - 10:00 AM',
-                    'user': 'CFO Office',
-                    'status': 'Completed',
-                    'description': 'Final report forwarded to Board of Directors for approval.'
-                },
-                {
-                    'title': 'Board Review',
-                    'time': 'March 25, 2023 - 03:30 PM',
-                    'user': 'Board Secretary',
-                    'status': 'Awaiting Approval',
-                    'description': 'Document is awaiting final approval from the Board of Directors.'
-                }
-            ],
-            'attachments': [
-                {
-                    'name': 'Annual_Budget_2023.pdf',
-                    'type': 'pdf',
-                    'size': '4.8 MB',
-                    'date': 'February 10, 2023'
-                },
-                {
-                    'name': 'Financial_Projections.xlsx',
-                    'type': 'xlsx',
-                    'size': '2.7 MB',
-                    'date': 'February 10, 2023'
-                },
-                {
-                    'name': 'Budget_Presentation.pptx',
-                    'type': 'ppt',
-                    'size': '5.2 MB',
-                    'date': 'March 5, 2023'
-                },
-                {
-                    'name': 'Revision_Summary.pdf',
-                    'type': 'pdf',
-                    'size': '1.3 MB',
-                    'date': 'March 5, 2023'
-                }
-            ],
-            'comments': [
-                {
-                    'user': 'Finance Team',
-                    'date': 'February 10, 2023',
-                    'content': 'Final version of the annual budget submitted for review and approval.'
-                },
-                {
-                    'user': 'CFO',
-                    'date': 'February 15, 2023',
-                    'content': 'Please revise the Q3 projections based on the updated forecast data.'
-                },
-                {
-                    'user': 'Finance Team',
-                    'date': 'March 5, 2023',
-                    'content': 'Revisions completed as requested. All projections now align with the latest forecast models.'
-                },
-                {
-                    'user': 'Board Secretary',
-                    'date': 'March 25, 2023',
-                    'content': 'Document received by the Board. Will be reviewed in the upcoming meeting on April 5.'
-                }
-            ]
-        }
-    else:
+                break
+    
+    # If still not found, show error message
+    if not document:
         error_message = f"No document found with tracking code: {tracking_code}"
     
-    return render_template('track_by_code.html', document=document, error_message=error_message)
+    return render_template('track_document_details.html', 
+                          document=document, 
+                          error_message=error_message,
+                          active_page='track_document')
 
 @app.route('/api/document/notify', methods=['POST'])
 def document_notify():
@@ -2809,14 +2815,37 @@ def registry_decision(tracking_code):
             new_status = ''
             if decision == 'approve':
                 new_status = f"Approved - Forwarded to {next_department}"
+                
+                # If approved, we also need to update document_type to 'Incoming' for the recipient department
+                # and update the recipient field to the next department
+                conn.execute('''UPDATE document 
+                              SET document_type = 'Incoming', 
+                                  recipient = ?,
+                                  status = ? 
+                              WHERE tracking_code = ?''', 
+                            (next_department, new_status, tracking_code))
+                
+                # Add a new row to the document_history to record the routing
+                conn.execute(
+                    '''INSERT INTO document_history 
+                       (document_id, action, details, user_id) 
+                       VALUES (?, ?, ?, ?)''',
+                    (document['id'], "Document Routed", 
+                     f"Document routed to {next_department} department", 
+                     session.get('user_id'))
+                )
+                
             elif decision == 'reject':
                 new_status = f"Rejected - {reject_reason}"
+                # Update only the status for rejected documents
+                conn.execute('UPDATE document SET status = ? WHERE tracking_code = ?', 
+                           (new_status, tracking_code))
+                
             elif decision == 'request_changes':
                 new_status = "Changes Requested"
-                
-            # Update the document status in the database
-            conn.execute('UPDATE document SET status = ? WHERE tracking_code = ?', 
-                        (new_status, tracking_code))
+                # Update only the status for documents needing changes
+                conn.execute('UPDATE document SET status = ? WHERE tracking_code = ?', 
+                           (new_status, tracking_code))
             
             # Update priority if provided
             if priority:
@@ -2858,6 +2887,9 @@ def registry_decision(tracking_code):
             if doc.get('tracking_code') == tracking_code:
                 if decision == 'approve':
                     doc['status'] = f"Approved - Forwarded to {next_department}"
+                    # Also update document_type and recipient for approved documents
+                    doc['document_type'] = 'Incoming'
+                    doc['recipient'] = next_department
                 elif decision == 'reject':
                     doc['status'] = f"Rejected - {reject_reason}"
                 elif decision == 'request_changes':
