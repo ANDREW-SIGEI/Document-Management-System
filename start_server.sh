@@ -14,6 +14,7 @@ pkill -f "python run_*.py" || true
 fuser -k 5000/tcp || true
 fuser -k 5001/tcp || true
 fuser -k 8080/tcp || true
+fuser -k 3000/tcp || true  # Added to kill port 3000 too
 
 # Check database issues
 echo -e "${YELLOW}Checking database schema...${NC}"
@@ -30,20 +31,23 @@ if [[ "$generate_data" == "y" || "$generate_data" == "Y" ]]; then
 fi
 
 # Database should be good now, run the server
-echo -e "${GREEN}Starting the server in debug mode on port 8080...${NC}"
+echo -e "${GREEN}Starting the server in debug mode on port 3000...${NC}"
 echo -e "${YELLOW}(This is the recommended mode for presentation)${NC}"
 echo ""
 echo -e "${GREEN}The application will be available at:${NC}"
-echo -e "${YELLOW}http://127.0.0.1:8080${NC}"
+echo -e "${YELLOW}http://127.0.0.1:3000${NC}"
 echo ""
 echo -e "${YELLOW}Press Ctrl+C to stop the server${NC}"
 echo ""
 
 # Open browser automatically
-xdg-open http://127.0.0.1:8080 &
+xdg-open http://127.0.0.1:3000 &
 
-# Run the main debug app
-python run_debug.py
+# Run the app directly on port 3000
+export FLASK_APP=app.py
+export FLASK_ENV=development
+export FLASK_DEBUG=1
+python -m flask run --host=0.0.0.0 --port=3000
 
 # If we get here, the server was stopped
 echo -e "${RED}Server stopped.${NC}" 

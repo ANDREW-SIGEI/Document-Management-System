@@ -452,13 +452,107 @@ document.querySelectorAll('.toggle-password').forEach(button => {
             passwordInput.type = 'text';
             this.innerHTML = '<i class="fas fa-eye-slash"></i>';
             this.setAttribute('title', 'Hide Password');
+            this.setAttribute('aria-label', 'Hide Password');
         } else {
             passwordInput.type = 'password';
             this.innerHTML = '<i class="fas fa-eye"></i>';
             this.setAttribute('title', 'Show Password');
+            this.setAttribute('aria-label', 'Show Password');
         }
     });
 });
+
+// Add password toggle buttons to any password fields that don't have them
+document.querySelectorAll('input[type="password"]').forEach(function(input) {
+    if (!input.parentElement.classList.contains('input-group')) {
+        const inputId = input.getAttribute('id');
+        if (!inputId) return; // Skip if no ID
+        
+        const inputGroup = document.createElement('div');
+        inputGroup.classList.add('input-group');
+        
+        // Clone the input to preserve all its attributes and event listeners
+        const newInput = input.cloneNode(true);
+        
+        // Create the toggle button
+        const toggleButton = document.createElement('button');
+        toggleButton.classList.add('btn', 'btn-outline-secondary', 'toggle-password');
+        toggleButton.setAttribute('type', 'button');
+        toggleButton.setAttribute('data-target', inputId);
+        toggleButton.setAttribute('title', 'Show Password');
+        toggleButton.setAttribute('aria-label', 'Show Password');
+        toggleButton.innerHTML = '<i class="fas fa-eye"></i>';
+        
+        // Add event listener to the new button
+        toggleButton.addEventListener('click', function() {
+            const targetId = this.getAttribute('data-target');
+            const passwordInput = document.getElementById(targetId);
+            
+            // Toggle password visibility
+            if (passwordInput.type === 'password') {
+                passwordInput.type = 'text';
+                this.innerHTML = '<i class="fas fa-eye-slash"></i>';
+                this.setAttribute('title', 'Hide Password');
+                this.setAttribute('aria-label', 'Hide Password');
+            } else {
+                passwordInput.type = 'password';
+                this.innerHTML = '<i class="fas fa-eye"></i>';
+                this.setAttribute('title', 'Show Password');
+                this.setAttribute('aria-label', 'Show Password');
+            }
+        });
+        
+        // Replace the input with the input group
+        input.parentNode.replaceChild(inputGroup, input);
+        inputGroup.appendChild(newInput);
+        inputGroup.appendChild(toggleButton);
+    }
+});
+
+// Handle password matching validation for Add User form
+if (document.getElementById('password') && document.getElementById('confirmPassword')) {
+    const passwordInput = document.getElementById('password');
+    const confirmPasswordInput = document.getElementById('confirmPassword');
+    const passwordFeedback = document.getElementById('passwordMatchFeedback');
+    const addUserBtn = document.getElementById('addUserBtn');
+    
+    // Function to check if passwords match
+    function checkPasswordsMatch() {
+        if (passwordInput.value !== confirmPasswordInput.value) {
+            confirmPasswordInput.classList.add('is-invalid');
+            if (passwordFeedback) {
+                passwordFeedback.style.display = 'block';
+            }
+            if (addUserBtn) {
+                addUserBtn.disabled = true;
+            }
+            return false;
+        } else {
+            confirmPasswordInput.classList.remove('is-invalid');
+            if (passwordFeedback) {
+                passwordFeedback.style.display = 'none';
+            }
+            if (addUserBtn) {
+                addUserBtn.disabled = false;
+            }
+            return true;
+        }
+    }
+    
+    // Add event listeners for password fields
+    passwordInput.addEventListener('input', checkPasswordsMatch);
+    confirmPasswordInput.addEventListener('input', checkPasswordsMatch);
+    
+    // Form submission validation
+    const addUserForm = document.getElementById('addUserForm');
+    if (addUserForm) {
+        addUserForm.addEventListener('submit', function(e) {
+            if (!checkPasswordsMatch()) {
+                e.preventDefault();
+            }
+        });
+    }
+}
 
 // Refresh the user table data
 function refreshUserTable() {

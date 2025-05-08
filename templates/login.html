@@ -159,6 +159,7 @@
         </form>
         
         <!-- Debug Login Buttons (only for development) -->
+        {% if debug_mode %}
         <div class="mt-4 text-center">
             <p class="text-muted">Debug Logins:</p>
             <div class="btn-group mb-3">
@@ -167,7 +168,8 @@
                 <a href="{{ url_for('debug_login', role='User') }}" class="btn btn-sm btn-outline-info">User Login</a>
                 <a href="{{ url_for('debug_login', role='Supervisor') }}" class="btn btn-sm btn-outline-warning">Supervisor Login</a>
             </div>
-    </div>
+        </div>
+        {% endif %}
 </div>
 
                     <div class="login-footer">

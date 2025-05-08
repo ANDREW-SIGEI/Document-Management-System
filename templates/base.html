@@ -430,5 +430,9 @@
     </script>
     
     {% block scripts %}{% endblock %}
+    
+    {% if additional_scripts is defined %}
+        {{ additional_scripts|safe }}
+    {% endif %}
 </body>
 </html> 

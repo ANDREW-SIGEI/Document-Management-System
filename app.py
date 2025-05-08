@@ -100,7 +100,7 @@ def admin_required(f):
         if not session.get('logged_in'):
             return redirect(url_for('login'))
         
-        if session.get('user_role') != 'Administrator':
+        if session.get('role') != 'Administrator':
             flash('You do not have permission to access this page!', 'danger')
             return redirect(url_for('dashboard'))
         
@@ -1144,7 +1144,7 @@ def report_data():
     return jsonify({'error': 'Invalid report type'})
 
 @app.route('/user-management')
-# Temporarily commented out: @admin_required  
+@admin_required  
 def user_management():
     # Define available departments and roles for dropdowns
     departments = ['IT', 'HR', 'Finance', 'Operations', 'Executive', 'Research', 'Marketing']
@@ -1247,7 +1247,7 @@ def database_management():
                           performance=performance)
 
 @app.route('/add-user', methods=['POST'])
-# Temporarily commented out: @admin_required
+@admin_required
 def add_user():
     # Get form fields matching the names in the HTML form
     username = request.form.get('fullName')
@@ -1285,7 +1285,7 @@ def add_user():
     return redirect(url_for('user_management'))
 
 @app.route('/edit-user/<int:user_id>', methods=['POST'])
-# Temporarily commented out: @admin_required
+@admin_required
 def edit_user(user_id):
     user = User.query.get_or_404(user_id)
     
@@ -1306,7 +1306,7 @@ def edit_user(user_id):
     return redirect(url_for('user_management'))
 
 @app.route('/delete-user/<int:user_id>', methods=['POST'])
-# Temporarily commented out: @admin_required
+@admin_required
 def delete_user(user_id):
     user = User.query.get_or_404(user_id)
     
@@ -1821,7 +1821,7 @@ def login():
             session['logged_in'] = True
             session['username'] = 'Admin User'
             session['user_id'] = 1
-            session['user_role'] = 'Administrator'
+            session['role'] = 'Administrator'  # Ensure this is 'role' to match how permissions.py checks it
             session['user_email'] = 'admin@example.com'
             flash('Welcome, Admin!', 'success')
             
@@ -1837,12 +1837,17 @@ def login():
             user = User.query.filter(User.username == username_or_email).first()
         
         if user and check_password_hash(user.password, password):
+            # Check if user is active
+            if not user.is_active:
+                flash('Your account has been deactivated. Please contact an administrator.', 'danger')
+                return render_template('login.html', current_year=datetime.now().year)
+                
             session.permanent = True
             session['logged_in'] = True
             session['user_id'] = user.id
             session['username'] = user.username
             session['user_email'] = user.email
-            session['user_role'] = user.role
+            session['role'] = user.role  # Ensure this is 'role' to match how permissions.py checks it
             
             # Update last login time
             user.last_login = datetime.now()
@@ -1887,7 +1892,7 @@ def create_admin_user():
         db.session.commit()
 
 @app.route('/quick_add_user', methods=['POST'])
-# Temporarily commented out: @admin_required
+@admin_required
 def quick_add_user():
     try:
         # Log the request data for debugging
@@ -1898,8 +1903,9 @@ def quick_add_user():
         email = request.form.get('email')
         department = request.form.get('department')
         password = request.form.get('password')
+        role = request.form.get('role', 'User')  # Get the role from the form, default to 'User' if not provided
         
-        print(f"Received form data - username: {username}, email: {email}, department: {department}, password: {'*' * len(password) if password else 'None'}")
+        print(f"Received form data - username: {username}, email: {email}, department: {department}, role: {role}, password: {'*' * len(password) if password else 'None'}")
         
         # Basic validation
         if not username or not email or not password or not department:
@@ -1920,7 +1926,7 @@ def quick_add_user():
             email=email,
             department=department,
             password=hashed_password,
-            role='User'  # Default role
+            role=role  # Use the role from the form instead of hardcoding to 'User'
         )
         
         db.session.add(new_user)
@@ -1933,7 +1939,7 @@ def quick_add_user():
             log_type='Success',
             user='Admin',
             action='User Added',
-            details=f'New user {username} with email {email} added successfully'
+            details=f'New user {username} with email {email} and role {role} added successfully'
         )
         db.session.add(new_log)
         db.session.commit()
@@ -2166,6 +2172,7 @@ def import_users():
     return redirect(url_for('user_management'))
 
 @app.route('/bulk_user_action', methods=['POST'])
+@admin_required
 def bulk_user_action():
     # Check if user is logged in and has admin privileges
     if 'user_id' not in session:

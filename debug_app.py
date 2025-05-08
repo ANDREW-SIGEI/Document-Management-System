@@ -9,7 +9,7 @@ from werkzeug.utils import secure_filename
 from permissions import requires_permission, requires_role, requires_login, has_permission, can_access_menu, log_activity, check_session_valid
 import time
 import uuid
-from werkzeug.security import generate_password_hash
+from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
 app.secret_key = 'kemri_secret_key'  # Required for flash messages
@@ -209,31 +209,45 @@ def login():
         # Simple connection to check if user exists
         conn = get_db_connection()
         user = conn.execute('SELECT * FROM user WHERE username = ?', (username,)).fetchone()
-        conn.close()
         
         if user:
-            # For simplicity, we're bypassing password check
-            session.clear()  # Ensure we start with a clean session
-            session['user_id'] = user['id']
-            session['username'] = user['username']
-            session['role'] = user['role']
-            # Use dictionary access with a default value if the column doesn't exist
-            session['department'] = user['department'] if 'department' in user.keys() else 'None'
-            session['email'] = user['email'] if 'email' in user.keys() else ''
-            session['last_activity'] = time.time()
-            
-            # Log login activity
-            log_activity(user['id'], 'login', {
-                'username': username,
-                'method': 'password',
-                'ip': request.remote_addr
-            })
-            
-            return redirect(url_for('dashboard'))
+            # Verify the password with the stored hash
+            if check_password_hash(user['password'], password):
+                session.clear()  # Ensure we start with a clean session
+                
+                # Check if user is active
+                if 'is_active' in user.keys() and user['is_active'] != 1:
+                    flash('Your account is inactive. Please contact an administrator.', 'danger')
+                    conn.close()
+                    return render_template('login.html', debug_mode=False)
+                
+                session['user_id'] = user['id']
+                session['username'] = user['username']
+                session['role'] = user['role']
+                # Use dictionary access with a default value if the column doesn't exist
+                session['department'] = user['department'] if 'department' in user.keys() else 'None'
+                session['email'] = user['email'] if 'email' in user.keys() else ''
+                session['last_activity'] = time.time()
+                
+                # Log login activity
+                log_activity(user['id'], 'login', {
+                    'username': username,
+                    'method': 'password',
+                    'ip': request.remote_addr
+                })
+                
+                return redirect(url_for('dashboard'))
+            else:
+                flash('Invalid username or password.', 'danger')
+                conn.close()
         else:
             flash('Invalid username or password.', 'danger')
+            conn.close()
     
-    return render_template('login.html')
+    # Set debug_mode to False in production
+    debug_mode = False  # Change to True only during development/testing
+    
+    return render_template('login.html', debug_mode=debug_mode)
 
 @app.route('/dashboard')
 @requires_login
@@ -423,10 +437,79 @@ def user_management():
     # Available roles
     roles = ['Administrator', 'Registry', 'Supervisor', 'User', 'Viewer', 'Manager']
     
+    # Custom JavaScript for password visibility toggle
+    password_toggle_script = """
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Add toggle password functionality
+        document.querySelectorAll('.toggle-password').forEach(function(button) {
+            button.addEventListener('click', function() {
+                const targetId = this.getAttribute('data-target');
+                const passwordInput = document.getElementById(targetId);
+                
+                // Toggle password visibility
+                if (passwordInput.type === 'password') {
+                    passwordInput.type = 'text';
+                    this.innerHTML = '<i class="fas fa-eye-slash"></i>';
+                    this.setAttribute('title', 'Hide Password');
+                } else {
+                    passwordInput.type = 'password';
+                    this.innerHTML = '<i class="fas fa-eye"></i>';
+                    this.setAttribute('title', 'Show Password');
+                }
+            });
+        });
+
+        // Add password toggle buttons to all password fields
+        document.querySelectorAll('input[type="password"]').forEach(function(input) {
+            if (!input.parentElement.classList.contains('input-group')) {
+                const inputId = input.getAttribute('id');
+                const inputGroup = document.createElement('div');
+                inputGroup.classList.add('input-group');
+                
+                // Clone the input to preserve all its attributes and event listeners
+                const newInput = input.cloneNode(true);
+                
+                // Create the toggle button
+                const toggleButton = document.createElement('button');
+                toggleButton.classList.add('btn', 'btn-outline-secondary', 'toggle-password');
+                toggleButton.setAttribute('type', 'button');
+                toggleButton.setAttribute('data-target', inputId);
+                toggleButton.setAttribute('title', 'Show Password');
+                toggleButton.innerHTML = '<i class="fas fa-eye"></i>';
+                
+                // Add event listener to the new button
+                toggleButton.addEventListener('click', function() {
+                    const targetId = this.getAttribute('data-target');
+                    const passwordInput = document.getElementById(targetId);
+                    
+                    // Toggle password visibility
+                    if (passwordInput.type === 'password') {
+                        passwordInput.type = 'text';
+                        this.innerHTML = '<i class="fas fa-eye-slash"></i>';
+                        this.setAttribute('title', 'Hide Password');
+                    } else {
+                        passwordInput.type = 'password';
+                        this.innerHTML = '<i class="fas fa-eye"></i>';
+                        this.setAttribute('title', 'Show Password');
+                    }
+                });
+                
+                // Replace the input with the input group
+                input.parentNode.replaceChild(inputGroup, input);
+                inputGroup.appendChild(newInput);
+                inputGroup.appendChild(toggleButton);
+            }
+        });
+    });
+    </script>
+    """
+    
     return render_template('user_management.html', 
                            users=users, 
                            roles=roles, 
-                           departments=departments)
+                           departments=departments,
+                           additional_scripts=password_toggle_script)
 
 @app.route('/user-management-enhanced')
 @requires_permission('view_users')
@@ -493,6 +576,74 @@ def user_management_enhanced():
     
     conn.close()
     
+    # Custom JavaScript for password visibility toggle (same as in user_management)
+    password_toggle_script = """
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Add toggle password functionality
+        document.querySelectorAll('.toggle-password').forEach(function(button) {
+            button.addEventListener('click', function() {
+                const targetId = this.getAttribute('data-target');
+                const passwordInput = document.getElementById(targetId);
+                
+                // Toggle password visibility
+                if (passwordInput.type === 'password') {
+                    passwordInput.type = 'text';
+                    this.innerHTML = '<i class="fas fa-eye-slash"></i>';
+                    this.setAttribute('title', 'Hide Password');
+                } else {
+                    passwordInput.type = 'password';
+                    this.innerHTML = '<i class="fas fa-eye"></i>';
+                    this.setAttribute('title', 'Show Password');
+                }
+            });
+        });
+
+        // Add password toggle buttons to all password fields
+        document.querySelectorAll('input[type="password"]').forEach(function(input) {
+            if (!input.parentElement.classList.contains('input-group')) {
+                const inputId = input.getAttribute('id');
+                const inputGroup = document.createElement('div');
+                inputGroup.classList.add('input-group');
+                
+                // Clone the input to preserve all its attributes and event listeners
+                const newInput = input.cloneNode(true);
+                
+                // Create the toggle button
+                const toggleButton = document.createElement('button');
+                toggleButton.classList.add('btn', 'btn-outline-secondary', 'toggle-password');
+                toggleButton.setAttribute('type', 'button');
+                toggleButton.setAttribute('data-target', inputId);
+                toggleButton.setAttribute('title', 'Show Password');
+                toggleButton.innerHTML = '<i class="fas fa-eye"></i>';
+                
+                // Add event listener to the new button
+                toggleButton.addEventListener('click', function() {
+                    const targetId = this.getAttribute('data-target');
+                    const passwordInput = document.getElementById(targetId);
+                    
+                    // Toggle password visibility
+                    if (passwordInput.type === 'password') {
+                        passwordInput.type = 'text';
+                        this.innerHTML = '<i class="fas fa-eye-slash"></i>';
+                        this.setAttribute('title', 'Hide Password');
+                    } else {
+                        passwordInput.type = 'password';
+                        this.innerHTML = '<i class="fas fa-eye"></i>';
+                        this.setAttribute('title', 'Show Password');
+                    }
+                });
+                
+                // Replace the input with the input group
+                input.parentNode.replaceChild(inputGroup, input);
+                inputGroup.appendChild(newInput);
+                inputGroup.appendChild(toggleButton);
+            }
+        });
+    });
+    </script>
+    """
+    
     return render_template('user_management_enhanced.html', 
                           users=users, 
                           roles=roles, 
@@ -500,7 +651,8 @@ def user_management_enhanced():
                           active_users=active_users_count,
                           inactive_users=inactive_users_count,
                           role_counts=role_counts,
-                          department_counts=department_counts)
+                          department_counts=department_counts,
+                          additional_scripts=password_toggle_script)
 
 @app.errorhandler(BuildError)
 def handle_build_error(error):
@@ -617,90 +769,97 @@ def document_details(doc_code):
         flash('Please log in to view document details', 'warning')
         return redirect(url_for('login'))
     
-    # In a real app, fetch document data from database
-    # For demo purposes, create a sample document
-    document = None
-    
-    # Check if document exists in session
-    if 'composed_documents' in session:
-        for doc in session['composed_documents']:
-            if doc.get('code') == doc_code or doc.get('tracking_code') == doc_code:
-                document = doc
-                break
-    
-    # If not found in session, create a demo document
-    if not document:
-        # Create sample document based on doc_code format
-        if doc_code.startswith('KEMRI-'):
-            document = {
-                'id': 1,
-                'code': doc_code,
-                'tracking_code': doc_code,
-                'title': f'Document {doc_code}',
-                'type': 'Outgoing',
-                'sender': 'KEMRI Laboratory',
-                'recipient': 'Ministry of Health',
-                'date_created': datetime.now().strftime('%Y-%m-%d'),
-                'date_submitted': datetime.now().strftime('%Y-%m-%d'),
-                'status': 'Pending Registry Approval',
-                'priority': 'Normal',
-                'details': 'This is a sample document for demonstration purposes.',
-                'required_action': 'Review',
-                'current_department': 'Registry',
-                'attachments': [
-                    {'name': 'sample_attachment.pdf', 'size': '245 KB', 'date_uploaded': datetime.now().strftime('%Y-%m-%d')}
-                ],
-                'history': [
-                    {
-                        'action': 'Document Created',
-                        'user': 'System Administrator',
-                        'timestamp': (datetime.now() - timedelta(days=2)).strftime('%Y-%m-%d %H:%M:%S'),
-                        'notes': 'Document initialized in the system'
-                    },
-                    {
-                        'action': 'Document Submitted',
-                        'user': 'System Administrator',
-                        'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                        'notes': 'Document submitted for processing'
-                    }
-                ]
-            }
-        else:
-            document = {
-                'id': 1,
-                'code': doc_code,
-                'title': f'Sample Document {doc_code}',
-                'type': 'Incoming',
-                'sender': 'External Organization',
-                'recipient': 'KEMRI Laboratory',
-                'date_received': datetime.now().strftime('%Y-%m-%d'),
-                'status': 'Incoming',
-                'priority': 'Normal',
-                'details': 'This is a sample document for demonstration purposes.',
-                'current_holder': 'Registry Department',
-                'attachments': [
-                    {'name': 'sample_document.pdf', 'size': '1.2 MB', 'date_uploaded': datetime.now().strftime('%Y-%m-%d')}
-                ],
-                'history': [
-                    {
-                        'action': 'Document Received',
-                        'user': 'Registry Officer',
-                        'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                        'notes': 'Document received and entered into the system'
-                    }
-                ]
-            }
-    
-    # Get comments from session if they exist
-    comments = []
-    if 'document_comments' in session and doc_code in session['document_comments']:
-        comments = session['document_comments'][doc_code]
-    
-    return render_template('document_details.html', 
-                          document=document,
-                          comments=comments,
-                          doc_code=doc_code,
-                          active_page='documents')
+    try:
+        # In a real app, fetch document data from database
+        # For demo purposes, create a sample document
+        document = None
+        
+        # Check if document exists in session
+        if 'composed_documents' in session:
+            for doc in session['composed_documents']:
+                if doc.get('code') == doc_code or doc.get('tracking_code') == doc_code:
+                    document = doc
+                    break
+        
+        # If not found in session, create a demo document
+        if not document:
+            # Create sample document based on doc_code format
+            if doc_code.startswith('KEMRI-') or doc_code.startswith('KMR-'):
+                document = {
+                    'id': 1,
+                    'code': doc_code,
+                    'tracking_code': doc_code,
+                    'title': f'Document {doc_code}',
+                    'type': 'Outgoing',
+                    'sender': 'KEMRI Laboratory',
+                    'recipient': 'Ministry of Health',
+                    'date_created': datetime.now().strftime('%Y-%m-%d'),
+                    'date_submitted': datetime.now().strftime('%Y-%m-%d'),
+                    'status': 'Pending Registry Approval',
+                    'priority': 'Normal',
+                    'details': 'This is a sample document for demonstration purposes.',
+                    'required_action': 'Review',
+                    'current_department': 'Registry',
+                    'attachments': [
+                        {'name': 'sample_attachment.pdf', 'size': '245 KB', 'date_uploaded': datetime.now().strftime('%Y-%m-%d')}
+                    ],
+                    'history': [
+                        {
+                            'action': 'Document Created',
+                            'user': 'System Administrator',
+                            'timestamp': (datetime.now() - timedelta(days=2)).strftime('%Y-%m-%d %H:%M:%S'),
+                            'notes': 'Document initialized in the system'
+                        },
+                        {
+                            'action': 'Document Submitted',
+                            'user': 'System Administrator',
+                            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                            'notes': 'Document submitted for processing'
+                        }
+                    ]
+                }
+            else:
+                # Generate a document for DOC-YYYY-XXX format codes
+                document = {
+                    'id': 1,
+                    'code': doc_code,
+                    'title': f'Sample Document {doc_code}',
+                    'type': 'Incoming',
+                    'sender': 'External Organization',
+                    'recipient': 'KEMRI Laboratory',
+                    'date_received': datetime.now().strftime('%Y-%m-%d'),
+                    'status': 'Incoming',
+                    'priority': 'Normal',
+                    'details': 'This is a sample document for demonstration purposes.',
+                    'current_holder': 'Registry Department',
+                    'attachments': [
+                        {'name': 'sample_document.pdf', 'size': '1.2 MB', 'date_uploaded': datetime.now().strftime('%Y-%m-%d')}
+                    ],
+                    'history': [
+                        {
+                            'action': 'Document Received',
+                            'user': 'Registry Officer',
+                            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                            'notes': 'Document received and entered into the system'
+                        }
+                    ]
+                }
+        
+        # Get comments from session if they exist
+        comments = []
+        if 'document_comments' in session and doc_code in session['document_comments']:
+            comments = session['document_comments'][doc_code]
+        
+        return render_template('document_details.html', 
+                              document=document,
+                              comments=comments,
+                              doc_code=doc_code,
+                              active_page='documents')
+    except Exception as e:
+        # Log the error
+        print(f"Error viewing document details for {doc_code}: {str(e)}")
+        flash(f'Error viewing document details: {str(e)}', 'danger')
+        return redirect(url_for('dashboard'))
 
 @app.route('/add_document_comment/<document_code>', methods=['POST'])
 def add_document_comment(document_code):
@@ -841,14 +1000,14 @@ def compose():
             if 'document_type' in columns:
                 # Use document_type column if it exists
                 conn.execute(
-                    'INSERT INTO document (code, title, sender, recipient, details, status, priority, created_at, date_of_letter, required_action, document_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-                    (tracking_code, title, sender, recipient, details, status, priority, datetime.now().strftime('%Y-%m-%d %H:%M:%S'), date_of_letter, required_action, doc_type)
+                    'INSERT INTO document (tracking_code, title, sender, recipient, description, status, priority, created_at, document_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                    (tracking_code, title, sender, recipient, details, status, priority, datetime.now().strftime('%Y-%m-%d %H:%M:%S'), doc_type)
                 )
             else:
                 # Use the standard columns
                 conn.execute(
-                    'INSERT INTO document (code, title, sender, recipient, details, status, priority, created_at, date_of_letter, required_action) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-                    (tracking_code, title, sender, recipient, details, status, priority, datetime.now().strftime('%Y-%m-%d %H:%M:%S'), date_of_letter, required_action)
+                    'INSERT INTO document (tracking_code, title, sender, recipient, description, status, priority, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                    (tracking_code, title, sender, recipient, details, status, priority, datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
                 )
             
             conn.commit()
@@ -860,12 +1019,11 @@ def compose():
             # Add to session for immediate display
             document = {
                 'id': len(session['composed_documents']) + 1,
-                'code': tracking_code,
                 'tracking_code': tracking_code,
                 'title': title,
                 'sender': sender,
                 'recipient': recipient,
-                'details': details,
+                'description': details,  # Use description to match database
                 'status': status,
                 'priority': priority,
                 'date_created': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
@@ -892,8 +1050,6 @@ def compose():
             'recipient': recipient,
             'document_type': doc_type
         })
-        
-        conn.close()
         
         # Show success message and redirect to document details
         flash(f'Document created successfully with tracking code: {tracking_code}', 'success')
@@ -942,8 +1098,80 @@ def my_account():
                          login_activities=login_activities,
                          active_page='my_account')
 
+@app.route('/view_user/<int:user_id>')
+@requires_login
+def view_user(user_id):
+    """View details of a specific user"""
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    
+    # Get user data from database
+    conn = get_db_connection()
+    user_data = conn.execute('SELECT * FROM user WHERE id = ?', (user_id,)).fetchone()
+    conn.close()
+    
+    if not user_data:
+        flash('User not found', 'danger')
+        return redirect(url_for('user_management'))
+    
+    # Convert to dict for template
+    user = dict(user_data)
+    
+    # Set default values for missing fields
+    if 'date_joined' not in user or not user['date_joined']:
+        user['date_joined'] = user.get('created_at', datetime.now().strftime('%Y-%m-%d'))
+    
+    if 'last_login' not in user or not user['last_login']:
+        user['last_login'] = 'Never'
+    
+    # For fields that need datetime conversion
+    if isinstance(user['date_joined'], str) and user['date_joined']:
+        try:
+            date_format = '%Y-%m-%d' if len(user['date_joined']) <= 10 else '%Y-%m-%d %H:%M:%S'
+            user['date_joined'] = datetime.strptime(user['date_joined'], date_format)
+        except ValueError:
+            user['date_joined'] = datetime.now()
+    
+    if isinstance(user['last_login'], str) and user['last_login'] != 'Never':
+        try:
+            date_format = '%Y-%m-%d' if len(user['last_login']) <= 10 else '%Y-%m-%d %H:%M:%S'
+            user['last_login'] = datetime.strptime(user['last_login'], date_format)
+        except ValueError:
+            user['last_login'] = 'Never'
+    
+    # Get user's activity history
+    try:
+        conn = get_db_connection()
+        activities = conn.execute('''
+            SELECT action, details, timestamp 
+            FROM activity_log 
+            WHERE user_id = ? 
+            ORDER BY timestamp DESC LIMIT 10
+        ''', (user_id,)).fetchall()
+        conn.close()
+        
+        # Convert to list of dicts
+        activity_history = [dict(a) for a in activities]
+    except Exception as e:
+        print(f"Error fetching user activities: {e}")
+        activity_history = []
+    
+    # Dummy login activities if no real data
+    login_activities = [
+        {'date': '2024-03-15 09:00:00', 'ip': '192.168.1.100', 'status': 'Success'},
+        {'date': '2024-03-14 14:30:00', 'ip': '192.168.1.100', 'status': 'Success'},
+        {'date': '2024-03-13 11:15:00', 'ip': '192.168.1.101', 'status': 'Failed'}
+    ]
+    
+    return render_template('user_details.html', 
+                         user=user,
+                         login_activities=login_activities,
+                         activity_history=activity_history,
+                         active_page='user_management')
+
 @app.route('/incoming')
 def incoming():
+    """Display incoming documents"""
     if 'user_id' not in session:
         return redirect(url_for('login'))
     
@@ -975,30 +1203,81 @@ def incoming():
     # Initialize documents list
     documents = []
     
-    # Get composed incoming documents from session if available
+    # Try to fetch documents from the database first
+    try:
+        conn = get_db_connection()
+        
+        # First, get documents with type "Incoming" or document_type "Incoming"
+        query = '''SELECT * FROM document 
+                  WHERE document_type = 'Incoming' 
+                  OR document_type LIKE '%incoming%'
+                  ORDER BY created_at DESC'''
+                  
+        rows = conn.execute(query).fetchall()
+        
+        # Convert rows to dictionaries
+        for row in rows:
+            try:
+                doc_dict = dict(row)
+                # Get created_at and format it properly
+                created_date = datetime.strptime(doc_dict['created_at'], '%Y-%m-%d %H:%M:%S') if doc_dict['created_at'] else datetime.now()
+                
+                incoming_doc = {
+                    'id': doc_dict.get('id', 0),
+                    'code': doc_dict.get('tracking_code', ''),
+                    'title': doc_dict.get('title', 'Untitled'),
+                    'sender': doc_dict.get('sender', 'Unknown'),
+                    'recipient': doc_dict.get('recipient', 'Unknown'),
+                    'details': doc_dict.get('description', ''),
+                    'required_action': doc_dict.get('required_action', ''),
+                    'date_received': doc_dict.get('created_at', ''),
+                    'date_received_obj': created_date,
+                    'status': doc_dict.get('status', 'Incoming'),
+                    'priority': doc_dict.get('priority', 'Normal'),
+                    'current_holder': 'Registry'
+                }
+                documents.append(incoming_doc)
+            except Exception as e:
+                print(f"Error processing row: {e}")
+                continue
+    except Exception as e:
+        print(f"Error fetching documents from database: {e}")
+        # Continue to use session documents if database fetch failed
+    finally:
+        if 'conn' in locals():
+            conn.close()
+    
+    # Get composed incoming documents from session if available (as fallback)
     if 'composed_documents' in session:
         for doc in session['composed_documents']:
             # Only include incoming documents
             if doc.get('type') == 'Incoming' or doc.get('document_type') == 'Incoming':
-                # Format the document for the incoming view
-                incoming_doc = {
-                    'id': doc.get('id', len(documents) + 1),
-                    'code': doc.get('code', doc.get('tracking_code', f"DOC-{datetime.now().strftime('%Y')}-{len(documents)+1:03d}")),
-                    'title': doc.get('title', 'Untitled Document'),
-                    'sender': doc.get('sender', 'Unknown Sender'),
-                    'recipient': doc.get('recipient', 'KEMRI Laboratory'),
-                    'details': doc.get('details', ''),
-                    'required_action': doc.get('required_action', 'Review'),
-                    'date_received': doc.get('date_created', doc.get('date_submitted', datetime.now().strftime('%Y-%m-%d %H:%M:%S'))),
-                    'date_received_obj': datetime.strptime(
-                        doc.get('date_created', doc.get('date_submitted', datetime.now().strftime('%Y-%m-%d'))), 
-                        '%Y-%m-%d' if len(doc.get('date_created', doc.get('date_submitted', datetime.now().strftime('%Y-%m-%d')))) <= 10 else '%Y-%m-%d %H:%M:%S'
-                    ),
-                    'status': doc.get('status', 'Incoming'),
-                    'priority': doc.get('priority', 'Normal'),
-                    'current_holder': doc.get('current_holder', 'Registry')
-                }
-                documents.append(incoming_doc)
+                # Check if this document is already in our list by tracking code
+                if not any(d.get('code') == doc.get('code', doc.get('tracking_code')) for d in documents):
+                    # Format the document for the incoming view
+                    date_str = doc.get('date_created', doc.get('date_submitted', datetime.now().strftime('%Y-%m-%d %H:%M:%S')))
+                    date_format = '%Y-%m-%d' if len(date_str) <= 10 else '%Y-%m-%d %H:%M:%S'
+                    
+                    try:
+                        date_obj = datetime.strptime(date_str, date_format)
+                    except ValueError:
+                        date_obj = datetime.now()
+                    
+                    incoming_doc = {
+                        'id': doc.get('id', len(documents) + 1),
+                        'code': doc.get('code', doc.get('tracking_code', f"DOC-{datetime.now().strftime('%Y')}-{len(documents)+1:03d}")),
+                        'title': doc.get('title', 'Untitled Document'),
+                        'sender': doc.get('sender', 'Unknown Sender'),
+                        'recipient': doc.get('recipient', 'KEMRI Laboratory'),
+                        'details': doc.get('details', doc.get('description', '')),
+                        'required_action': doc.get('required_action', 'Review'),
+                        'date_received': date_str,
+                        'date_received_obj': date_obj,
+                        'status': doc.get('status', 'Incoming'),
+                        'priority': doc.get('priority', 'Normal'),
+                        'current_holder': doc.get('current_holder', 'Registry')
+                    }
+                    documents.append(incoming_doc)
     
     # Generate additional sample documents if needed
     if not documents:
@@ -1034,7 +1313,7 @@ def incoming():
             
             document = {
                 'id': i,
-                'code': f'DOC-{2025}-{i:03d}',
+                'code': f'DOC-{datetime.now().year}-{i:03d}',
                 'title': f'Sample Document {i}',
                 'sender': f'Department {i % 5 + 1}',
                 'recipient': 'KEMRI Laboratory',
@@ -1121,118 +1400,233 @@ def incoming():
 
 @app.route('/outgoing')
 def outgoing():
+    """Display outgoing documents"""
     if 'user_id' not in session:
         return redirect(url_for('login'))
-        
-    # Add dummy data for priority counts
-    priority_counts = {
-        'Urgent': 2,
-        'Priority': 5,
-        'Normal': 10
-    }
     
-    # Get filter parameters
+    # Log this action
+    log_activity(session.get('user_id'), 'view_outgoing', {'request': 'view'})
+    
+    # Get filter parameters from query string
+    status_filter = request.args.get('status', 'all')
+    priority_filter = request.args.get('priority', 'all')
+    date_filter = request.args.get('date', 'all')
     search_query = request.args.get('search', '')
-    priority_filter = request.args.get('priority', 'All')
-    sort_by = request.args.get('sort_by', 'date')
-    sort_order = request.args.get('sort_order', 'desc')
-    page = request.args.get('page', 1, type=int)
+    page = int(request.args.get('page', 1))
+    per_page = int(request.args.get('per_page', 20))
     
-    # Get documents from database
+    # Initialize documents list
+    documents = []
+    total_documents = 0
+    
+    # Database connection
     conn = get_db_connection()
-    
     try:
-        # Count documents by priority
-        normal = conn.execute('SELECT COUNT(*) FROM document WHERE priority = ?', ('Normal',)).fetchone()[0]
-        priority = conn.execute('SELECT COUNT(*) FROM document WHERE priority = ?', ('Priority',)).fetchone()[0]
-        urgent = conn.execute('SELECT COUNT(*) FROM document WHERE priority = ?', ('Urgent',)).fetchone()[0]
-        
+        # Count documents by priority for stats
         priority_counts = {
-            'Normal': normal,
-            'Priority': priority,
-            'Urgent': urgent
+            'urgent': 0,
+            'high': 0,
+            'normal': 0,
+            'low': 0,
+            'Urgent': 0,    # Added capitalized versions
+            'Priority': 0,  # Added for template compatibility
+            'Normal': 0     # Added for template compatibility
         }
         
-        # Build the query based on filters
-        query = 'SELECT * FROM document'
+        # Get total documents in each priority
+        try:
+            for priority in ['Urgent', 'High', 'Priority', 'Normal', 'Low']:
+                count = conn.execute(
+                    "SELECT COUNT(*) FROM document WHERE priority = ? AND document_type != 'Incoming'", 
+                    (priority,)
+                ).fetchone()[0]
+                
+                # Map to both lowercase and capitalized keys
+                lowercase_key = priority.lower()
+                if lowercase_key == 'high':
+                    priority_counts['Priority'] += count  # Map 'High' to 'Priority'
+                else:
+                    priority_counts[priority] = count  # Capitalized version
+                    priority_counts[lowercase_key] = count  # Lowercase version
+        except Exception as e:
+            print(f"Error counting documents by priority: {e}")
+            # Continue execution with default counts
         
-        # Apply filters
-        conditions = []
+        # Build the query based on filters
+        query = "SELECT * FROM document WHERE document_type != 'Incoming'"
         params = []
         
-        if priority_filter != 'All':
-            conditions.append('priority = ?')
-            params.append(priority_filter)
-            
+        # Apply status filter
+        if status_filter != 'all':
+            query += " AND status LIKE ?"
+            params.append(f"%{status_filter}%")
+        
+        # Apply priority filter
+        if priority_filter != 'all':
+            query += " AND priority = ?"
+            params.append(priority_filter.title())
+        
+        # Apply date filter
+        if date_filter != 'all':
+            if date_filter == 'today':
+                query += " AND DATE(created_at) = DATE('now')"
+            elif date_filter == 'week':
+                query += " AND created_at >= date('now', '-7 days')"
+            elif date_filter == 'month':
+                query += " AND created_at >= date('now', '-30 days')"
+        
+        # Apply search query if present
         if search_query:
-            conditions.append('(title LIKE ? OR sender LIKE ? OR recipient LIKE ?)')
-            search_term = f'%{search_query}%'
-            params.extend([search_term, search_term, search_term])
+            query += " AND (tracking_code LIKE ? OR title LIKE ? OR sender LIKE ? OR recipient LIKE ?)"
+            search_term = f"%{search_query}%"
+            params.extend([search_term, search_term, search_term, search_term])
         
-        # Apply conditions if any
-        if conditions:
-            query += ' WHERE ' + ' AND '.join(conditions)
-            
-        # Apply sorting
-        if sort_by == 'date':
-            query += ' ORDER BY created_at'
-        elif sort_by == 'priority':
-            query += ' ORDER BY priority'
-        elif sort_by == 'status':
-            query += ' ORDER BY status'
-        else:
-            query += ' ORDER BY created_at'
-            
-        # Apply sort order
-        if sort_order == 'desc':
-            query += ' DESC'
-        else:
-            query += ' ASC'
-            
-        # Fetch documents
-        docs = conn.execute(query, params).fetchall()
+        # Count total documents matching the query for pagination
+        try:
+            count_query = query.replace("SELECT *", "SELECT COUNT(*)")
+            total_documents = conn.execute(count_query, params).fetchone()[0]
+        except Exception as e:
+            print(f"Error counting documents: {e}")
+            total_documents = 0
         
-        # Convert to dictionary for easier template rendering
-        documents = []
-        for doc in docs:
-            documents.append({
-                'id': doc['id'],
-                'code': doc['code'],
-                'title': doc['title'],
-                'sender': doc['sender'],
-                'recipient': doc['recipient'],
-                'details': doc['details'],
-                'status': doc['status'] if doc['status'] else 'Pending Registry Approval',
-                'priority': doc['priority'],
-                'date': doc['created_at'],
-                'required_action': doc['required_action']
-            })
+        # Order by most recent first
+        query += " ORDER BY created_at DESC"
+        
+        # Apply pagination manually (don't use LIMIT in SQL as we need all documents for session check)
+        rows = conn.execute(query, params).fetchall()
+        
+        # Convert to dictionary for template
+        for row in rows:
+            # Convert row to dictionary
+            row_dict = dict(row)
+            
+            # Format dates
+            created_date = datetime.strptime(row_dict['created_at'], '%Y-%m-%d %H:%M:%S') if row_dict['created_at'] else datetime.now()
+            date_diff = (datetime.now() - created_date).days
+            
+            document = {
+                'id': row_dict['id'],
+                'tracking_code': row_dict['tracking_code'],
+                'title': row_dict['title'],
+                'sender': row_dict['sender'],
+                'recipient': row_dict['recipient'],
+                'description': row_dict.get('description', ''),
+                'status': row_dict['status'],
+                'priority': row_dict['priority'],
+                'date_created': row_dict['created_at'],
+                'days_ago': date_diff,
+                'document_type': row_dict.get('document_type', 'Outgoing')
+            }
+            documents.append(document)
             
     except Exception as e:
         print(f"Error retrieving documents: {e}")
-        documents = []
-    
     finally:
         conn.close()
     
-    # Create pagination object with proper iter_pages method
-    total_docs = len(documents)
-    pagination = Pagination(page=page, per_page=10, total_items=total_docs or 17)
+    # Add documents from session if available (for demo purposes)
+    if 'composed_documents' in session:
+        for doc in session['composed_documents']:
+            # Skip documents already in our list
+            if any(d.get('tracking_code') == doc.get('tracking_code') for d in documents):
+                continue
+                
+            # Skip incoming documents
+            if doc.get('document_type') == 'Incoming':
+                continue
+                
+            # Format dates
+            if 'date_created' in doc:
+                try:
+                    created_date = datetime.strptime(doc['date_created'], '%Y-%m-%d %H:%M:%S')
+                    date_diff = (datetime.now() - created_date).days
+                except (ValueError, TypeError):
+                    date_diff = 0
+            else:
+                date_diff = 0
+                
+            document = {
+                'id': doc.get('id', len(documents) + 1),
+                'tracking_code': doc.get('tracking_code'),
+                'title': doc.get('title', 'Untitled Document'),
+                'sender': doc.get('sender', 'Unknown'),
+                'recipient': doc.get('recipient', 'Unknown'),
+                'description': doc.get('description', ''),
+                'status': doc.get('status', 'Pending'),
+                'priority': doc.get('priority', 'Normal'),
+                'date_created': doc.get('date_created', datetime.now().strftime('%Y-%m-%d')),
+                'days_ago': date_diff,
+                'document_type': doc.get('document_type', 'Outgoing')
+            }
+            
+            # Apply filters
+            if status_filter != 'all' and status_filter.lower() not in document['status'].lower():
+                continue
+                
+            if priority_filter != 'all' and priority_filter.lower() != document['priority'].lower():
+                continue
+                
+            if search_query and search_query.lower() not in document['title'].lower() and search_query.lower() not in document['tracking_code'].lower():
+                continue
+                
+            documents.append(document)
     
-    # Apply pagination manually
-    start_idx = (page - 1) * 10
-    end_idx = start_idx + 10
-    paged_documents = documents[start_idx:end_idx] if documents else []
+    # Manual pagination
+    pagination = Pagination(page, per_page, len(documents))
+    start = (page - 1) * per_page
+    end = min(start + per_page, len(documents))
+    paginated_documents = documents[start:end]
     
-    return render_template('outgoing.html', 
-                          active_page='outgoing',
-                          priority_counts=priority_counts,
-                          documents=paged_documents,
-                          search_query=search_query,
-                          priority_filter=priority_filter,
-                          sort_by=sort_by,
-                          sort_order=sort_order,
-                          pagination=pagination)
+    # Statistics for the dashboard header
+    stats = {
+        'total': len(documents),
+        'urgent': priority_counts['urgent'],
+        'high': priority_counts['high'],
+        'normal': priority_counts['normal'],
+        'low': priority_counts['low'],
+        'pending': len([d for d in documents if 'pending' in d.get('status', '').lower()]),
+        'completed': len([d for d in documents if 'completed' in d.get('status', '').lower() or 'approved' in d.get('status', '').lower()])
+    }
+    
+    # Users for the reassign dropdown
+    users = []
+    
+    # For the sample, get activity timeline (most recent first)
+    activities = [
+        {
+            'user': 'System Administrator',
+            'action': 'Approved document',
+            'document': 'Financial Report Q1',
+            'timestamp': (datetime.now() - timedelta(hours=2)).strftime('%Y-%m-%d %H:%M:%S'),
+            'tracking_code': 'DOC-2023-004'
+        },
+        {
+            'user': 'Jane Smith',
+            'action': 'Added comment',
+            'document': 'Project Proposal',
+            'timestamp': (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d %H:%M:%S'),
+            'tracking_code': 'DOC-2023-003'
+        },
+        {
+            'user': 'Robert Chen',
+            'action': 'Shared document',
+            'document': 'HR Guidelines',
+            'timestamp': (datetime.now() - timedelta(days=2)).strftime('%Y-%m-%d %H:%M:%S'),
+            'tracking_code': 'DOC-2023-002'
+        }
+    ]
+    
+    return render_template('outgoing.html',
+                         documents=paginated_documents,
+                         stats=stats,
+                         status_filter=status_filter,
+                         priority_filter=priority_filter,
+                         date_filter=date_filter,
+                         search_query=search_query,
+                         pagination=pagination,
+                         users=users,
+                         activities=activities,
+                         priority_counts=priority_counts)  # Added priority_counts to the template context
 
 @app.route('/database_management')
 @requires_permission('database_management')
@@ -1583,6 +1977,13 @@ def debug_login():
     """Debug route to bypass login for development
     In production, this should be removed
     """
+    # Disable this route in production by default
+    debug_enabled = False  # Set this to True only in development
+    
+    if not debug_enabled:
+        flash('Debug login is disabled in production mode.', 'warning')
+        return redirect(url_for('login'))
+        
     # Clear any existing session
     session.clear()
     
@@ -1703,6 +2104,235 @@ def import_users():
     
     # For debug mode, just flash a message and redirect back
     flash('User import functionality is not implemented in debug mode', 'info')
+    return redirect(url_for('user_management'))
+
+@app.route('/edit-user/<int:user_id>', methods=['POST'])
+@requires_login
+def edit_user(user_id):
+    """Edit a user's details"""
+    print(f"EDIT USER ROUTE CALLED for user ID: {user_id}")
+    
+    if session.get('role') != 'Administrator':
+        flash('You do not have permission to perform this action', 'danger')
+        return redirect(url_for('dashboard'))
+    
+    # Get form data
+    fullname = request.form.get('fullName')
+    email = request.form.get('email')
+    phone = request.form.get('phone', '')
+    department = request.form.get('department')
+    role = request.form.get('role')
+    new_password = request.form.get('password')
+    
+    # Basic validation
+    if not email or not department or not role:
+        flash('All required fields must be filled', 'danger')
+        return redirect(url_for('user_management'))
+    
+    # Update user in database
+    try:
+        conn = get_db_connection()
+        
+        # Construct update SQL based on whether password is being changed
+        if new_password and new_password.strip():
+            # Hash the new password
+            hashed_password = generate_password_hash(new_password)
+            
+            conn.execute(
+                'UPDATE user SET email = ?, phone = ?, department = ?, role = ?, password = ? WHERE id = ?',
+                (email, phone, department, role, hashed_password, user_id)
+            )
+        else:
+            # Don't update password
+            conn.execute(
+                'UPDATE user SET email = ?, phone = ?, department = ?, role = ? WHERE id = ?',
+                (email, phone, department, role, user_id)
+            )
+        
+        conn.commit()
+        
+        # Get updated user for flashing a message
+        user = conn.execute('SELECT username FROM user WHERE id = ?', (user_id,)).fetchone()
+        conn.close()
+        
+        if user:
+            # Log this action
+            log_activity(session.get('user_id'), 'edit_user', {
+                'user_id': user_id,
+                'username': user['username']
+            })
+            
+            flash(f'User {user["username"]} has been updated successfully', 'success')
+        else:
+            flash('User not found', 'danger')
+    except Exception as e:
+        print(f"Error updating user: {e}")
+        flash(f'Error updating user: {str(e)}', 'danger')
+    
+    return redirect(url_for('user_management'))
+
+@app.route('/delete-user/<int:user_id>', methods=['POST'])
+@requires_login
+def delete_user(user_id):
+    """Delete a user"""
+    print(f"DELETE USER ROUTE CALLED for user ID: {user_id}")
+    
+    if session.get('role') != 'Administrator':
+        flash('You do not have permission to perform this action', 'danger')
+        return redirect(url_for('dashboard'))
+    
+    # Check if user is trying to delete themselves
+    if int(session.get('user_id', 0)) == user_id:
+        flash('You cannot delete yourself', 'danger')
+        return redirect(url_for('user_management'))
+    
+    try:
+        conn = get_db_connection()
+        
+        # Get the user first for logging
+        user = conn.execute('SELECT username FROM user WHERE id = ?', (user_id,)).fetchone()
+        
+        if not user:
+            conn.close()
+            flash('User not found', 'danger')
+            return redirect(url_for('user_management'))
+        
+        # Delete the user
+        conn.execute('DELETE FROM user WHERE id = ?', (user_id,))
+        conn.commit()
+        conn.close()
+        
+        # Log this action
+        log_activity(session.get('user_id'), 'delete_user', {
+            'user_id': user_id,
+            'username': user['username']
+        })
+        
+        flash(f'User {user["username"]} has been deleted successfully', 'success')
+    except Exception as e:
+        print(f"Error deleting user: {e}")
+        flash(f'Error deleting user: {str(e)}', 'danger')
+    
+    return redirect(url_for('user_management'))
+
+@app.route('/reset-password/<int:user_id>', methods=['POST'])
+@requires_login
+def reset_password(user_id):
+    """Reset a user's password"""
+    print(f"RESET PASSWORD ROUTE CALLED for user ID: {user_id}")
+    
+    if session.get('role') != 'Administrator':
+        flash('You do not have permission to perform this action', 'danger')
+        return redirect(url_for('dashboard'))
+    
+    # Check if we should generate a random password
+    generate_random = request.form.get('generatePassword') == 'on'
+    
+    if generate_random:
+        # Generate a random password
+        import random
+        import string
+        new_password = ''.join(random.choices(string.ascii_letters + string.digits, k=10))
+    else:
+        # Use the provided password
+        new_password = request.form.get('password')
+        if not new_password:
+            flash('Password cannot be empty', 'danger')
+            return redirect(url_for('user_management'))
+    
+    try:
+        conn = get_db_connection()
+        
+        # Get the user first for logging and feedback
+        user = conn.execute('SELECT username FROM user WHERE id = ?', (user_id,)).fetchone()
+        
+        if not user:
+            conn.close()
+            flash('User not found', 'danger')
+            return redirect(url_for('user_management'))
+        
+        # Hash the new password
+        hashed_password = generate_password_hash(new_password)
+        
+        # Update the user's password
+        conn.execute('UPDATE user SET password = ? WHERE id = ?', (hashed_password, user_id))
+        conn.commit()
+        conn.close()
+        
+        # Log this action
+        log_activity(session.get('user_id'), 'reset_password', {
+            'user_id': user_id,
+            'username': user['username']
+        })
+        
+        # Check if we should email the password
+        if request.form.get('email_password') == 'on':
+            # In a real app you would send an email here
+            flash(f'New password would be emailed to user (debug mode)', 'info')
+        
+        flash(f'Password for {user["username"]} has been reset. New password: {new_password}', 'success')
+    except Exception as e:
+        print(f"Error resetting password: {e}")
+        flash(f'Error resetting password: {str(e)}', 'danger')
+    
+    return redirect(url_for('user_management'))
+
+@app.route('/toggle-user-status/<int:user_id>', methods=['POST'])
+@requires_login
+def toggle_user_status(user_id):
+    """Activate or deactivate a user"""
+    print(f"TOGGLE USER STATUS ROUTE CALLED for user ID: {user_id}")
+    
+    if session.get('role') != 'Administrator':
+        flash('You do not have permission to perform this action', 'danger')
+        return redirect(url_for('dashboard'))
+    
+    # Check if user is trying to deactivate themselves
+    if int(session.get('user_id', 0)) == user_id:
+        flash('You cannot change your own status', 'danger')
+        return redirect(url_for('user_management'))
+    
+    # Get the requested action (activate or deactivate)
+    action = request.form.get('action')
+    if action not in ['activate', 'deactivate']:
+        flash('Invalid action', 'danger')
+        return redirect(url_for('user_management'))
+    
+    # Set is_active based on the action
+    is_active = 1 if action == 'activate' else 0
+    
+    try:
+        conn = get_db_connection()
+        
+        # Get the user first for logging and feedback
+        user = conn.execute('SELECT username, is_active FROM user WHERE id = ?', (user_id,)).fetchone()
+        
+        if not user:
+            conn.close()
+            flash('User not found', 'danger')
+            return redirect(url_for('user_management'))
+        
+        # Only update if the status is actually changing
+        if (is_active == 1 and user['is_active'] == 0) or (is_active == 0 and user['is_active'] == 1):
+            # Update the user's status
+            conn.execute('UPDATE user SET is_active = ? WHERE id = ?', (is_active, user_id))
+            conn.commit()
+            
+            # Log this action
+            log_activity(session.get('user_id'), f'{action}_user', {
+                'user_id': user_id,
+                'username': user['username']
+            })
+            
+            flash(f'User {user["username"]} has been {"activated" if is_active else "deactivated"} successfully', 'success')
+        else:
+            flash(f'User {user["username"]} is already {"active" if is_active else "inactive"}', 'info')
+        
+        conn.close()
+    except Exception as e:
+        print(f"Error toggling user status: {e}")
+        flash(f'Error toggling user status: {str(e)}', 'danger')
+    
     return redirect(url_for('user_management'))
 
 @app.errorhandler(403)
@@ -2013,7 +2643,7 @@ def registry_approval():
         
         # Search query
         if search_query:
-            conditions.append("(title LIKE ? OR sender LIKE ? OR recipient LIKE ? OR code LIKE ?)")
+            conditions.append("(title LIKE ? OR sender LIKE ? OR recipient LIKE ? OR tracking_code LIKE ?)")
             search_term = f"%{search_query}%"
             params.extend([search_term, search_term, search_term, search_term])
         
@@ -2045,21 +2675,23 @@ def registry_approval():
         
         # Convert to dictionary for template
         for row in rows:
-            created_date = datetime.strptime(row['created_at'], '%Y-%m-%d %H:%M:%S') if row['created_at'] else datetime.now()
+            # Convert row to dictionary
+            row_dict = dict(row)
+            created_date = datetime.strptime(row_dict['created_at'], '%Y-%m-%d %H:%M:%S') if row_dict['created_at'] else datetime.now()
             days_in_stage = (datetime.now() - created_date).days
             
             documents.append({
-                'id': row['id'],
-                'tracking_code': row['code'],
-                'title': row['title'],
-                'sender': row['sender'],
-                'department': row['sender'].split(' - ')[0] if ' - ' in row['sender'] else row['sender'],
-                'received_date': row['created_at'],
-                'date_submitted': row['created_at'],
-                'status': 'pending' if row['status'] == 'Pending Registry Approval' else row['status'].lower(),
-                'priority': row['priority'],
-                'notes': row['details'],
-                'document_type': 'Document',
+                'id': row_dict['id'],
+                'tracking_code': row_dict['tracking_code'],
+                'title': row_dict['title'],
+                'sender': row_dict['sender'],
+                'department': row_dict['sender'].split(' - ')[0] if ' - ' in row_dict['sender'] else row_dict['sender'],
+                'received_date': row_dict['created_at'],
+                'date_submitted': row_dict['created_at'],
+                'status': 'pending' if row_dict['status'] == 'Pending Registry Approval' else row_dict['status'].lower(),
+                'priority': row_dict['priority'],
+                'notes': row_dict.get('description', ''),
+                'document_type': row_dict.get('document_type', 'Document'),
                 'workflow_stage': 'Initial Review',
                 'days_in_stage': days_in_stage
             })
@@ -2098,7 +2730,7 @@ def registry_approval():
                     
                     documents.append({
                         'id': doc.get('id', len(documents) + 1),
-                        'tracking_code': doc.get('tracking_code', doc.get('code')),
+                        'tracking_code': doc.get('tracking_code'),
                         'title': doc.get('title', 'Untitled Document'),
                         'sender': doc.get('sender', 'Unknown'),
                         'department': doc.get('sender', 'Unknown').split(' - ')[0] if ' - ' in doc.get('sender', 'Unknown') else doc.get('sender', 'Unknown'),
@@ -2106,7 +2738,7 @@ def registry_approval():
                         'date_submitted': doc.get('date_created', datetime.now().strftime('%Y-%m-%d')),
                         'status': 'pending',
                         'priority': doc.get('priority', 'Normal'),
-                        'notes': doc.get('details', ''),
+                        'notes': doc.get('description', ''),
                         'document_type': doc.get('document_type', 'Document'),
                         'workflow_stage': 'Initial Review',
                         'days_in_stage': days_in_stage
@@ -2163,21 +2795,73 @@ def registry_decision(tracking_code):
     # Log this decision
     log_activity(session.get('user_id'), 'registry_decision', decision_data)
     
-    # In a real app, update document status in the database
+    # Update document in the database
+    conn = None
+    try:
+        conn = get_db_connection()
+        
+        # Get the current document
+        document = conn.execute('SELECT * FROM document WHERE tracking_code = ?', 
+                              (tracking_code,)).fetchone()
+        
+        if document:
+            # Determine the new status based on decision
+            new_status = ''
+            if decision == 'approve':
+                new_status = f"Approved - Forwarded to {next_department}"
+            elif decision == 'reject':
+                new_status = f"Rejected - {reject_reason}"
+            elif decision == 'request_changes':
+                new_status = "Changes Requested"
+                
+            # Update the document status in the database
+            conn.execute('UPDATE document SET status = ? WHERE tracking_code = ?', 
+                        (new_status, tracking_code))
+            
+            # Update priority if provided
+            if priority:
+                conn.execute('UPDATE document SET priority = ? WHERE tracking_code = ?', 
+                            (priority, tracking_code))
+                
+            # Add to document history
+            conn.execute(
+                'INSERT INTO document_history (document_id, action, details, user_id) VALUES (?, ?, ?, ?)',
+                (document['id'], f"Registry {decision.replace('_', ' ').title()}", 
+                 f"Comments: {comments}, Next Department: {next_department}", session.get('user_id'))
+            )
+            
+            # Commit the changes
+            conn.commit()
+            
+            # Display appropriate message
+            if decision == 'approve':
+                flash(f"Document {tracking_code} has been approved and forwarded to {next_department}", 'success')
+            elif decision == 'reject':
+                flash(f"Document {tracking_code} has been rejected. Reason: {reject_reason}", 'warning')
+            elif decision == 'request_changes':
+                flash(f"Changes have been requested for document {tracking_code}", 'info')
+        else:
+            flash(f"Document with tracking code {tracking_code} not found", 'danger')
+            
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        print(f"Error updating document: {e}")
+        flash(f"Error updating document: {str(e)}", 'danger')
+    finally:
+        if conn:
+            conn.close()
     
-    # For demo, update in the session if the document exists there
+    # For demo, also update in the session if the document exists there
     if 'composed_documents' in session:
         for doc in session['composed_documents']:
             if doc.get('tracking_code') == tracking_code:
                 if decision == 'approve':
                     doc['status'] = f"Approved - Forwarded to {next_department}"
-                    flash(f"Document {tracking_code} has been approved and forwarded to {next_department}", 'success')
                 elif decision == 'reject':
                     doc['status'] = f"Rejected - {reject_reason}"
-                    flash(f"Document {tracking_code} has been rejected. Reason: {reject_reason}", 'warning')
                 elif decision == 'request_changes':
                     doc['status'] = "Changes Requested"
-                    flash(f"Changes have been requested for document {tracking_code}", 'info')
                 
                 # Update other fields
                 if priority:
@@ -2219,14 +2903,46 @@ def update_incoming_status(doc_code):
         flash('No status provided', 'danger')
         return redirect(url_for('incoming'))
     
-    # In a real app, update the document status in the database
-    # For demo, update in the session if the document exists there
+    # Update the document status in the database
+    conn = None
+    try:
+        conn = get_db_connection()
+        # Update document status
+        result = conn.execute('UPDATE document SET status = ? WHERE tracking_code = ?', 
+                           (new_status, doc_code))
+        
+        if result.rowcount > 0:
+            # Add to document history
+            document = conn.execute('SELECT id FROM document WHERE tracking_code = ?', 
+                                  (doc_code,)).fetchone()
+            
+            if document:
+                conn.execute(
+                    'INSERT INTO document_history (document_id, action, details, user_id) VALUES (?, ?, ?, ?)',
+                    (document['id'], f"Status Updated", f"New status: {new_status}", session.get('user_id'))
+                )
+            
+            conn.commit()
+            flash(f'Document {doc_code} status updated to {new_status}', 'success')
+        else:
+            flash(f'Document {doc_code} not found', 'warning')
+            
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        print(f"Error updating document status: {e}")
+        flash(f"Error updating document status: {str(e)}", 'danger')
+    finally:
+        if conn:
+            conn.close()
+    
+    # For backwards compatibility: also update in the session if the document exists there
     if 'composed_documents' in session:
         found = False
         for doc in session['composed_documents']:
-            # Check both code and tracking_code for incoming documents
-            if ((doc.get('code') == doc_code or doc.get('tracking_code') == doc_code) and 
-                (doc.get('type') == 'Incoming' or doc.get('document_type') == 'Incoming')):
+            # Check tracking_code for incoming documents
+            if (doc.get('tracking_code') == doc_code and 
+                (doc.get('document_type') == 'Incoming')):
                 doc['status'] = new_status
                 doc['last_updated'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                 
@@ -2245,13 +2961,6 @@ def update_incoming_status(doc_code):
                 session.modified = True
                 found = True
                 break
-        
-        if found:
-            flash(f'Document {doc_code} status updated to {new_status}', 'success')
-        else:
-            flash(f'Document {doc_code} not found', 'warning')
-    else:
-        flash('No documents in session', 'warning')
     
     # Redirect back to the incoming documents page
     return redirect(url_for('incoming'))
@@ -2270,13 +2979,44 @@ def update_outgoing_status(doc_code):
         flash('No status provided', 'danger')
         return redirect(url_for('outgoing'))
     
-    # In a real app, update the document status in the database
-    # For demo, update in the session if the document exists there
+    # Update the document status in the database
+    conn = None
+    try:
+        conn = get_db_connection()
+        # Update document status
+        result = conn.execute('UPDATE document SET status = ? WHERE tracking_code = ?', 
+                           (new_status, doc_code))
+        
+        if result.rowcount > 0:
+            # Add to document history
+            document = conn.execute('SELECT id FROM document WHERE tracking_code = ?', 
+                                  (doc_code,)).fetchone()
+            
+            if document:
+                conn.execute(
+                    'INSERT INTO document_history (document_id, action, details, user_id) VALUES (?, ?, ?, ?)',
+                    (document['id'], f"Status Updated", f"New status: {new_status}", session.get('user_id'))
+                )
+            
+            conn.commit()
+            flash(f'Document {doc_code} status updated to {new_status}', 'success')
+        else:
+            flash(f'Document {doc_code} not found', 'warning')
+            
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        print(f"Error updating document status: {e}")
+        flash(f"Error updating document status: {str(e)}", 'danger')
+    finally:
+        if conn:
+            conn.close()
+    
+    # For backwards compatibility: also update in the session if the document exists there
     if 'composed_documents' in session:
-        found = False
         for doc in session['composed_documents']:
-            # Check both code and tracking_code
-            if (doc.get('code') == doc_code) or (doc.get('tracking_code') == doc_code):
+            # Check tracking_code
+            if doc.get('tracking_code') == doc_code:
                 doc['status'] = new_status
                 doc['last_updated'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                 
@@ -2293,15 +3033,7 @@ def update_outgoing_status(doc_code):
                 
                 # Mark session as modified
                 session.modified = True
-                found = True
                 break
-        
-        if found:
-            flash(f'Document {doc_code} status updated to {new_status}', 'success')
-        else:
-            flash(f'Document {doc_code} not found', 'warning')
-    else:
-        flash('No documents in session', 'warning')
     
     # Redirect back to the outgoing documents page
     return redirect(url_for('outgoing'))
@@ -3167,15 +3899,47 @@ def generate_tracking_code():
     
     # Check if code already exists in database
     conn = get_db_connection()
-    exists = conn.execute('SELECT COUNT(*) FROM document WHERE code = ?', 
-                         (tracking_code,)).fetchone()[0] > 0
-    conn.close()
+    try:
+        # Use the correct column name 'tracking_code' instead of 'code'
+        exists = conn.execute('SELECT COUNT(*) FROM document WHERE tracking_code = ?', 
+                             (tracking_code,)).fetchone()[0] > 0
+    except sqlite3.OperationalError as e:
+        # If there's an error (like the table doesn't exist yet), assume the code doesn't exist
+        print(f"Database error checking tracking code: {e}")
+        exists = False
+    except Exception as e:
+        print(f"Error checking tracking code: {e}")
+        exists = False
+    finally:
+        conn.close()
     
     # If code exists, try again recursively
     if exists:
         return generate_tracking_code()
     
     return tracking_code
+
+@app.route('/add_attachment/<doc_code>', methods=['POST'])
+def add_attachment(doc_code):
+    """Placeholder route for add_attachment to prevent BuildError"""
+    flash('Document attachment functionality is not available in debug mode', 'warning')
+    return redirect(url_for('document_details', doc_code=doc_code))
+
+@app.route('/document/<doc_code>')
+def document_view(doc_code):
+    """Placeholder for document view route"""
+    return redirect(url_for('document_details', doc_code=doc_code))
+
+@app.route('/reassign_document/<document_code>', methods=['POST'])
+def reassign_document(document_code):
+    """Placeholder route for reassign_document to prevent BuildError"""
+    flash('Document reassignment is not available in debug mode', 'warning')
+    return redirect(url_for('document_details', doc_code=document_code))
+
+@app.route('/test-route/<int:user_id>', methods=['GET'])
+def test_route(user_id):
+    """Test route to check if routing is working"""
+    return f"Test route successful with user_id: {user_id}"
 
 if __name__ == '__main__':
     # Ensure the database exists
