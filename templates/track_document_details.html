@@ -1,0 +1,315 @@
+{% extends 'base.html' %}
+
+{% block title %}Document Tracking: {{ document.tracking_code }} - KEMRI Lab System{% endblock %}
+
+{% block styles %}
+<style>
+  .timeline {
+    list-style: none;
+    padding: 0;
+    position: relative;
+  }
+  
+  .timeline:before {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: #e9ecef;
+    left: 24px;
+    margin-left: -1px;
+  }
+  
+  .timeline-item {
+    position: relative;
+    margin-bottom: 30px;
+    padding-left: 60px;
+  }
+  
+  .timeline-marker {
+    position: absolute;
+    top: 0;
+    left: 19px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 2px solid white;
+    box-shadow: 0 0 0 2px #007bff;
+  }
+  
+  .timeline-content {
+    padding: 0;
+  }
+
+  .status-badge {
+    font-size: 1rem;
+    padding: 0.4rem 0.8rem;
+  }
+  
+  .document-info-card {
+    height: 100%;
+  }
+
+  .priority-urgent {
+    border-left: 4px solid #dc3545;
+  }
+  
+  .priority-priority {
+    border-left: 4px solid #ffc107;
+  }
+  
+  .priority-normal {
+    border-left: 4px solid #28a745;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+  {% if error_message %}
+    <div class="alert alert-warning" role="alert">
+      {{ error_message }}
+      <a href="{{ url_for('track_document') }}" class="btn btn-sm btn-outline-dark ms-3">
+        <i class="fas fa-arrow-left"></i> Back to Document Tracking
+      </a>
+    </div>
+  {% else %}
+    <!-- Header with Document Code and Status -->
+    <div class="row mb-4">
+      <div class="col-md-8">
+        <h2>
+          <span class="badge bg-primary me-2">{{ document.tracking_code }}</span>
+          {{ document.title }}
+        </h2>
+        <p class="text-muted mb-0">{{ document.document_type }}</p>
+      </div>
+      <div class="col-md-4 text-md-end">
+        <span class="badge bg-{% if document.status == 'Pending' %}warning{% elif document.status == 'Approved' %}success{% elif document.status == 'Rejected' %}danger{% else %}info{% endif %} status-badge mb-2">
+          {{ document.status }}
+        </span>
+        <div class="mt-2">
+          <a href="{{ url_for('track_document') }}" class="btn btn-sm btn-outline-secondary">
+            <i class="fas fa-arrow-left"></i> Back to Tracking
+          </a>
+          <a href="#" class="btn btn-sm btn-outline-primary ms-2" onclick="window.print()">
+            <i class="fas fa-print"></i> Print
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="row">
+      <!-- Document Information -->
+      <div class="col-lg-4">
+        <div class="card shadow-sm mb-4 document-info-card priority-{{ document.priority|lower }}">
+          <div class="card-header bg-white d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Document Information</h5>
+            <span class="badge bg-{% if document.priority == 'Urgent' %}danger{% elif document.priority == 'Priority' %}warning{% else %}info{% endif %}">
+              {{ document.priority }}
+            </span>
+          </div>
+          <div class="card-body">
+            <div class="row mb-3">
+              <div class="col-md-6">
+                <p class="mb-1 small text-muted">Document Type</p>
+                <p class="mb-3">{{ document.document_type }}</p>
+                
+                <p class="mb-1 small text-muted">Date Created</p>
+                <p class="mb-3">{{ document.date_created }}</p>
+                
+                <p class="mb-1 small text-muted">Processing Time</p>
+                <p class="mb-0">{{ document.process_time }}</p>
+              </div>
+              <div class="col-md-6">
+                <p class="mb-1 small text-muted">Confidentiality</p>
+                <p class="mb-3">{{ document.confidentiality }}</p>
+                
+                <p class="mb-1 small text-muted">Last Updated</p>
+                <p class="mb-3">{{ document.last_updated }}</p>
+                
+                <p class="mb-1 small text-muted">Status</p>
+                <p class="mb-0">{{ document.status }}</p>
+              </div>
+            </div>
+            
+            <hr>
+            
+            <div class="row">
+              <div class="col-md-6">
+                <p class="mb-1 small text-muted">Sender</p>
+                <p class="mb-3">{{ document.sender }}</p>
+                
+                <p class="mb-1 small text-muted">Sender Department</p>
+                <p class="mb-0">{{ document.sender_department }}</p>
+              </div>
+              <div class="col-md-6">
+                <p class="mb-1 small text-muted">Recipient</p>
+                <p class="mb-3">{{ document.recipient }}</p>
+                
+                <p class="mb-1 small text-muted">Current Department</p>
+                <p class="mb-0">{{ document.current_department }}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Attachments Section (if available) -->
+        {% if document.attachments and document.attachments|length > 0 %}
+        <div class="card shadow-sm mb-4">
+          <div class="card-header bg-white">
+            <h5 class="mb-0">Attachments</h5>
+          </div>
+          <div class="card-body p-0">
+            <ul class="list-group list-group-flush">
+              {% for attachment in document.attachments %}
+              <li class="list-group-item d-flex justify-content-between align-items-center">
+                <div>
+                  <i class="fas fa-{% if attachment.type == 'pdf' %}file-pdf text-danger{% elif attachment.type == 'excel' %}file-excel text-success{% elif attachment.type == 'word' %}file-word text-primary{% else %}file-alt{% endif %} me-2"></i>
+                  {{ attachment.name }}
+                </div>
+                <a href="#" class="btn btn-sm btn-outline-primary">
+                  <i class="fas fa-download"></i>
+                </a>
+              </li>
+              {% endfor %}
+            </ul>
+          </div>
+        </div>
+        {% endif %}
+      </div>
+      
+      <!-- Document Timeline -->
+      <div class="col-lg-8">
+        <div class="card shadow-sm mb-4">
+          <div class="card-header bg-white">
+            <h5 class="mb-0"><i class="fas fa-history me-2"></i> Document History</h5>
+          </div>
+          <div class="card-body">
+            {% if document.timeline and document.timeline|length > 0 %}
+              <ul class="timeline">
+                {% for event in document.timeline %}
+                <li class="timeline-item">
+                  <div class="timeline-marker bg-{% if 'Created' in event.title %}success{% elif 'Approved' in event.title %}success{% elif 'Rejected' in event.title %}danger{% elif 'Pending' in event.title %}warning{% else %}primary{% endif %}"></div>
+                  <div class="timeline-content">
+                    <div class="d-flex justify-content-between">
+                      <h6 class="mb-1">{{ event.title }}</h6>
+                      <small class="text-muted">{{ event.time }}</small>
+                    </div>
+                    <p class="mb-1">{{ event.description }}</p>
+                    <small class="text-muted">By: {{ event.user }}</small>
+                  </div>
+                </li>
+                {% endfor %}
+              </ul>
+            {% else %}
+              <div class="text-center py-4">
+                <i class="fas fa-file-alt fa-3x text-muted mb-3"></i>
+                <h5>No Timeline Available</h5>
+                <p class="text-muted">No history has been recorded for this document yet.</p>
+              </div>
+            {% endif %}
+          </div>
+        </div>
+        
+        <!-- Document Actions -->
+        <div class="card shadow-sm">
+          <div class="card-header bg-white">
+            <h5 class="mb-0"><i class="fas fa-tasks me-2"></i> Document Actions</h5>
+          </div>
+          <div class="card-body">
+            <form action="{{ url_for('update_document_status', tracking_code=document.tracking_code) }}" method="POST">
+              <div class="row mb-3">
+                <div class="col-md-4">
+                  <label for="status" class="form-label">Update Status</label>
+                  <select class="form-select" id="status" name="status">
+                    <option value="" disabled selected>Select status...</option>
+                    <option value="Pending">Pending</option>
+                    <option value="In Review">In Review</option>
+                    <option value="Approved">Approved</option>
+                    <option value="Rejected">Rejected</option>
+                    <option value="Completed">Completed</option>
+                  </select>
+                </div>
+                <div class="col-md-4">
+                  <label for="department" class="form-label">Forward to Department</label>
+                  <select class="form-select" id="department" name="department">
+                    <option value="" disabled selected>Select department...</option>
+                    <option value="Finance">Finance</option>
+                    <option value="IT">IT</option>
+                    <option value="HR">HR</option>
+                    <option value="Research">Research</option>
+                    <option value="Registry">Registry</option>
+                    <option value="Laboratory">Laboratory</option>
+                  </select>
+                </div>
+                <div class="col-md-4 d-flex align-items-end">
+                  <button type="submit" class="btn btn-primary w-100">
+                    <i class="fas fa-save me-1"></i> Update Document
+                  </button>
+                </div>
+              </div>
+              <div class="mb-3">
+                <label for="comments" class="form-label">Comments</label>
+                <textarea class="form-control" id="comments" name="comments" rows="3" placeholder="Add your comments..."></textarea>
+              </div>
+            </form>
+            
+            <hr>
+            
+            <div class="row">
+              <div class="col-md-6">
+                <div class="d-grid">
+                  <button class="btn btn-outline-primary" onclick="window.print()">
+                    <i class="fas fa-print me-1"></i> Print Document
+                  </button>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="d-grid">
+                  <button class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#notifyModal">
+                    <i class="fas fa-bell me-1"></i> Notify Stakeholders
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Notification Modal -->
+    <div class="modal fade" id="notifyModal" tabindex="-1" aria-labelledby="notifyModalLabel" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="notifyModalLabel">Notify Stakeholders</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <p>Send a notification about this document to relevant stakeholders.</p>
+            <div class="mb-3">
+              <label for="recipients" class="form-label">Recipients</label>
+              <select class="form-select" id="recipients" multiple>
+                <option value="sender">Document Sender</option>
+                <option value="recipient">Document Recipient</option>
+                <option value="registry">Registry Department</option>
+                <option value="it">IT Department</option>
+              </select>
+            </div>
+            <div class="mb-3">
+              <label for="message" class="form-label">Message</label>
+              <textarea class="form-control" id="message" rows="3" placeholder="Enter your notification message..."></textarea>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button type="button" class="btn btn-primary">Send Notification</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  {% endif %}
+</div>
+{% endblock %} 
