@@ -288,7 +288,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const username = this.getAttribute('data-username');
             
             // Set form action and username
-            document.getElementById('singleResetPasswordForm').action = "{{ url_for('reset_password', user_id=0) }}".replace('0', userId);
+            document.getElementById('singleResetPasswordForm').action = "{{ url_for('reset_single_password', user_id=0) }}".replace('0', userId);
             document.getElementById('resetPasswordUsername').textContent = username;
         });
     }

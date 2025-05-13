@@ -163,7 +163,7 @@
                     {% endif %}
                     
                     <!-- Add Comment Form -->
-                    <form action="{{ url_for('add_document_comment', document_code=doc_code) }}" method="post">
+                    <form action="{{ url_for('add_document_comment', document_code=document.code) }}" method="post">
                         <div class="mb-3">
                             <label for="comment" class="form-label">Add a Comment</label>
                             <textarea class="form-control" id="comment" name="comment" rows="3" placeholder="Your comment..."></textarea>

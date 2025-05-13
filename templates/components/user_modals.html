@@ -517,4 +517,36 @@
             </form>
         </div>
     </div>
-</div> 
+</div>
+
+<script>
+    // Add script to toggle password visibility
+    document.addEventListener('DOMContentLoaded', function() {
+        // Password toggle for all password fields
+        document.querySelectorAll('.toggle-password').forEach(button => {
+            button.addEventListener('click', function() {
+                const targetId = this.getAttribute('data-target');
+                const passwordInput = document.getElementById(targetId);
+                
+                // Toggle password visibility
+                if (passwordInput.type === 'password') {
+                    passwordInput.type = 'text';
+                    this.innerHTML = '<i class="fas fa-eye-slash"></i>';
+                    this.setAttribute('title', 'Hide Password');
+                } else {
+                    passwordInput.type = 'password';
+                    this.innerHTML = '<i class="fas fa-eye"></i>';
+                    this.setAttribute('title', 'Show Password');
+                }
+            });
+        });
+        
+        // For generate password checkbox in reset password modal
+        const generatePwdCheckbox = document.getElementById('generatePassword');
+        if (generatePwdCheckbox) {
+            generatePwdCheckbox.addEventListener('change', function() {
+                document.getElementById('customPasswordField').style.display = this.checked ? 'none' : 'block';
+            });
+        }
+    });
+</script> 

@@ -258,23 +258,22 @@
                                     </td>
                                     <td class="align-middle">
                                         <div class="dropdown">
-                                            <button class="btn btn-link text-secondary mb-0" id="dropdownMenuButton" data-bs-toggle="dropdown" aria-expanded="false"
-                                                    aria-label="File options" title="File options">
-                                                <i class="fa fa-ellipsis-v"></i>
+                                            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" id="fileActions{{ loop.index }}" data-bs-toggle="dropdown" aria-expanded="false">
+                                                Actions
                                             </button>
-                                            <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton">
-                                                <li>
-                                                    <a class="dropdown-item" href="{{ url_for('download_file', filename=file.filename) }}">
-                                                        <i class="fa fa-download me-2"></i> Download
-                                                    </a>
-                                                </li>
-                                                {% if session['role'] == 'Administrator' or session['role'] == 'Registry' %}
-                                                <li>
-                                                    <a class="dropdown-item delete-file" href="#" data-filename="{{ file.filename }}">
-                                                        <i class="fa fa-trash me-2"></i> Delete
-                                                    </a>
-                                                </li>
-                                                {% endif %}
+                                            <ul class="dropdown-menu" aria-labelledby="fileActions{{ loop.index }}">
+                                                <li><a class="dropdown-item download-file" href="{{ url_for('download_file', file_id=file.id) if file.id is defined else '#' }}"
+                                                       {% if file.id is not defined %}onclick="showNotification('danger', 'Download feature is not available for this file'); return false;"{% endif %}
+                                                       ><i class="fas fa-download me-2"></i> Download</a></li>
+                                                <li><a class="dropdown-item delete-file" href="#" data-filename="{{ file.name }}"><i class="fas fa-trash-alt me-2"></i> Delete</a></li>
+                                                <li><hr class="dropdown-divider"></li>
+                                                <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#fileDetailsModal" 
+                                                       data-filename="{{ file.name }}" 
+                                                       data-size="{{ file.size }}" 
+                                                       data-created="{{ file.created }}" 
+                                                       data-type="{{ file.file_type }}">
+                                                    <i class="fas fa-info-circle me-2"></i> Properties
+                                                </a></li>
                                             </ul>
                                         </div>
                                     </td>
@@ -298,7 +297,7 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <form action="{{ url_for('file_upload') }}" method="POST" enctype="multipart/form-data" id="upload-form">
+                <form action="{{ url_for('file_upload_alt') }}" method="POST" enctype="multipart/form-data" id="upload-form">
                     <div class="upload-area" id="dropzone">
                         <i class="fa fa-cloud-upload-alt mb-3"></i>
                         <h5>Drag & Drop files here</h5>
@@ -340,6 +339,39 @@
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                 <button type="button" class="btn btn-danger" id="confirm-delete">Delete</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add File Details Modal -->
+<div class="modal fade" id="fileDetailsModal" tabindex="-1" role="dialog" aria-labelledby="fileDetailsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="fileDetailsModalLabel">File Properties</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row mb-3">
+                    <div class="col-4 text-end fw-bold">Filename:</div>
+                    <div class="col-8" id="detail-filename"></div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-4 text-end fw-bold">File Type:</div>
+                    <div class="col-8" id="detail-type"></div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-4 text-end fw-bold">Size:</div>
+                    <div class="col-8" id="detail-size"></div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-4 text-end fw-bold">Created:</div>
+                    <div class="col-8" id="detail-created"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
             </div>
         </div>
     </div>
@@ -455,6 +487,20 @@
                     showNotification('danger', response.message);
                 }
             });
+        });
+        
+        // File details modal
+        $('#fileDetailsModal').on('show.bs.modal', function (event) {
+            var button = $(event.relatedTarget);
+            var filename = button.data('filename');
+            var size = button.data('size');
+            var created = button.data('created');
+            var type = button.data('type');
+            
+            $('#detail-filename').text(filename);
+            $('#detail-size').text(size);
+            $('#detail-created').text(created);
+            $('#detail-type').text(type);
         });
         
         // Notification function

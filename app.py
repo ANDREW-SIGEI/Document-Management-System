@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
 from config import Config
 from datetime import datetime, timedelta
@@ -97,10 +97,12 @@ def login_required(f):
 def admin_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if not session.get('logged_in'):
+        if 'user_id' not in session or not session.get('logged_in'):
+            flash('Please log in to access this page', 'warning')
             return redirect(url_for('login'))
         
-        if session.get('role') != 'Administrator':
+        # Check for either 'Administrator' or 'Admin' roles
+        if session.get('role') not in ['Administrator', 'Admin']:
             flash('You do not have permission to access this page!', 'danger')
             return redirect(url_for('dashboard'))
         
@@ -366,9 +368,7 @@ with app.app_context():
 
 @app.route('/')
 def home():
-    """Home page route - redirects to dashboard if logged in"""
-    if 'user_id' in session:
-        return redirect(url_for('dashboard'))
+    """Home page route - always show the home page"""
     return render_template('index.html')
 
 @app.route('/index')
@@ -1143,12 +1143,50 @@ def report_data():
     
     return jsonify({'error': 'Invalid report type'})
 
-@app.route('/user-management')
+@app.route('/user-management', methods=['GET', 'POST'])
 @admin_required  
 def user_management():
     # Define available departments and roles for dropdowns
     departments = ['IT', 'HR', 'Finance', 'Operations', 'Executive', 'Research', 'Marketing']
     roles = ['Administrator', 'Manager', 'Supervisor', 'Staff', 'User']
+    
+    # Handle form submission
+    if request.method == 'POST':
+        # Get form data for add user form
+        username = request.form.get('username')
+        fullname = request.form.get('fullName')
+        email = request.form.get('email')
+        phone = request.form.get('phone', '')
+        department = request.form.get('department')
+        role = request.form.get('role')
+        password = request.form.get('password')
+        
+        # Basic validation
+        if not username or not fullname or not email or not password or not department or not role:
+            flash('All fields are required!', 'danger')
+            return redirect(url_for('user_management'))
+        
+        # Check if user already exists
+        if User.query.filter((User.email == email) | (User.username == username)).first():
+            flash('User with that email or username already exists!', 'danger')
+            return redirect(url_for('user_management'))
+        
+        # Create new user with hashed password
+        hashed_password = generate_password_hash(password)
+        new_user = User(
+            username=fullname,
+            email=email,
+            phone=phone,
+            department=department,
+            password=hashed_password,
+            role=role
+        )
+        
+        db.session.add(new_user)
+        db.session.commit()
+        
+        flash('User added successfully!', 'success')
+        return redirect(url_for('user_management'))
     
     # Get all users
     users = User.query.order_by(User.username).all()
@@ -1815,49 +1853,75 @@ def login():
         password = request.form.get('password')
         is_email = '@' in username_or_email
         
-        # Check for admin credentials first (for demo purposes)
-        if username_or_email == 'admin' and password == 'admin123':
+        print(f"Login attempt with username/email: {username_or_email}")
+        
+        # Direct admin login - hardcoded for simplicity
+        if (username_or_email == 'admin' and password == 'admin123') or \
+           (username_or_email == 'admin@example.com' and password == 'admin123'):
+            print("Admin credentials matched - direct login")
             session.permanent = True
             session['logged_in'] = True
             session['username'] = 'Admin User'
             session['user_id'] = 1
-            session['role'] = 'Administrator'  # Ensure this is 'role' to match how permissions.py checks it
+            session['role'] = 'Administrator'
             session['user_email'] = 'admin@example.com'
             flash('Welcome, Admin!', 'success')
             
             # Log login activity
             log_login_activity(1, 'admin@example.com', request.remote_addr)
             
-            return redirect(url_for('home'))
+            return redirect(url_for('dashboard'))
         
         # Check for normal user login
         if is_email:
             user = User.query.filter(User.email == username_or_email).first()
+            print(f"Searching for user by email: {username_or_email}")
         else:
             user = User.query.filter(User.username == username_or_email).first()
+            print(f"Searching for user by username: {username_or_email}")
         
-        if user and check_password_hash(user.password, password):
-            # Check if user is active
-            if not user.is_active:
-                flash('Your account has been deactivated. Please contact an administrator.', 'danger')
-                return render_template('login.html', current_year=datetime.now().year)
+        print(f"User found: {user}")
+        
+        if user:
+            print(f"Checking password hash for user: {user.username}")
+            
+            # Special case for admin user - direct comparison
+            if user.username == 'admin' and password == 'admin123':
+                session.permanent = True
+                session['logged_in'] = True
+                session['user_id'] = user.id
+                session['username'] = user.username
+                session['user_email'] = user.email
+                session['role'] = user.role
+                flash(f'Welcome, {user.username}!', 'success')
+                return redirect(url_for('dashboard'))
+            
+            # For other users, check password hash
+            password_matches = check_password_hash(user.password, password)
+            print(f"Password match: {password_matches}")
+            
+            if password_matches:
+                # Check if user is active
+                if not user.is_active:
+                    flash('Your account has been deactivated. Please contact an administrator.', 'danger')
+                    return render_template('login.html', current_year=datetime.now().year)
+                    
+                session.permanent = True
+                session['logged_in'] = True
+                session['user_id'] = user.id
+                session['username'] = user.username
+                session['user_email'] = user.email
+                session['role'] = user.role  # Ensure this is 'role' to match how permissions.py checks it
                 
-            session.permanent = True
-            session['logged_in'] = True
-            session['user_id'] = user.id
-            session['username'] = user.username
-            session['user_email'] = user.email
-            session['role'] = user.role  # Ensure this is 'role' to match how permissions.py checks it
-            
-            # Update last login time
-            user.last_login = datetime.now()
-            db.session.commit()
-            
-            # Log login activity
-            log_login_activity(user.id, user.email, request.remote_addr)
-            
-            flash(f'Welcome, {user.username}!', 'success')
-            return redirect(url_for('home'))
+                # Update last login time
+                user.last_login = datetime.now()
+                db.session.commit()
+                
+                # Log login activity
+                log_login_activity(user.id, user.email, request.remote_addr)
+                
+                flash(f'Welcome, {user.username}!', 'success')
+                return redirect(url_for('dashboard'))
         
         flash('Invalid username or password.', 'danger')
     
@@ -2457,5 +2521,539 @@ def send_user_credentials():
     
     return redirect(url_for('user_management'))
 
-if __name__ == '__main__':
-    app.run(debug=True) 
+def can_access_menu(menu_item):
+    """Check if the current user has permission to access a specific menu item."""
+    if not session.get('user_id'):
+        return False
+        
+    role = session.get('role')
+    if not role:
+        return False
+        
+    # Define menu access permissions for each role
+    menu_permissions = {
+        'Administrator': [
+            'dashboard', 'compose', 'track_document', 'incoming', 'outgoing',
+            'registry_approval', 'registry_workflow', 'reports',
+            'user_management', 'file_manager', 'database_management', 'maintenance'
+        ],
+        'Registry Officer': [
+            'dashboard', 'compose', 'track_document', 'incoming', 'outgoing',
+            'registry_approval', 'registry_workflow', 'reports'
+        ],
+        'User': [
+            'dashboard', 'compose', 'track_document', 'incoming', 'outgoing'
+        ]
+    }
+    
+    return menu_item in menu_permissions.get(role, [])
+
+# Make the function available in templates
+app.jinja_env.globals.update(can_access_menu=can_access_menu)
+
+@app.route('/registry_approval')
+def registry_approval():
+    """Registry approval route"""
+    return render_template('registry_approval.html')
+
+@app.route('/registry_workflow')
+def registry_workflow():
+    """Registry workflow route"""
+    # Get workflow documents for registry
+    documents = Document.query.filter_by(status='In Registry').all()
+    return render_template('registry_workflow.html', documents=documents)
+
+# Add this function near the top of the file, with other utility functions
+def allowed_file(filename):
+    """Check if file has an allowed extension"""
+    ALLOWED_EXTENSIONS = {'pdf', 'doc', 'docx', 'xls', 'xlsx', 'jpg', 'jpeg', 'png', 'txt'}
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+# Replace the file_manager route with improved permissions
+@app.route('/file_manager')
+@login_required
+def file_manager():
+    """File manager route - simplified for reliability"""
+    
+    # Check for Admin access
+    if session.get('role') not in ['Administrator', 'Admin']:
+        flash('You do not have permission to access this page!', 'danger')
+        return redirect(url_for('dashboard'))
+    
+    # Initialize variables
+    files = []
+    file_types = {}
+    total_size = 0
+    
+    try:
+        # Direct file system scan
+        print("Checking uploads directory...")
+        uploads_path = os.path.join(os.getcwd(), 'uploads')
+        print(f"Uploads path: {uploads_path}")
+        
+        if not os.path.exists(uploads_path):
+            os.makedirs(uploads_path)
+            print("Created uploads directory")
+        
+        # List all files in the uploads directory
+        for filename in os.listdir(uploads_path):
+            file_path = os.path.join(uploads_path, filename)
+            
+            if os.path.isfile(file_path):
+                print(f"Found file: {filename}")
+                
+                # Get file stats
+                file_stats = os.stat(file_path)
+                size = file_stats.st_size
+                total_size += size
+                
+                # Get file extension
+                file_ext = os.path.splitext(filename)[1][1:].lower() if '.' in filename else ''
+                
+                # Update file type counts
+                if file_ext in file_types:
+                    file_types[file_ext] += 1
+                else:
+                    file_types[file_ext] = 1
+                
+                # Format size string
+                if size < 1024:
+                    size_str = f"{size} bytes"
+                elif size < 1024 * 1024:
+                    size_str = f"{size / 1024:.1f} KB"
+                else:
+                    size_str = f"{size / (1024 * 1024):.1f} MB"
+                
+                # Determine icon based on file type
+                if file_ext == 'pdf':
+                    icon = 'fa-file-pdf'
+                elif file_ext in ['doc', 'docx']:
+                    icon = 'fa-file-word'
+                elif file_ext in ['xls', 'xlsx', 'csv']:
+                    icon = 'fa-file-excel'
+                elif file_ext in ['ppt', 'pptx']:
+                    icon = 'fa-file-powerpoint'
+                elif file_ext in ['jpg', 'jpeg', 'png', 'gif']:
+                    icon = 'fa-file-image'
+                else:
+                    icon = 'fa-file'
+                
+                # Extract original name
+                original_name = filename
+                
+                # Add to file list
+                files.append({
+                    'name': original_name,
+                    'filename': filename,
+                    'path': 'Uploads directory',
+                    'size': size_str,
+                    'file_type': file_ext.upper() if file_ext else 'UNKNOWN',
+                    'created': datetime.fromtimestamp(file_stats.st_ctime).strftime('%Y-%m-%d %H:%M'),
+                    'modified': datetime.fromtimestamp(file_stats.st_mtime).strftime('%Y-%m-%d %H:%M'),
+                    'icon': icon,
+                    'id': f"file_{len(files) + 1}"
+                })
+        
+        # Format total size
+        if total_size < 1024:
+            total_size_str = f"{total_size} bytes"
+        elif total_size < 1024 * 1024:
+            total_size_str = f"{total_size / 1024:.1f} KB"
+        else:
+            total_size_str = f"{total_size / (1024 * 1024):.1f} MB"
+            
+        # Debug output
+        print(f"Found {len(files)} files totaling {total_size_str}")
+        for i, file_data in enumerate(files):
+            print(f"File {i+1}: {file_data['name']}")
+            
+    except Exception as e:
+        print(f"Error in file_manager: {str(e)}")
+        files = []
+        total_size_str = "0 bytes"
+        file_types = {}
+    
+    # Prepare stats
+    stats = {
+        'total_files': len(files),
+        'total_size': total_size_str if 'total_size_str' in locals() else "0 bytes",
+        'file_types': file_types,
+        'allowed_extensions': 'pdf, doc, docx, xls, xlsx, txt, jpg, jpeg, png'
+    }
+    
+    return render_template('file_manager.html', files=files, stats=stats)
+
+# Improve the file_upload route
+@app.route('/file_upload', methods=['POST'])
+@login_required
+def file_upload():
+    """Handle file uploads for the file manager"""
+    
+    # Ensure upload directory exists
+    upload_dir = os.path.join(os.getcwd(), 'uploads')
+    try:
+        if not os.path.exists(upload_dir):
+            os.makedirs(upload_dir)
+            print(f"Created upload directory: {upload_dir}")
+        elif not os.path.isdir(upload_dir):
+            flash(f'Upload path exists but is not a directory: {upload_dir}', 'danger')
+            return redirect(url_for('file_manager'))
+    except Exception as e:
+        flash(f'Failed to create upload directory: {str(e)}', 'danger')
+        return redirect(url_for('file_manager'))
+    
+    # Check if the post request has the file part
+    if 'file' not in request.files:
+        flash('No file part in the request', 'danger')
+        return redirect(url_for('file_manager'))
+    
+    file = request.files['file']
+    
+    # If user does not select file, browser also submits an empty part without filename
+    if file.filename == '':
+        flash('No file selected for uploading', 'danger')
+        return redirect(url_for('file_manager'))
+    
+    try:
+        # Process the file
+        original_filename = file.filename
+        # Save directly with original filename (simpler approach)
+        file_path = os.path.join(upload_dir, original_filename)
+        
+        # Check for duplicate filename
+        if os.path.exists(file_path):
+            # Add timestamp to make unique
+            timestamp = datetime.utcnow().strftime('%Y%m%d%H%M%S')
+            base, ext = os.path.splitext(original_filename)
+            unique_filename = f"{base}_{timestamp}{ext}"
+            file_path = os.path.join(upload_dir, unique_filename)
+        else:
+            unique_filename = original_filename
+            
+        # Save the file
+        file.save(file_path)
+        print(f"File saved successfully to: {file_path}")
+        
+        flash(f'File {original_filename} uploaded successfully', 'success')
+    except Exception as e:
+        flash(f'Error uploading file: {str(e)}', 'danger')
+        print(f"Error saving file: {str(e)}")
+    
+    return redirect(url_for('file_manager'))
+
+# Add an alias route for file_upload with dash instead of underscore
+@app.route('/file-upload', methods=['POST'])
+@login_required
+def file_upload_alt():
+    """Alias for file_upload route"""
+    return file_upload()
+
+# Add download functionality
+@app.route('/download_file/<file_id>')
+@login_required
+def download_file(file_id):
+    """Download a file from the file manager using direct filesystem access"""
+    try:
+        # Extract file number from the ID
+        file_num = int(file_id.replace('file_', '')) if file_id.startswith('file_') else int(file_id)
+        
+        # Get list of files from uploads directory
+        uploads_dir = os.path.join(os.getcwd(), 'uploads')
+        if not os.path.exists(uploads_dir):
+            flash('Upload directory not found', 'danger')
+            return redirect(url_for('file_manager'))
+        
+        # List all files
+        files = []
+        for filename in os.listdir(uploads_dir):
+            file_path = os.path.join(uploads_dir, filename)
+            if os.path.isfile(file_path):
+                files.append(filename)
+        
+        # Sort files to ensure consistent order
+        files.sort()
+        
+        # Check if file index is valid
+        if file_num < 1 or file_num > len(files):
+            flash('Invalid file ID', 'danger')
+            return redirect(url_for('file_manager'))
+        
+        # Get the filename (1-indexed, so subtract 1)
+        filename = files[file_num - 1]
+        file_path = os.path.join(uploads_dir, filename)
+        
+        print(f"Downloading file: {filename} from {file_path}")
+        
+        # Return the file as an attachment
+        return send_from_directory(
+            uploads_dir,
+            filename,
+            as_attachment=True
+        )
+    except Exception as e:
+        flash(f'Error downloading file: {str(e)}', 'danger')
+        print(f"Download error: {str(e)}")
+        return redirect(url_for('file_manager'))
+
+# Improve delete_file route with better permissions
+@app.route('/delete_file', methods=['POST'])
+@login_required
+def delete_file():
+    """Delete a file from the file manager"""
+    # Check if user has permission
+    if 'role' in session and session['role'] != 'Administrator':
+        return jsonify({'success': False, 'message': 'You do not have permission to delete files'})
+    
+    # Get the filename from the request
+    data = request.get_json()
+    if not data or 'filename' not in data:
+        return jsonify({'success': False, 'message': 'No filename provided'})
+    
+    filename = data['filename']
+    
+    try:
+        # Find the attachment record
+        attachment = DocumentAttachment.query.filter_by(original_filename=filename).first()
+        
+        if attachment:
+            # Get the actual filename on disk
+            file_to_delete = attachment.filename
+            file_path = os.path.join(app.config['UPLOAD_FOLDER'], file_to_delete)
+            
+            # Delete the file from disk if it exists
+            if os.path.exists(file_path):
+                os.remove(file_path)
+            
+            # Delete the database record
+            db.session.delete(attachment)
+            
+            # Log the activity
+            current_user = User.query.get(session['user_id'])
+            log = SystemLog(
+                log_type='Warning',
+                user=current_user.username if current_user else 'Unknown',
+                action='File Deleted',
+                details=f'File "{filename}" was deleted'
+            )
+            db.session.add(log)
+            db.session.commit()
+            
+            return jsonify({'success': True, 'message': f'File {filename} deleted successfully'})
+        else:
+            # Try to find the file directly in the uploads folder
+            for file in os.listdir(app.config['UPLOAD_FOLDER']):
+                if os.path.isfile(os.path.join(app.config['UPLOAD_FOLDER'], file)):
+                    # Check if this is the original filename embedded in the stored filename
+                    parts = file.split('_', 1)
+                    if len(parts) > 1 and parts[1] == filename:
+                        file_path = os.path.join(app.config['UPLOAD_FOLDER'], file)
+                        os.remove(file_path)
+                        
+                        # Log the activity
+                        current_user = User.query.get(session['user_id'])
+                        log = SystemLog(
+                            log_type='Warning',
+                            user=current_user.username if current_user else 'Unknown',
+                            action='File Deleted',
+                            details=f'File "{filename}" was deleted (no database record found)'
+                        )
+                        db.session.add(log)
+                        db.session.commit()
+                        
+                        return jsonify({'success': True, 'message': f'File {filename} deleted successfully'})
+            
+            return jsonify({'success': False, 'message': f'File {filename} not found'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': f'Error deleting file: {str(e)}'})
+
+@app.route('/add_document_comment/<string:document_code>', methods=['POST'])
+def add_document_comment(document_code):
+    """Add a comment to a document"""
+    document = Document.query.filter_by(code=document_code).first_or_404()
+    
+    comment_text = request.form.get('comment')
+    if not comment_text:
+        flash('Comment cannot be empty', 'warning')
+        return redirect(url_for('document_details', doc_code=document_code))
+    
+    # In a real app, get the current user ID from session
+    user = User.query.first()  # Just get the first user for now
+    
+    # Create the comment
+    new_comment = DocumentComment(
+        document_id=document.id,
+        user_id=user.id,
+        comment=comment_text
+    )
+    
+    # Log the activity
+    new_log = SystemLog(
+        log_type='Info',
+        user=user.username,
+        action='Comment Added',
+        details=f'Comment added to document {document_code}'
+    )
+    
+    db.session.add(new_comment)
+    db.session.add(new_log)
+    db.session.commit()
+    
+    flash('Comment added successfully', 'success')
+    return redirect(url_for('document_details', doc_code=document_code))
+
+@app.route('/confirm_document_receipt/<string:document_code>/<int:transfer_id>', methods=['POST'])
+def confirm_document_receipt(document_code, transfer_id):
+    """Confirm receipt of a document"""
+    # This would update a transfer record to confirm receipt 
+    # For now just redirect back to document details
+    flash('Document receipt confirmed', 'success')
+    return redirect(url_for('document_details', doc_code=document_code))
+
+@app.route('/reassign_document/<string:document_code>', methods=['POST'])
+def reassign_document(document_code):
+    """Reassign/transfer a document to another person"""
+    document = Document.query.filter_by(code=document_code).first_or_404()
+    
+    # Get form data
+    new_holder = request.form.get('new_holder')
+    if not new_holder:
+        flash('New holder name is required', 'danger')
+        return redirect(url_for('document_details', doc_code=document_code))
+    
+    # Update document holder
+    document.current_holder = new_holder
+    db.session.commit()
+    
+    flash(f'Document {document_code} has been transferred to {new_holder}', 'success')
+    return redirect(url_for('document_details', doc_code=document_code))
+
+@app.route('/registry_decision/<string:tracking_code>', methods=['POST'])
+def registry_decision(tracking_code):
+    """Process registry decision (approve/reject)"""
+    # Get the document by tracking code
+    document = Document.query.filter_by(code=tracking_code).first_or_404()
+    
+    # Get form data
+    decision = request.form.get('decision')
+    comments = request.form.get('comments')
+    
+    if decision == 'approve':
+        # Update document status
+        document.status = 'Approved by Registry'
+        flash(f'Document {tracking_code} has been approved', 'success')
+    elif decision == 'reject':
+        # Update document status
+        document.status = 'Rejected by Registry'
+        flash(f'Document {tracking_code} has been rejected', 'warning')
+    else:
+        flash('Invalid decision', 'danger')
+        return redirect(url_for('registry_workflow'))
+    
+    # Add the comment if provided
+    if comments:
+        user = User.query.first()  # Just get the first user for now
+        new_comment = DocumentComment(
+            document_id=document.id,
+            user_id=user.id,
+            comment=f"Registry {decision}: {comments}"
+        )
+        db.session.add(new_comment)
+    
+    # Log the activity
+    new_log = SystemLog(
+        log_type='Info',
+        user='Admin',
+        action='Registry Decision',
+        details=f"Registry {decision} for document {tracking_code}"
+    )
+    db.session.add(new_log)
+    db.session.commit()
+    
+    return redirect(url_for('registry_workflow'))
+
+@app.route('/user_management_enhanced')
+def user_management_enhanced():
+    """Enhanced user management interface"""
+    users = User.query.all()
+    
+    # Use static lists if database models are empty
+    try:
+        roles = Role.query.all()
+        if not roles:
+            # Fallback to static list if no roles in database
+            roles = [
+                {'id': 1, 'name': 'Administrator'},
+                {'id': 2, 'name': 'Registry Officer'},
+                {'id': 3, 'name': 'User'}
+            ]
+    except Exception as e:
+        print(f"Error getting roles: {str(e)}")
+        # Fallback to static list
+        roles = [
+            {'id': 1, 'name': 'Administrator'},
+            {'id': 2, 'name': 'Registry Officer'},
+            {'id': 3, 'name': 'User'}
+        ]
+    
+    try:
+        departments = Department.query.all()
+        if not departments:
+            # Fallback to static list if no departments in database
+            departments = [
+                {'id': 1, 'name': 'IT Department'},
+                {'id': 2, 'name': 'HR'},
+                {'id': 3, 'name': 'Finance'},
+                {'id': 4, 'name': 'Operations'},
+                {'id': 5, 'name': 'Research'}
+            ]
+    except Exception as e:
+        print(f"Error getting departments: {str(e)}")
+        # Fallback to static list
+        departments = [
+            {'id': 1, 'name': 'IT Department'},
+            {'id': 2, 'name': 'HR'},
+            {'id': 3, 'name': 'Finance'},
+            {'id': 4, 'name': 'Operations'},
+            {'id': 5, 'name': 'Research'}
+        ]
+    
+    return render_template('user_management_enhanced.html', users=users, roles=roles, departments=departments)
+
+# Role Model
+class Role(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(80), nullable=False)
+    description = db.Column(db.String(255))
+    
+    def __repr__(self):
+        return f'<Role {self.name}>'
+
+# Department Model
+class Department(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    description = db.Column(db.String(255))
+    
+    def __repr__(self):
+        return f'<Department {self.name}>'
+
+@app.route('/view_user/<int:user_id>')
+def view_user(user_id):
+    """View user profile details"""
+    user = User.query.get_or_404(user_id)
+    login_activities = LoginActivity.query.filter_by(user_id=user.id).order_by(LoginActivity.login_date.desc()).limit(5).all()
+    return render_template('view_user.html', user=user, login_activities=login_activities)
+
+@app.route('/debug-session')
+def debug_session():
+    """A debug endpoint to show the current session data"""
+    session_data = {
+        'user_id': session.get('user_id'),
+        'username': session.get('username'),
+        'role': session.get('role'),
+        'logged_in': session.get('logged_in'),
+        'user_email': session.get('user_email')
+    }
+    return jsonify(session_data)
+
