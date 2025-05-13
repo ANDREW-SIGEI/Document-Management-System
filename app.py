@@ -17,7 +17,7 @@ app.config.from_object(Config)
 app.secret_key = 'kemri_secret_key'  # Required for flash messages
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///app.db'  # Direct path to the database we created
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['UPLOAD_FOLDER'] = 'uploads'
+app.config['UPLOAD_FOLDER'] = os.path.join(os.getcwd(), 'uploads')
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50 MB max upload
 app.permanent_session_lifetime = timedelta(days=5)
 

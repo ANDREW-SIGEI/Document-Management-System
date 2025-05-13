@@ -80,4 +80,9 @@ Thumbs.db
 
 # Project specific
 document_tracking.json
-uploads/ 
+uploads/*
+!uploads/.gitkeep
+
+# Backup files
+*.bak
+*.bak* 

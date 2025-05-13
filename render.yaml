@@ -1,13 +1,13 @@
 services:
   - type: web
-    name: kemri-lab-system
+    name: kemri-document-management
     env: python
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn debug_app:app
+    startCommand: gunicorn app:app
     envVars:
-      - key: SECRET_KEY
-        generateValue: true
-      - key: WEB_CONCURRENCY
-        value: 2
       - key: PYTHON_VERSION
-        value: 3.9.16 
+        value: 3.9.2
+      - key: FLASK_APP
+        value: app.py
+      - key: FLASK_DEBUG
+        value: 0 
